@@ -51,6 +51,21 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Mascot celebration */}
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: [0, 1.15, 1] }}
+              transition={{ delay: 0.05, duration: 0.5 }}
+              className="mb-2 flex justify-center"
+            >
+              <img
+                src="/mascot/mascot_std_3.png"
+                alt=""
+                aria-hidden="true"
+                style={{ height: '96px', width: 'auto' }}
+              />
+            </motion.div>
+
             {/* Confetti burst */}
             <motion.div
               initial={{ scale: 0 }}

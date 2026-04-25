@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
 @import "tailwindcss";
 
 /* ============================================================================
@@ -5,7 +6,7 @@
    ============================================================================ */
 
 :root {
-  /* Word class colours */
+  /* Word class colours — DO NOT CHANGE THESE */
   --color-determiner:  #7C3AED;
   --color-adjective:   #16A34A;
   --color-noun:        #2563EB;
@@ -15,19 +16,30 @@
   --color-pronoun:     #DB2777;
   --color-conjunction: #CA8A04;
 
-  /* Brand */
-  --color-brand-primary:   #2563EB;
-  --color-brand-secondary: #7C3AED;
-  --color-brand-accent:    #F59E0B;
+  /* Brand — updated to match approved graphics */
+  --color-brand-primary:    #F5841F;  /* warm orange — CTAs, primary buttons */
+  --color-brand-secondary:  #4A9BD4;  /* friendly blue — headers, nav */
+  --color-brand-accent:     #F7C948;  /* warm yellow — stars, highlights */
+  --color-brand-success:    #6BC46D;  /* green — completed, positive */
+  --color-brand-dark:       #1A3A5C;  /* dark navy — headings */
 
-  /* Neutrals */
-  --color-surface:    #FFFFFF;
-  --color-background: #F8FAFC;
-  --color-border:     #E2E8F0;
-  --color-text:       #1E293B;
-  --color-text-muted: #64748B;
+  /* Surfaces */
+  --color-background:  #D4EBF8;  /* sky blue page background */
+  --color-surface:     #FFFFFF;  /* white cards */
+  --color-surface-alt: #EBF5FF;  /* slightly tinted surface for nested panels */
+  --color-border:      #B8D9F0;  /* light blue border */
 
-  font-family: Inter, system-ui, sans-serif;
+  /* Text */
+  --color-text:        #1A3A5C;  /* dark navy */
+  --color-text-muted:  #5A7A9C;  /* medium blue-grey */
+  --color-text-light:  #FFFFFF;  /* white text on coloured backgrounds */
+
+  /* XP / Gamification */
+  --color-xp-gold:   #F7C948;
+  --color-xp-silver: #94A3B8;
+  --color-xp-bronze: #92400E;
+
+  font-family: 'Nunito', 'Quicksand', system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -138,6 +150,46 @@ p {
   --color-text-muted: #cccccc;
   --color-border: #ffffff;
   --color-brand-primary: #4d9fff;
+}
+
+/* ============================================================================
+   WriFe UI Utility Classes
+   ============================================================================ */
+
+/* WriFe primary button style */
+.btn-primary {
+  background-color: var(--color-brand-primary);
+  color: var(--color-text-light);
+  border: none;
+  border-radius: 12px;
+  padding: 10px 24px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn-primary:hover { opacity: 0.92; transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* WriFe card style */
+.wf-card {
+  background-color: var(--color-surface);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(26, 58, 92, 0.08);
+  border: 1px solid var(--color-border);
+}
+
+/* WriFe page header */
+.wf-page-header {
+  background-color: var(--color-brand-secondary);
+  color: var(--color-text-light);
+  border-radius: 16px;
+  padding: 16px 20px;
+  font-weight: 800;
+  font-size: 20px;
 }
 
 /* ============================================================================

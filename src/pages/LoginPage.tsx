@@ -186,7 +186,7 @@ export default function LoginPage() {
 
         <h1
           className="text-5xl font-bold tracking-tight mb-2"
-          style={{ color: 'var(--color-brand-primary)' }}
+          style={{ color: 'var(--color-brand-dark)' }}
           data-tts="WriFe"
         >
           WriFe
@@ -222,10 +222,10 @@ export default function LoginPage() {
             }}
             className="px-6 py-2 rounded-lg text-sm font-semibold transition-all duration-200 capitalize min-w-[110px]"
             style={{
-              backgroundColor: loginMode === mode ? 'var(--color-surface)' : 'transparent',
+              backgroundColor: loginMode === mode ? 'var(--color-brand-secondary)' : 'transparent',
               color:
-                loginMode === mode ? 'var(--color-brand-primary)' : 'var(--color-text-muted)',
-              boxShadow: loginMode === mode ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                loginMode === mode ? 'var(--color-text-light)' : 'var(--color-text-muted)',
+              boxShadow: loginMode === mode ? '0 1px 3px rgba(0,0,0,0.15)' : 'none',
             }}
             data-testid={`tab-${mode}`}
             data-tts={`${mode} login`}
@@ -235,16 +235,30 @@ export default function LoginPage() {
         ))}
       </motion.div>
 
+      {/* Login card + mascot wrapper */}
+      <div className="w-full max-w-md flex items-end gap-4">
+        {/* Mascot beside the card */}
+        <div className="hidden sm:flex flex-col items-center justify-end pb-4 flex-shrink-0">
+          <img
+            src="/mascot/mascot_std_1.png"
+            alt=""
+            aria-hidden="true"
+            style={{ height: '120px', width: 'auto' }}
+          />
+        </div>
+
       {/* Login card */}
       <motion.div
         key={loginMode}
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.25 }}
-        className="w-full max-w-md rounded-2xl p-8 shadow-lg"
+        className="flex-1 rounded-2xl p-8 shadow-lg"
         style={{
           backgroundColor: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
+          borderRadius: '16px',
+          boxShadow: '0 4px 16px rgba(26, 58, 92, 0.12)',
         }}
         data-testid="login-card"
       >
@@ -552,6 +566,7 @@ export default function LoginPage() {
           </>
         )}
       </motion.div>
+      </div>{/* end login card + mascot wrapper */}
 
       {/* Footer */}
       <motion.p

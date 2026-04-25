@@ -431,6 +431,13 @@ export default function DashboardPage() {
           </span>
         </div>
 
+        <img
+          src="/mascot/mascot_std_1.png"
+          alt=""
+          aria-hidden="true"
+          style={{ height: '88px', width: 'auto', display: 'block' }}
+        />
+
           <button
             onClick={() => setSettingsOpen(true)}
             className="text-sm px-2 py-1.5 rounded-lg transition-colors"

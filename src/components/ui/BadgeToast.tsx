@@ -64,6 +64,14 @@ export const BadgeToast: React.FC<BadgeToastProps> = ({ badge, onDismiss }) => {
               border: `2px solid ${rarity.border}`,
             }}
           >
+            {/* Mascot celebration */}
+            <img
+              src="/mascot/mascot_std_3.png"
+              alt=""
+              aria-hidden="true"
+              style={{ height: '80px', width: 'auto', flexShrink: 0 }}
+            />
+
             {/* Badge icon */}
             <div
               className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 text-2xl"
