@@ -21,6 +21,11 @@ export const RoleRedirect = () => {
     return <Navigate to="/login" replace />
   }
 
+  // Auth user exists but no profile row yet → new teacher who just confirmed email
+  if (!profile) {
+    return <Navigate to="/onboarding" replace />
+  }
+
   switch (role) {
     case Role.PUPIL:
       return <Navigate to="/dashboard" replace />

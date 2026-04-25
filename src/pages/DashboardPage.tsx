@@ -295,7 +295,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const navigate = useNavigate()
   const { user, profile } = useAuthStore()
   const queryClient = useQueryClient()
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -342,7 +341,8 @@ export default function DashboardPage() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
-    navigate('/login', { replace: true })
+    useAuthStore.getState().clearAuth()
+    window.location.href = '/login'
   }
 
   const level = progress?.current_formula_level ?? 1
@@ -442,6 +442,7 @@ export default function DashboardPage() {
             ⚙
           </button>
         <button
+          type="button"
           onClick={handleSignOut}
           className="text-sm px-3 py-1.5 rounded-lg transition-colors"
           style={{

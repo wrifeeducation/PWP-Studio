@@ -21,7 +21,7 @@ interface SchoolFormData {
 
 export default function OnboardingPage() {
   const navigate = useNavigate()
-  const { profile, setProfile } = useAuthStore()
+  const { user, profile, setProfile } = useAuthStore()
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,7 +45,9 @@ export default function OnboardingPage() {
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!firstName.trim() || !profile) return
+    // Use profile.id if available, otherwise fall back to the auth user id
+    const profileId = profile?.id ?? user?.id
+    if (!firstName.trim() || !profileId) return
     setSaving(true)
     setError(null)
 
@@ -63,11 +65,14 @@ export default function OnboardingPage() {
 
       if (schoolErr) throw schoolErr
 
-      // Update profile
+      // Upsert profile — insert if no row exists yet (new teacher sign-up),
+      // or update if the row already exists. Always sets role to 'teacher'.
       const { data: updatedProfile, error: profileErr } = await supabase
         .from('profiles')
-        .update({ school_id: school.id, first_name: firstName })
-        .eq('id', profile.id)
+        .upsert(
+          { id: profileId, school_id: school.id, first_name: firstName, role: 'teacher' },
+          { onConflict: 'id' }
+        )
         .select()
         .single()
 
