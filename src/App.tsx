@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 
 // Auth initialisation
 import { supabase } from './lib/supabase'
@@ -10,18 +10,26 @@ import type { Profile } from './types/index'
 // Route guards
 import { ProtectedRoute } from './components/ui/ProtectedRoute'
 import { RoleRedirect } from './components/ui/RoleRedirect'
+import { LoadingSpinner } from './components/ui/LoadingSpinner'
 
-// Pages
+// High contrast: apply on load from stored preference
+import { applyHighContrastPreference } from './lib/contrastMode'
+import { useSettingsStore } from './stores/settingsStore'
+
+// Static pages (small, load eagerly)
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import FormulaPage from './pages/FormulaPage'
 import ParagraphPage from './pages/ParagraphPage'
-import TeacherPage from './pages/TeacherPage'
-import TeacherReviewPage from './pages/TeacherReviewPage'
-import WritingStudioPage from './pages/WritingStudioPage'
-import AdminPage from './pages/AdminPage'
-import ParentPage from './pages/ParentPage'
-import PortfolioPage from './pages/PortfolioPage'
+
+// WF-040: Heavy pages — lazy loaded to reduce initial bundle
+const WritingStudioPage = lazy(() => import('./pages/WritingStudioPage'))
+const TeacherPage = lazy(() => import('./pages/TeacherPage'))
+const TeacherReviewPage = lazy(() => import('./pages/TeacherReviewPage'))
+const AdminPage = lazy(() => import('./pages/AdminPage'))
+const ParentPage = lazy(() => import('./pages/ParentPage'))
+const PortfolioPage = lazy(() => import('./pages/PortfolioPage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 
 // Role constants
 import { Role } from './types/index'
@@ -87,113 +95,143 @@ function AuthInitialiser() {
   return null
 }
 
+/** SettingsInitialiser — applies persisted preferences on startup. */
+function SettingsInitialiser() {
+  const { highContrast, fontSize } = useSettingsStore()
+
+  useEffect(() => {
+    applyHighContrastPreference(highContrast)
+    if (fontSize === 'large') {
+      document.documentElement.classList.add('font-large')
+    } else {
+      document.documentElement.classList.remove('font-large')
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return null
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         {/* Auth initialiser runs once at root — no render output */}
         <AuthInitialiser />
+        {/* WF-038: Apply settings preferences on startup */}
+        <SettingsInitialiser />
 
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<LoginPage />} />
+        <Suspense fallback={<LoadingSpinner label="Loading page…" />}>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<LoginPage />} />
 
-          {/* WF-002: Role-based redirect from root */}
-          <Route path="/" element={<RoleRedirect />} />
+            {/* WF-002: Role-based redirect from root */}
+            <Route path="/" element={<RoleRedirect />} />
 
-          {/* WF-003: Pupil dashboard — pupils only */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                <DashboardPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* WF-003: Pupil dashboard — pupils only */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* WF-006: Formula Practice — pupils only */}
-          <Route
-            path="/practice"
-            element={
-              <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                <FormulaPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* WF-006: Formula Practice — pupils only */}
+            <Route
+              path="/practice"
+              element={
+                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
+                  <FormulaPage />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* WF-011: Paragraph Builder — pupils only, from L8 */}
-          <Route
-            path="/paragraph"
-            element={
-              <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                <ParagraphPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* WF-011: Paragraph Builder — pupils only, from L8 */}
+            <Route
+              path="/paragraph"
+              element={
+                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
+                  <ParagraphPage />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* WF-016: Writing Studio — pupils only, requires studio_unlocked */}
-          <Route
-            path="/studio"
-            element={
-              <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                <WritingStudioPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* WF-016: Writing Studio — pupils only, requires studio_unlocked */}
+            <Route
+              path="/studio"
+              element={
+                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
+                  <WritingStudioPage />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Teacher dashboard — teachers only */}
-          <Route
-            path="/teacher"
-            element={
-              <ProtectedRoute allowedRoles={[Role.TEACHER]}>
-                <TeacherPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Teacher dashboard — teachers only */}
+            <Route
+              path="/teacher"
+              element={
+                <ProtectedRoute allowedRoles={[Role.TEACHER]}>
+                  <TeacherPage />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* WF-019: Teacher review of individual writing piece */}
-          <Route
-            path="/teacher/review/:pieceId"
-            element={
-              <ProtectedRoute allowedRoles={[Role.TEACHER]}>
-                <TeacherReviewPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* WF-019: Teacher review of individual writing piece */}
+            <Route
+              path="/teacher/review/:pieceId"
+              element={
+                <ProtectedRoute allowedRoles={[Role.TEACHER]}>
+                  <TeacherReviewPage />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* School admin panel — admins only */}
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute allowedRoles={[Role.SCHOOL_ADMIN]}>
-                <AdminPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* School admin panel — admins only */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute allowedRoles={[Role.SCHOOL_ADMIN]}>
+                  <AdminPage />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* WF-024: Parent read-only view — parents only */}
-          <Route
-            path="/parent"
-            element={
-              <ProtectedRoute allowedRoles={[Role.PARENT]}>
-                <ParentPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* WF-024: Parent read-only view — parents only */}
+            <Route
+              path="/parent"
+              element={
+                <ProtectedRoute allowedRoles={[Role.PARENT]}>
+                  <ParentPage />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* WF-029: Pupil portfolio — pupils only */}
-          <Route
-            path="/portfolio"
-            element={
-              <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                <PortfolioPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* WF-029: Pupil portfolio — pupils only */}
+            <Route
+              path="/portfolio"
+              element={
+                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
+                  <PortfolioPage />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Catch-all: redirect to role-based home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            {/* WF-037: Pupil settings page */}
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
+                  <SettingsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Catch-all: redirect to role-based home */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </QueryClientProvider>
   )

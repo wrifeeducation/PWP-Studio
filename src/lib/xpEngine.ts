@@ -90,6 +90,21 @@ export const calcWritingXP = (overallBand: number): number => {
   return xp
 }
 
+// ─── Double XP (WF-035) ───────────────────────────────────────────────────────
+
+/**
+ * Doubles XP if current time is before doubleXpUntil timestamp.
+ * @param baseXP - The base XP amount to potentially double
+ * @param doubleXpUntil - ISO timestamp string, or null if no active double XP
+ */
+export const applyDoubleXP = (baseXP: number, doubleXpUntil: string | null): number => {
+  if (!doubleXpUntil) return baseXP
+  const until = new Date(doubleXpUntil)
+  const now = new Date()
+  if (now < until) return baseXP * 2
+  return baseXP
+}
+
 /**
  * Returns true if the streak should break (missed a school day, no shield).
  */

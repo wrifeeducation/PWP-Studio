@@ -245,6 +245,8 @@ export interface PupilProgress extends WithTimestamps {
   streak_shield_active: boolean;
   last_session_date: Nullable<string>; // Date ISO format
   total_xp: number;
+  /** WF-035: Set when pupil buys Double XP Day from the XP Shop */
+  double_xp_until: Nullable<string>; // ISO timestamp
 }
 
 export interface PupilBadge extends WithTimestamps {
@@ -387,6 +389,8 @@ export interface InterventionLog extends WithTimestamps {
   };
   action_taken: string;
   consolidation_pack_generated: boolean;
+  /** WF-032: Set when mastery_tracking.consolidation_required = true triggered this intervention */
+  consolidation_required: boolean;
   resolved_at: Nullable<string>;
 }
 

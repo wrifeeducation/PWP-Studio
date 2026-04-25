@@ -8,6 +8,10 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { classifyTransferGap, transferGapLabel, transferGapColour } from '../lib/transferGap'
+import { ConsolidationPackCard } from '../components/teacher/ConsolidationPackCard'
+import { WordBankEditor } from '../components/teacher/WordBankEditor'
+import { generateConsolidationPack } from '../lib/consolidationPack'
+import type { ConsolidationPackData } from '../lib/consolidationPack'
 import type { PendingWritingReview, PupilTransferRate, InterventionLog, InterventionTrigger } from '../types/index'
 import { Genre } from '../types/index'
 
@@ -33,13 +37,14 @@ interface WritingTask {
   prompt_text: string
 }
 
-type TabId = 'pending' | 'progress' | 'assign' | 'interventions'
+type TabId = 'pending' | 'progress' | 'assign' | 'interventions' | 'wordbanks'
 
 const TAB_LABELS: Record<TabId, string> = {
   pending: 'Pending Review',
   progress: 'Class Progress',
   assign: 'Assign Task',
   interventions: 'Interventions',
+  wordbanks: 'Word Banks',
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -139,6 +144,7 @@ export default function TeacherPage() {
         {activeTab === 'interventions' && (
           <InterventionLogTab onResolve={() => setUnresolvedCount((c) => Math.max(0, c - 1))} />
         )}
+        {activeTab === 'wordbanks' && <WordBankEditor />}
       </main>
     </div>
   )
@@ -542,6 +548,7 @@ function InterventionLogTab({ onResolve }: { onResolve: () => void }) {
   const [rows, setRows] = useState<InterventionRow[]>([])
   const [loading, setLoading] = useState(true)
   const [resolving, setResolving] = useState<string | null>(null)
+  const [consolidationPacks, setConsolidationPacks] = useState<Record<string, ConsolidationPackData>>({})
 
   const TRIGGER_LABELS: Record<InterventionTrigger, string> = {
     formula: 'Formula',
@@ -554,14 +561,37 @@ function InterventionLogTab({ onResolve }: { onResolve: () => void }) {
       .from('intervention_log')
       .select('*, profiles(first_name)')
       .order('trigger_date', { ascending: false })
-      .then(({ data }) => {
-        setRows(
-          (data ?? []).map((r: Record<string, unknown>) => ({
-            ...(r as unknown as InterventionLog),
-            pupil_name: (r.profiles as { first_name: string } | null)?.first_name ?? 'Unknown',
-          }))
-        )
+      .then(async ({ data }) => {
+        const mapped: InterventionRow[] = (data ?? []).map((r: Record<string, unknown>) => ({
+          ...(r as unknown as InterventionLog),
+          consolidation_required: Boolean((r as Record<string, unknown>).consolidation_required),
+          consolidation_pack_generated: Boolean((r as Record<string, unknown>).consolidation_pack_generated),
+          pupil_name: (r.profiles as { first_name: string } | null)?.first_name ?? 'Unknown',
+        }))
+        setRows(mapped)
         setLoading(false)
+
+        // Generate consolidation packs for rows that need it
+        const needsPack = mapped.filter(
+          (r) => r.consolidation_required && !r.consolidation_pack_generated && !r.resolved_at
+        )
+        const packs: Record<string, ConsolidationPackData> = {}
+        await Promise.all(
+          needsPack.map(async (row) => {
+            try {
+              const pack = await generateConsolidationPack(
+                row.pupil_id,
+                // level_id not directly on row — use a heuristic from error_pattern
+                1,
+                row.error_pattern?.category ?? 'noun'
+              )
+              packs[row.id] = pack
+            } catch {
+              // ignore individual pack generation failures
+            }
+          })
+        )
+        setConsolidationPacks(packs)
       })
   }, [])
 
@@ -618,58 +648,74 @@ function InterventionLogTab({ onResolve }: { onResolve: () => void }) {
               {unresolved.map((row) => {
                 const isOld = new Date(row.trigger_date) < sevenDaysAgo
                 return (
-                  <div
-                    key={row.id}
-                    className="rounded-xl p-4 flex items-start gap-4"
-                    style={{
-                      backgroundColor: isOld ? '#FEF2F2' : 'var(--color-surface)',
-                      border: `1px solid ${isOld ? '#FECACA' : 'var(--color-border)'}`,
-                    }}
-                    data-testid={`intervention-row-${row.id}`}
-                  >
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-sm" style={{ color: isOld ? '#DC2626' : 'var(--color-text)' }}>
-                          {row.pupil_name}
-                        </span>
-                        <span
-                          className="text-xs px-2 py-0.5 rounded-full"
-                          style={{ backgroundColor: '#EFF6FF', color: '#1D4ED8' }}
-                        >
-                          {TRIGGER_LABELS[row.trigger_layer]}
-                        </span>
-                        {isOld && (
-                          <span
-                            className="text-xs px-2 py-0.5 rounded-full font-medium"
-                            style={{ backgroundColor: '#FEE2E2', color: '#DC2626' }}
-                          >
-                            Overdue
+                  <div key={row.id} className="space-y-2">
+                    <div
+                      className="rounded-xl p-4 flex items-start gap-4"
+                      style={{
+                        backgroundColor: isOld ? '#FEF2F2' : 'var(--color-surface)',
+                        border: `1px solid ${isOld ? '#FECACA' : 'var(--color-border)'}`,
+                      }}
+                      data-testid={`intervention-row-${row.id}`}
+                    >
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm" style={{ color: isOld ? '#DC2626' : 'var(--color-text)' }}>
+                            {row.pupil_name}
                           </span>
+                          <span
+                            className="text-xs px-2 py-0.5 rounded-full"
+                            style={{ backgroundColor: '#EFF6FF', color: '#1D4ED8' }}
+                          >
+                            {TRIGGER_LABELS[row.trigger_layer]}
+                          </span>
+                          {isOld && (
+                            <span
+                              className="text-xs px-2 py-0.5 rounded-full font-medium"
+                              style={{ backgroundColor: '#FEE2E2', color: '#DC2626' }}
+                            >
+                              Overdue
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                          {new Date(row.trigger_date).toLocaleDateString('en-GB')} &middot;{' '}
+                          {row.error_pattern?.category ?? '—'}
+                          {row.error_pattern?.frequency != null
+                            ? ` (${Math.round(row.error_pattern.frequency * 100)}% frequency)`
+                            : ''}
+                        </p>
+                        {row.action_taken && (
+                          <p className="text-xs" style={{ color: 'var(--color-text)' }}>
+                            Action: {row.action_taken}
+                          </p>
                         )}
                       </div>
-                      <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                        {new Date(row.trigger_date).toLocaleDateString('en-GB')} &middot;{' '}
-                        {row.error_pattern?.category ?? '—'}
-                        {row.error_pattern?.frequency != null
-                          ? ` (${Math.round(row.error_pattern.frequency * 100)}% frequency)`
-                          : ''}
-                      </p>
-                      {row.action_taken && (
-                        <p className="text-xs" style={{ color: 'var(--color-text)' }}>
-                          Action: {row.action_taken}
-                        </p>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleResolve(row.id)}
+                        disabled={resolving === row.id}
+                        data-testid={`resolve-intervention-${row.id}`}
+                        className="text-xs px-3 py-1.5 rounded-lg font-medium whitespace-nowrap flex-shrink-0"
+                        style={{ backgroundColor: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0' }}
+                      >
+                        {resolving === row.id ? 'Resolving…' : 'Mark Resolved'}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleResolve(row.id)}
-                      disabled={resolving === row.id}
-                      data-testid={`resolve-intervention-${row.id}`}
-                      className="text-xs px-3 py-1.5 rounded-lg font-medium whitespace-nowrap flex-shrink-0"
-                      style={{ backgroundColor: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0' }}
-                    >
-                      {resolving === row.id ? 'Resolving…' : 'Mark Resolved'}
-                    </button>
+                    {/* WF-032: Show consolidation pack if available */}
+                    {row.consolidation_required && consolidationPacks[row.id] && (
+                      <ConsolidationPackCard
+                        interventionId={row.id}
+                        pupilName={row.pupil_name}
+                        pack={consolidationPacks[row.id]}
+                        onMarkedSent={() => {
+                          setRows((prev) =>
+                            prev.map((r) =>
+                              r.id === row.id ? { ...r, consolidation_pack_generated: true } : r
+                            )
+                          )
+                        }}
+                      />
+                    )}
                   </div>
                 )
               })}

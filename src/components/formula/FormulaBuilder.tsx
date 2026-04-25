@@ -19,6 +19,7 @@ import { Phase, WordClass } from '../../types/index'
 import { useFormulaStore } from '../../stores/formulaStore'
 import { WordClassTile } from './WordClassTile'
 import { FormulaSlot } from './FormulaSlot'
+import { TTSButton } from '../ui/TTSButton'
 
 interface FormulaBuilderProps {
   level: FormulaLevel
@@ -206,12 +207,15 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
           aria-live="polite"
           aria-label="Sentence preview"
         >
-          <p
-            className="text-xs uppercase tracking-wider font-semibold mb-2"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            Your sentence
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p
+              className="text-xs uppercase tracking-wider font-semibold"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
+              Your sentence
+            </p>
+            <TTSButton text={buildSentence()} />
+          </div>
           <p
             className="text-base font-mono font-medium"
             style={{ color: allFilled ? 'var(--color-text)' : 'var(--color-text-muted)' }}

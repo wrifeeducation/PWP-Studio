@@ -7,12 +7,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, useSpring, useTransform, useMotionValue } from 'framer-motion'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { FormulaLevelBadge } from '../components/dashboard/FormulaLevelBadge'
 import { StreakCounter } from '../components/dashboard/StreakCounter'
 import { NavCard } from '../components/dashboard/NavCard'
+import { XPShop } from '../components/dashboard/XPShop'
+import { TTSButton } from '../components/ui/TTSButton'
+import { useSettingsStore } from '../stores/settingsStore'
 import type { PupilProgress, PupilBadge, Badge } from '../types/index'
 
 const PARAGRAPH_UNLOCK_LEVEL = 8
@@ -186,11 +189,115 @@ const LevelProgressBar: React.FC<LevelProgressBarProps> = ({
   )
 }
 
+// ─── Settings Modal (WF-031) ──────────────────────────────────────────────────
+
+interface SettingsModalProps {
+  onClose: () => void
+}
+
+const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
+  const navigate = useNavigate()
+  const { ttsEnabled, ttsRate, setTtsEnabled, setTtsRate } = useSettingsStore()
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
+      onClick={onClose}
+      data-testid="settings-modal-overlay"
+    >
+      <div
+        className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl p-6 space-y-5"
+        style={{ backgroundColor: 'var(--color-surface)' }}
+        onClick={(e) => e.stopPropagation()}
+        data-testid="settings-modal"
+      >
+        <div className="flex items-center justify-between">
+          <h2
+            className="font-bold text-base"
+            style={{ color: 'var(--color-text)' }}
+            data-tts="Settings"
+          >
+            Settings
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close settings"
+            className="text-lg px-2"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* TTS toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+              Read Aloud (TTS)
+            </p>
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>UK English voice</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={ttsEnabled}
+            onClick={() => setTtsEnabled(!ttsEnabled)}
+            data-testid="modal-tts-toggle"
+            className="relative w-11 h-6 rounded-full transition-colors"
+            style={{ backgroundColor: ttsEnabled ? 'var(--color-brand-primary)' : 'var(--color-border)' }}
+          >
+            <span
+              className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform"
+              style={{ transform: ttsEnabled ? 'translateX(20px)' : 'translateX(0)' }}
+            />
+          </button>
+        </div>
+
+        {/* Rate slider */}
+        {ttsEnabled && (
+          <div>
+            <label className="text-xs font-medium flex justify-between" style={{ color: 'var(--color-text-muted)' }}>
+              <span>Reading speed</span>
+              <span>{ttsRate.toFixed(2)}×</span>
+            </label>
+            <input
+              type="range"
+              min={0.5}
+              max={1.5}
+              step={0.05}
+              value={ttsRate}
+              onChange={(e) => setTtsRate(Number(e.target.value))}
+              data-testid="modal-tts-rate"
+              className="w-full mt-2 accent-blue-600"
+            />
+          </div>
+        )}
+
+        {/* Full settings link */}
+        <button
+          type="button"
+          onClick={() => { onClose(); navigate('/settings') }}
+          className="w-full text-sm px-4 py-2.5 rounded-lg font-medium"
+          style={{ border: '1px solid var(--color-border)', color: 'var(--color-brand-primary)' }}
+          data-testid="open-full-settings"
+        >
+          All Settings →
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { user, profile } = useAuthStore()
+  const queryClient = useQueryClient()
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [shopOpen, setShopOpen] = useState(false)
 
   // React Query for pupil_progress (auto-refreshes on invalidation)
   const {
@@ -307,6 +414,16 @@ export default function DashboardPage() {
           </span>
         </div>
 
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="text-sm px-2 py-1.5 rounded-lg transition-colors"
+            style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}
+            data-testid="settings-gear-button"
+            aria-label="Open settings"
+            data-tts="Settings"
+          >
+            ⚙
+          </button>
         <button
           onClick={handleSignOut}
           className="text-sm px-3 py-1.5 rounded-lg transition-colors"
@@ -321,6 +438,9 @@ export default function DashboardPage() {
         </button>
       </header>
 
+      {/* Settings modal */}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+
       <main className="max-w-xl mx-auto px-4 pt-6 space-y-5">
         {/* Greeting */}
         <motion.div
@@ -328,13 +448,16 @@ export default function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
         >
-          <h1
-            className="text-2xl font-bold"
-            style={{ color: 'var(--color-text)' }}
-            data-tts={`Hello, ${firstName}`}
-          >
-            Hello, {firstName}! 👋
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1
+              className="text-2xl font-bold"
+              style={{ color: 'var(--color-text)' }}
+              data-tts={`Hello, ${firstName}`}
+            >
+              Hello, {firstName}! 👋
+            </h1>
+            <TTSButton text={`Hello, ${firstName}! Ready to write today?`} />
+          </div>
           <p
             className="text-sm mt-1"
             style={{ color: 'var(--color-text-muted)' }}
@@ -419,6 +542,30 @@ export default function DashboardPage() {
 
         {/* Recent badges */}
         {user?.id && <RecentBadges pupilId={user.id} />}
+
+        {/* WF-035: XP Shop */}
+        {progress && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setShopOpen((o) => !o)}
+              className="text-xs font-medium mb-2 flex items-center gap-1"
+              style={{ color: 'var(--color-brand-primary)' }}
+              data-testid="toggle-xp-shop"
+              data-tts={shopOpen ? 'Hide XP Shop' : 'Open XP Shop'}
+            >
+              🏪 XP Shop {shopOpen ? '▲' : '▼'}
+            </button>
+            {shopOpen && (
+              <XPShop
+                progress={progress}
+                onPurchase={() => {
+                  queryClient.invalidateQueries({ queryKey: ['pupil_progress', user?.id] })
+                }}
+              />
+            )}
+          </div>
+        )}
 
         {/* Three-layer navigation cards */}
         <section aria-label="Learning layers" data-testid="nav-cards">

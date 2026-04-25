@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Genre, Phase } from '../../types/index'
+import { TTSButton } from '../ui/TTSButton'
 
 interface ParagraphSlot {
   key: 'support_1' | 'support_2' | 'close'
@@ -287,12 +288,15 @@ export const ParagraphFrame: React.FC<ParagraphFrameProps> = ({
           >
             Lead
           </span>
-          <span
-            className="ml-auto text-xs px-2 py-0.5 rounded-full font-medium"
-            style={{ backgroundColor: 'rgba(22,163,74,0.15)', color: 'var(--color-adjective)' }}
-          >
-            From formula
-          </span>
+          <div className="ml-auto flex items-center gap-2">
+            {leadSentence && <TTSButton text={leadSentence} />}
+            <span
+              className="text-xs px-2 py-0.5 rounded-full font-medium"
+              style={{ backgroundColor: 'rgba(22,163,74,0.15)', color: 'var(--color-adjective)' }}
+            >
+              From formula
+            </span>
+          </div>
         </div>
         <div
           className="px-4 py-3 text-sm font-medium italic"

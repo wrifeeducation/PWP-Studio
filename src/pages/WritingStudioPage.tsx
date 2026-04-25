@@ -13,6 +13,7 @@ import { WrifeEditor } from '../components/writing-studio/WrifeEditor'
 import { PlanningScaffold } from '../components/writing-studio/PlanningScaffold'
 import type { PlanData } from '../components/writing-studio/PlanningScaffold'
 import { AssessmentReport } from '../components/writing-studio/AssessmentReport'
+import { TTSButton } from '../components/ui/TTSButton'
 import { assessWriting } from '../lib/assessWriting'
 import type { AssessWritingOutput } from '../lib/assessWriting'
 import { calcWritingXP } from '../lib/xpEngine'
@@ -237,13 +238,34 @@ export default function WritingStudioPage() {
     }
   }
 
-  // Publish to teacher
+  // Publish to teacher (WF-036: triggers notify-teacher Edge Function)
   const handlePublish = async () => {
-    if (!pieceId) return
+    if (!pieceId || !profile) return
     await supabase
       .from('writing_pieces')
-      .update({ status: 'submitted' })
+      .update({ status: 'submitted', submitted_at: new Date().toISOString() })
       .eq('id', pieceId)
+
+    // Fetch teacher_id from teacher_task_assignments if available
+    const { data: assignment } = await supabase
+      .from('teacher_task_assignments')
+      .select('teacher_id')
+      .eq('pupil_id', profile.id)
+      .order('assigned_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (assignment?.teacher_id) {
+      await supabase.functions.invoke('notify-teacher', {
+        body: {
+          pieceId,
+          pupilName: profile.first_name,
+          teacherId: assignment.teacher_id,
+          genre,
+          wordCount,
+        },
+      })
+    }
   }
 
   // Save self-review scores
@@ -380,16 +402,19 @@ export default function WritingStudioPage() {
                 >
                   {task.title}
                 </h3>
-                <button
-                  type="button"
-                  onClick={handleNewPrompt}
-                  className="text-xs px-2 py-1 rounded whitespace-nowrap flex-shrink-0"
-                  style={{ color: 'var(--color-brand-primary)', border: '1px solid var(--color-brand-primary)' }}
-                  data-testid="new-prompt-button"
-                  data-tts="New prompt"
-                >
-                  New prompt
-                </button>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <TTSButton text={task.prompt_text} />
+                  <button
+                    type="button"
+                    onClick={handleNewPrompt}
+                    className="text-xs px-2 py-1 rounded whitespace-nowrap"
+                    style={{ color: 'var(--color-brand-primary)', border: '1px solid var(--color-brand-primary)' }}
+                    data-testid="new-prompt-button"
+                    data-tts="New prompt"
+                  >
+                    New prompt
+                  </button>
+                </div>
               </div>
 
               <p

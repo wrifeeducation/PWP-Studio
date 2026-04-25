@@ -8,8 +8,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
+import { pdf } from '@react-pdf/renderer'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { WritingPiecePDF } from '../components/writing-studio/WritingPiecePDF'
 import type {
   WritingPiece,
   AIAssessment,
@@ -107,11 +109,32 @@ interface PieceCardProps {
   piece: WritingPiece
   assessment: AIAssessment | undefined
   annotationCount: number
+  pupilName: string
 }
 
-function PieceCard({ piece, assessment, annotationCount }: PieceCardProps) {
+function PieceCard({ piece, assessment, annotationCount, pupilName }: PieceCardProps) {
   const [expanded, setExpanded] = useState(false)
+  const [downloading, setDownloading] = useState(false)
   const colour = GENRE_COLOURS[piece.genre] ?? '#6B7280'
+
+  const handleDownloadPDF = async () => {
+    setDownloading(true)
+    try {
+      const blob = await pdf(
+        <WritingPiecePDF piece={piece} assessment={assessment} pupilName={pupilName} />
+      ).toBlob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `WriFe-${pupilName.replace(/\s/g, '-')}-${promptTitle(piece).replace(/\s/g, '-').slice(0, 30)}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('PDF generation failed:', err)
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   return (
     <motion.div
@@ -199,6 +222,25 @@ function PieceCard({ piece, assessment, annotationCount }: PieceCardProps) {
           className="border-t px-4 pb-4 pt-3 space-y-4"
           style={{ borderColor: 'var(--color-border)' }}
         >
+          {/* Download PDF button (WF-033) */}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleDownloadPDF}
+              disabled={downloading}
+              data-testid={`download-pdf-${piece.id}`}
+              className="text-xs px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-opacity"
+              style={{
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-text-muted)',
+                opacity: downloading ? 0.6 : 1,
+              }}
+              data-tts="Download as PDF"
+            >
+              📄 {downloading ? 'Generating…' : 'Download PDF'}
+            </button>
+          </div>
+
           {/* Full piece text */}
           <div
             className="prose prose-sm max-w-none text-sm leading-relaxed"
@@ -391,7 +433,8 @@ function ProgressSection({ pupilId }: ProgressSectionProps) {
 
 export default function PortfolioPage() {
   const navigate = useNavigate()
-  const { user } = useAuthStore()
+  const { user, profile } = useAuthStore()
+  const pupilName = profile?.first_name ?? 'Pupil'
 
   // Fetch published writing pieces
   const { data: pieces, isLoading: piecesLoading } = useQuery<WritingPiece[]>({
@@ -536,6 +579,7 @@ export default function PortfolioPage() {
                   piece={piece}
                   assessment={assessmentMap[piece.id]}
                   annotationCount={annotationCountMap[piece.id] ?? 0}
+                  pupilName={pupilName}
                 />
               </motion.div>
             ))}
