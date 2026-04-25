@@ -242,7 +242,7 @@ export default function FormulaPage() {
         .from('formula_sessions')
         .select('id')
         .eq('pupil_id', user.id)
-      const isFirstFormula = (formulaSessions?.length ?? 0) === 1
+      const isFirstFormula = (formulaSessions?.length ?? 0) <= 1
 
       const updatedProgress: PupilProgress = {
         ...(progress as PupilProgress),
@@ -292,6 +292,146 @@ export default function FormulaPage() {
         }
       }
 
+      setScreen('feedback')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Something went wrong'
+      setSubmitError(message)
+    } finally {
+      setAssessing(false)
+    }
+  }
+
+  // ─── LensLab submit handler (Phase D) ──────────────────────────────────────
+
+  const handleLensLabSubmit = async (score: number) => {
+    if (!user?.id || !data) return
+    setSubmitError(null)
+    setAssessing(true)
+
+    const syntheticResult = {
+      overall_score: score,
+      slot_results: [],
+      formula_score: score,
+      semantic_score: null,
+      feedback: score >= 80 ? 'Excellent recognition!' : 'Good effort — keep practising.',
+    } as unknown as RawAssessmentResult
+
+    try {
+      // Save formula_sessions with is_lens_lab: true
+      await supabase.from('formula_sessions').insert({
+        pupil_id: user.id,
+        level_id: data.level.id,
+        session_date: new Date().toISOString().split('T')[0],
+        sentence_built: '',
+        scaffold_used: false,
+        scaffold_type: null,
+        is_lens_lab: true,
+        formula_score: score,
+        xp_earned: Math.round(score / 2),
+        semantic_purpose_score: null,
+        semantic_audience_score: null,
+        semantic_effect_score: null,
+      })
+
+      // WF-008: fetch existing mastery row then upsert
+      const { data: existingMastery } = await supabase
+        .from('mastery_tracking')
+        .select('*')
+        .eq('pupil_id', user.id)
+        .eq('level_id', data.level.id)
+        .maybeSingle()
+
+      const masteryPayload = buildMasteryUpsert(
+        user.id,
+        data.level.id,
+        existingMastery as MasteryTracking | null,
+        score
+      )
+
+      await supabase
+        .from('mastery_tracking')
+        .upsert(masteryPayload, { onConflict: 'pupil_id,level_id' })
+
+      // WF-009: XP + streak update
+      const { data: progressRow } = await supabase
+        .from('pupil_progress')
+        .select('*')
+        .eq('pupil_id', user.id)
+        .single()
+
+      const progress = progressRow as PupilProgress | null
+      const today = new Date().toISOString().split('T')[0]
+
+      let streakUpdate = {}
+      let streakBonus = 0
+      if (progress) {
+        const newStreak = updateStreak(progress, today)
+        streakBonus = calcStreakBonus(newStreak.current_streak)
+        streakUpdate = newStreak
+      }
+
+      const levelXp = calcFormulaXP(data.level.id, score)
+      const totalXpEarned = levelXp + streakBonus
+      setXpEarned(totalXpEarned)
+
+      const progressionUpdates: Record<string, unknown> = {
+        total_xp: (progress?.total_xp ?? 0) + totalXpEarned,
+        last_session_date: today,
+        ...streakUpdate,
+      }
+
+      await supabase.from('pupil_progress').update(progressionUpdates).eq('pupil_id', user.id)
+
+      // WF-010: evaluate badges
+      const { data: allBadges } = await supabase.from('badges').select('*')
+      const { data: earnedBadgesRows } = await supabase
+        .from('pupil_badges')
+        .select('badge_id')
+        .eq('pupil_id', user.id)
+
+      const earnedIds = (earnedBadgesRows ?? []).map((r: { badge_id: string }) => r.badge_id)
+
+      const { data: formulaSessions } = await supabase
+        .from('formula_sessions')
+        .select('id')
+        .eq('pupil_id', user.id)
+      const isFirstFormula = (formulaSessions?.length ?? 0) <= 1
+
+      const updatedProgress: PupilProgress = {
+        ...(progress as PupilProgress),
+        ...progressionUpdates,
+        current_formula_level: data.level.id,
+      }
+
+      const newBadges = evaluateBadges({
+        progress: updatedProgress,
+        mastery: existingMastery as MasteryTracking | null,
+        updatedMastery: masteryPayload,
+        paragraphSessionCount: 0,
+        recentParagraphScores: [],
+        isFirstFormulaSession: isFirstFormula,
+        isFirstParagraphSession: false,
+        earnedBadgeIds: earnedIds,
+        allBadges: (allBadges ?? []) as Badge[],
+      })
+
+      if (newBadges.length > 0) {
+        const badge = newBadges[0]
+        await supabase.from('pupil_badges').upsert(
+          {
+            pupil_id: user.id,
+            badge_id: badge.id,
+            awarded_at: new Date().toISOString(),
+            source: null,
+          },
+          { onConflict: 'pupil_id,badge_id' }
+        )
+        setNewBadge(badge)
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['pupil_progress', user.id] })
+
+      setAssessmentResult(syntheticResult)
       setScreen('feedback')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong'
@@ -544,20 +684,7 @@ export default function FormulaPage() {
             {data.level.phase === 'D' ? (
               <LensLab
                 level={data.level}
-                onSubmit={(score) => {
-                  // For Lens Lab, we use the score directly as the overall_score
-                  // Build a synthetic result and advance to feedback
-                  const syntheticResult = {
-                    overall_score: score,
-                    slot_results: [],
-                    formula_score: score,
-                    semantic_score: null,
-                    feedback: score >= 80 ? 'Excellent recognition!' : 'Good effort — keep practising.',
-                  } as unknown as RawAssessmentResult
-                  setAssessmentResult(syntheticResult)
-                  setXpEarned(Math.round(score / 2))
-                  setScreen('feedback')
-                }}
+                onSubmit={handleLensLabSubmit}
                 isSubmitting={isAssessing}
               />
             ) : (

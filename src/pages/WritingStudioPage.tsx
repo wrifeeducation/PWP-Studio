@@ -228,9 +228,17 @@ export default function WritingStudioPage() {
 
       // WF-018: Award XP
       const xp = calcWritingXP(result.overall_band)
-      await supabase.from('pupil_progress').update({
-        total_xp: supabase.rpc('increment_xp', { pupil_id: profile.id, amount: xp }),
-      })
+      const { data: progressRow } = await supabase
+        .from('pupil_progress')
+        .select('total_xp')
+        .eq('pupil_id', profile.id)
+        .single()
+      if (progressRow) {
+        await supabase
+          .from('pupil_progress')
+          .update({ total_xp: progressRow.total_xp + xp })
+          .eq('pupil_id', profile.id)
+      }
     } catch (err) {
       setFlashMessage('Assessment failed. Please try again.')
       setTimeout(() => setFlashMessage(null), 3000)

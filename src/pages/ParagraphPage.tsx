@@ -7,6 +7,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
 import { assessParagraph } from '../lib/assessParagraph'
 import type { RawParagraphAssessment } from '../lib/assessParagraph'
@@ -82,6 +83,7 @@ const getStarters = (
 export default function ParagraphPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const queryClient = useQueryClient()
   const { user, profile } = useAuthStore()
 
   // Props passed from FormulaPage via router state
@@ -146,6 +148,7 @@ export default function ParagraphPage() {
       setAssessResult(result.raw)
       setCompositeScore(result.compositeScore)
       setXpEarned(result.xpEarned)
+      queryClient.invalidateQueries({ queryKey: ['pupil_progress', user?.id] })
       setScreen('feedback')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong'

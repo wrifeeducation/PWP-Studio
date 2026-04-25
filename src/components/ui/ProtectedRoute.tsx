@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
-  const { session, role, isLoading, isInitialised } = useAuthStore()
+  const { session, profile, role, isLoading, isInitialised } = useAuthStore()
 
   if (isLoading || !isInitialised) {
     return (
@@ -36,6 +36,10 @@ export const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) 
 
   if (!session) {
     return <Navigate to="/login" replace />
+  }
+
+  if (session && !profile) {
+    return <Navigate to="/onboarding" replace />
   }
 
   if (allowedRoles && role && !allowedRoles.includes(role)) {
