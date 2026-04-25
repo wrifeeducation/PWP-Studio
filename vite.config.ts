@@ -16,8 +16,8 @@ export default defineConfig({
         name: 'WriFe — Progressive Writing Practice',
         short_name: 'WriFe',
         description: 'Gamified grammar and writing practice for UK schools',
-        theme_color: '#2563EB',
-        background_color: '#F8FAFC',
+        theme_color: '#4A9BD4',
+        background_color: '#D4EBF8',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
@@ -26,7 +26,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        globPatterns: ['**/*.{js,css,html,ico,svg}'],
+        globIgnores: ['mascot/**', '**/*.png'],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MiB safety net
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/nxhkpqngnxshgotvuujb\.supabase\.co\/rest\/.*/i,
