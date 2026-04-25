@@ -114,7 +114,7 @@ export default function TeacherReviewPage() {
     >
       {/* Header */}
       <header
-        className="px-4 py-3 flex items-center gap-4 sticky top-0 z-10"
+        className="px-4 py-3 flex items-center gap-4 sticky top-0 z-10 no-print"
         style={{ backgroundColor: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}
       >
         <button
@@ -150,7 +150,7 @@ export default function TeacherReviewPage() {
         {/* Writing piece — left */}
         <main className="flex-1 p-4 space-y-4">
           <div
-            className="rounded-xl p-5"
+            className="rounded-xl p-5 print-section"
             style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
           >
             <h2

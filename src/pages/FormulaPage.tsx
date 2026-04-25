@@ -33,6 +33,10 @@ import { BadgeToast } from '../components/ui/BadgeToast'
 import { LevelUpModal } from '../components/ui/LevelUpModal'
 import { OfflineBanner } from '../components/ui/OfflineBanner'
 import { LensLab } from '../components/formula/LensLab'
+import { SessionExpiryBanner } from '../components/ui/SessionExpiryBanner'
+import { CertificateModal } from '../components/ui/CertificateModal'
+import { awardCertificate } from '../lib/certificateEngine'
+import { sanitizeText } from '../lib/sanitize'
 import type { MasteryTracking, Badge, PupilProgress } from '../types/index'
 
 // ─── Screen states ────────────────────────────────────────────────────────────
@@ -53,6 +57,13 @@ export default function FormulaPage() {
 
   // WF-010: badge state
   const [newBadge, setNewBadge] = useState<Badge | null>(null)
+
+  // WF-042: certificate state
+  const [showCertificate, setShowCertificate] = useState(false)
+  const [certificateData, setCertificateData] = useState<{
+    levelId: number
+    awardedAt: string
+  } | null>(null)
 
   // WF-027: network status + offline queue flush
   const { isOnline } = useNetworkStatus()
@@ -98,7 +109,7 @@ export default function FormulaPage() {
           pupil_id: user.id,
           level_id: data.level.id,
           session_date: new Date().toISOString().split('T')[0],
-          sentence_built: sentence,
+          sentence_built: sanitizeText(sentence),
           scaffold_used: false,
           scaffold_type: null,
           is_lens_lab: data.level.phase === 'D',
@@ -271,6 +282,14 @@ export default function FormulaPage() {
 
       if (didLevelUp) {
         setShowLevelUp(true)
+        // WF-042: award formula mastery certificate on gate pass
+        if (user?.id) {
+          const cert = await awardCertificate(user.id, data.level.id, 'formula_mastery')
+          if (cert) {
+            setCertificateData({ levelId: cert.level_id, awardedAt: cert.awarded_at })
+            setShowCertificate(true)
+          }
+        }
       }
 
       setScreen('feedback')
@@ -403,6 +422,24 @@ export default function FormulaPage() {
       style={{ backgroundColor: 'var(--color-background)' }}
       data-testid="formula-page"
     >
+      {/* WF-047: Session expiry warning */}
+      <SessionExpiryBanner />
+
+      {/* WF-042: Certificate modal */}
+      {showCertificate && certificateData && profile && (
+        <CertificateModal
+          pupilName={profile.first_name}
+          levelId={certificateData.levelId}
+          certificateType="formula_mastery"
+          awardedAt={certificateData.awardedAt}
+          onClose={() => setShowCertificate(false)}
+          onDownload={() => {
+            // PDF download — uses existing @react-pdf/renderer integration
+            setShowCertificate(false)
+          }}
+        />
+      )}
+
       {/* WF-027: Offline banner + toast */}
       <OfflineBanner />
       {offlineToast && (

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import { Role } from '../types/index'
 import type { Profile } from '../types/index'
+import { APP_VERSION } from '../lib/version'
 
 type LoginMode = 'teacher' | 'pupil'
 type AuthMode = 'login' | 'signup'
@@ -561,7 +562,7 @@ export default function LoginPage() {
         style={{ color: 'var(--color-text-muted)' }}
         data-tts="WriFe helps every pupil build confident writing skills"
       >
-        WriFe — Helping every pupil build confident writing skills
+        WriFe v{APP_VERSION} · Built with ❤️ for UK schools
       </motion.p>
     </div>
   )

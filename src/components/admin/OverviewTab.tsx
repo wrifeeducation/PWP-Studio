@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { APP_VERSION, BUILD_DATE } from '../../lib/version'
 import type { School } from '../../types/index'
 
 interface OverviewStats {
@@ -132,6 +133,15 @@ export function OverviewTab({ schoolId }: { schoolId: string }) {
           label="Studio Unlocked"
           value={stats.pctStudioUnlocked != null ? `${stats.pctStudioUnlocked.toFixed(0)}%` : '—'}
         />
+      </div>
+
+      {/* WF-059: App version info */}
+      <div
+        className="rounded-xl p-4 text-xs"
+        style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
+        data-testid="app-version-info"
+      >
+        WriFe v{APP_VERSION} &middot; Build date: {BUILD_DATE}
       </div>
     </div>
   )

@@ -12,6 +12,7 @@ import { pdf } from '@react-pdf/renderer'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { WritingPiecePDF } from '../components/writing-studio/WritingPiecePDF'
+import { getPupilCertificates, type Certificate } from '../lib/certificateEngine'
 import type {
   WritingPiece,
   AIAssessment,
@@ -586,6 +587,9 @@ export default function PortfolioPage() {
           </div>
         </section>
 
+        {/* Certificates section (WF-042) */}
+        {user?.id && <CertificatesSection pupilId={user.id} pupilName={pupilName} />}
+
         {/* Badges strip */}
         {user?.id && <BadgesStrip pupilId={user.id} />}
 
@@ -593,5 +597,78 @@ export default function PortfolioPage() {
         {user?.id && <ProgressSection pupilId={user.id} />}
       </main>
     </div>
+  )
+}
+
+// ─── Certificates Section ──────────────────────────────────────────────────────
+
+interface CertificatesSectionProps {
+  pupilId: string
+  pupilName: string
+}
+
+const CERT_LABELS: Record<Certificate['certificate_type'], string> = {
+  formula_mastery: 'Formula Master',
+  paragraph_mastery: 'Paragraph Master',
+  writing_band2: 'Writing Star',
+  writing_band3: 'Writing Champion',
+  streak_30: '30-Day Streak Champion',
+}
+
+function CertificatesSection({ pupilId, pupilName }: CertificatesSectionProps) {
+  const { data: certificates, isLoading } = useQuery<Certificate[]>({
+    queryKey: ['portfolio_certificates', pupilId],
+    queryFn: () => getPupilCertificates(pupilId),
+    enabled: !!pupilId,
+    staleTime: 1000 * 60 * 5,
+  })
+
+  if (isLoading || !certificates?.length) return null
+
+  return (
+    <section aria-label="My Certificates" data-testid="portfolio-certificates">
+      <h2
+        className="text-sm font-semibold uppercase tracking-wider mb-3"
+        style={{ color: 'var(--color-text-muted)' }}
+        data-tts="My Certificates"
+      >
+        My Certificates
+      </h2>
+      <div className="space-y-2">
+        {certificates.map((cert) => (
+          <div
+            key={cert.id}
+            className="rounded-xl p-4 flex items-center justify-between print-section"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              border: '2px solid var(--color-brand-primary)',
+            }}
+            data-testid={`certificate-${cert.id}`}
+          >
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--color-brand-primary)' }}>
+                ⭐ Level {cert.level_id} — {CERT_LABELS[cert.certificate_type] ?? cert.certificate_type}
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                {pupilName} · {new Date(cert.awarded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                // Certificate PDF download — placeholder for now
+                window.print()
+              }}
+              className="print-btn text-xs px-3 py-1.5 rounded-lg font-medium"
+              style={{ backgroundColor: 'var(--color-brand-primary)', color: '#fff' }}
+              data-testid={`download-cert-${cert.id}`}
+              data-tts="Download certificate"
+            >
+              Download
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }

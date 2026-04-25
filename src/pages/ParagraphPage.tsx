@@ -14,6 +14,7 @@ import { ParagraphFrame } from '../components/paragraph/ParagraphFrame'
 import { ParagraphFeedback } from '../components/paragraph/ParagraphFeedback'
 import { Genre, Phase } from '../types/index'
 import paragraphStartersJson from '../../content/paragraph-starters.json'
+import { sanitizeText } from '../lib/sanitize'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -125,17 +126,21 @@ export default function ParagraphPage() {
     setSubmitError(null)
 
     try {
+      // WF-043: pass paragraph_model for KS3 (L51+)
+      // WF-055: sanitize text before saving
+      const isPEEL = levelId >= 51
       const result = await assessParagraph({
         pupilId: user.id,
         levelId,
         genre: selectedGenre,
         phase,
-        leadSentence,
-        supportSentences: [support1, support2].filter(Boolean),
-        closeSentence,
+        leadSentence: sanitizeText(leadSentence),
+        supportSentences: [sanitizeText(support1), sanitizeText(support2)].filter(Boolean),
+        closeSentence: sanitizeText(closeSentence),
         yearGroup,
         formulaScore,
         paragraphActive: true,
+        ...(isPEEL ? { paragraph_model: 'PEEL' as const } : {}),
       })
 
       setAssessResult(result.raw)
@@ -264,6 +269,7 @@ export default function ParagraphPage() {
             <ParagraphFrame
               genre={selectedGenre}
               phase={phase}
+              levelId={levelId}
               leadSentence={leadSentence}
               support1={support1}
               support2={support2}

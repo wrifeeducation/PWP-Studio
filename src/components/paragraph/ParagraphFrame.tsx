@@ -21,6 +21,7 @@ interface ParagraphSlot {
 interface ParagraphFrameProps {
   genre: Genre
   phase: Phase
+  levelId?: number
   leadSentence: string
   support1: string
   support2: string
@@ -36,6 +37,7 @@ interface ParagraphFrameProps {
   isEditable: boolean
 }
 
+// WF-043: Standard LSC slots
 const SLOT_CONFIG: Omit<ParagraphSlot, 'starters'>[] = [
   {
     key: 'support_1',
@@ -56,6 +58,31 @@ const SLOT_CONFIG: Omit<ParagraphSlot, 'starters'>[] = [
     label: 'Close',
     icon: '⟲',
     color: '#1B3A6B',
+    minWords: 5,
+  },
+]
+
+// WF-043: PEEL slot config for L51+ (KS3 Phase D)
+const PEEL_SLOT_CONFIG: Omit<ParagraphSlot, 'starters'>[] = [
+  {
+    key: 'support_1',
+    label: 'Point',
+    icon: '●',
+    color: 'var(--color-brand-primary)',
+    minWords: 5,
+  },
+  {
+    key: 'support_2',
+    label: 'Evidence',
+    icon: '📖',
+    color: 'var(--color-brand-secondary)',
+    minWords: 5,
+  },
+  {
+    key: 'close',
+    label: 'Explanation & Link',
+    icon: '↩',
+    color: '#0369A1',
     minWords: 5,
   },
 ]
@@ -204,6 +231,7 @@ const SlotTextArea: React.FC<SlotTextAreaProps> = ({
 export const ParagraphFrame: React.FC<ParagraphFrameProps> = ({
   genre,
   phase,
+  levelId,
   leadSentence,
   support1,
   support2,
@@ -214,7 +242,11 @@ export const ParagraphFrame: React.FC<ParagraphFrameProps> = ({
   onCloseChange,
   isEditable,
 }) => {
-  const slots: ParagraphSlot[] = SLOT_CONFIG.map((cfg) => ({
+  // WF-043: Use PEEL structure for L51+ (KS3)
+  const isPEEL = (levelId ?? 0) >= 51
+  const activeConfig = isPEEL ? PEEL_SLOT_CONFIG : SLOT_CONFIG
+
+  const slots: ParagraphSlot[] = activeConfig.map((cfg) => ({
     ...cfg,
     starters: starters[cfg.key],
   }))

@@ -52,6 +52,8 @@ export interface AssessParagraphParams {
   yearGroup: number
   formulaScore: number // Needed for composite XP calculation
   paragraphActive: boolean
+  /** WF-043: 'PEEL' for L51+ KS3 levels */
+  paragraph_model?: 'PEEL'
 }
 
 // ─── Result returned to callers ───────────────────────────────────────────────
@@ -86,10 +88,11 @@ export const assessParagraph = async (
     yearGroup,
     formulaScore,
     paragraphActive,
+    paragraph_model,
   } = params
 
   // Build input per Edge Function contract
-  const input: AssessParagraphInput = {
+  const input: AssessParagraphInput & { paragraph_model?: string } = {
     level_id: `P${levelId}${phase}`,
     genre,
     phase,
@@ -99,7 +102,12 @@ export const assessParagraph = async (
     year_group: yearGroup,
     tense_target: null,
     register_target: null,
+    // WF-043: pass PEEL model for KS3
+    ...(paragraph_model ? { paragraph_model } : {}),
   }
+
+  // Suppress unused variable warning
+  void paragraphActive
 
   // Call Edge Function
   const { data, error } = await supabase.functions.invoke<RawParagraphAssessment>(

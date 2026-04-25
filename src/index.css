@@ -148,6 +148,59 @@ p {
   font-size: 112%;
 }
 
+/* ============================================================================
+   WF-044: Print Stylesheet
+   ============================================================================ */
+
+@media print {
+  nav, .no-print, button:not(.print-btn), .offline-banner { display: none !important; }
+  body { background: white; color: black; font-size: 12pt; }
+  .print-section { page-break-inside: avoid; }
+  a { color: black; text-decoration: none; }
+}
+
+/* ============================================================================
+   WF-045: Focus ring for keyboard navigation
+   ============================================================================ */
+
+:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+
+/* ============================================================================
+   WF-051: Mobile responsive utilities
+   ============================================================================ */
+
+@media (max-width: 640px) {
+  .formula-builder { flex-wrap: wrap; gap: 8px; }
+  .word-bank-panel { max-height: 40vh; overflow-y: auto; }
+  .dashboard-grid { grid-template-columns: 1fr; }
+  .teacher-table { font-size: 13px; }
+}
+
+/* ============================================================================
+   WF-052: Skeleton shimmer animation
+   ============================================================================ */
+
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* ============================================================================
+   WF-044: TeacherReviewPage and PortfolioPage print-section utility
+   (class is applied directly in those components)
+   ============================================================================ */
+
 code,
 .counter {
   font-family: var(--mono);

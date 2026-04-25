@@ -15,6 +15,8 @@ import { StreakCounter } from '../components/dashboard/StreakCounter'
 import { NavCard } from '../components/dashboard/NavCard'
 import { XPShop } from '../components/dashboard/XPShop'
 import { TTSButton } from '../components/ui/TTSButton'
+import { SessionExpiryBanner } from '../components/ui/SessionExpiryBanner'
+import { PupilWelcomeModal, useShouldShowWelcome } from '../components/ui/PupilWelcomeModal'
 import { useSettingsStore } from '../stores/settingsStore'
 import type { PupilProgress, PupilBadge, Badge } from '../types/index'
 
@@ -354,6 +356,9 @@ export default function DashboardPage() {
 
   const firstName = profile?.first_name ?? 'Pupil'
   const sessionsCompleted = masteryData?.sessions_completed ?? 0
+  // WF-057: Show welcome modal on first visit
+  const shouldShowWelcome = useShouldShowWelcome()
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false)
 
   if (isLoading) {
     return (
@@ -388,6 +393,18 @@ export default function DashboardPage() {
       style={{ backgroundColor: 'var(--color-background)' }}
       data-testid="dashboard-page"
     >
+      {/* WF-057: First-visit welcome modal */}
+      {shouldShowWelcome && !welcomeDismissed && user?.id && (
+        <PupilWelcomeModal
+          pupilId={user.id}
+          firstName={firstName}
+          onComplete={() => setWelcomeDismissed(true)}
+        />
+      )}
+
+      {/* WF-047: Session expiry warning */}
+      <SessionExpiryBanner />
+
       {/* Top header */}
       <header
         className="px-4 py-4 flex items-center justify-between"
@@ -577,7 +594,7 @@ export default function DashboardPage() {
             Your Learning Layers
           </h2>
 
-          <div className="space-y-3">
+          <div className="space-y-3 dashboard-grid">
             {/* Layer 1: Formula Practice — always unlocked */}
             <NavCard
               title="Formula Practice"

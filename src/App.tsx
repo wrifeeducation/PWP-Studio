@@ -11,6 +11,8 @@ import type { Profile } from './types/index'
 import { ProtectedRoute } from './components/ui/ProtectedRoute'
 import { RoleRedirect } from './components/ui/RoleRedirect'
 import { LoadingSpinner } from './components/ui/LoadingSpinner'
+import { ErrorBoundary } from './components/ui/ErrorBoundary'
+import { ToastContainer } from './components/ui/ToastContainer'
 
 // High contrast: apply on load from stored preference
 import { applyHighContrastPreference } from './lib/contrastMode'
@@ -30,6 +32,8 @@ const AdminPage = lazy(() => import('./pages/AdminPage'))
 const ParentPage = lazy(() => import('./pages/ParentPage'))
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+// WF-056: Teacher onboarding
+const OnboardingPage = lazy(() => import('./pages/OnboardingPage'))
 
 // Role constants
 import { Role } from './types/index'
@@ -120,6 +124,9 @@ function App() {
         {/* WF-038: Apply settings preferences on startup */}
         <SettingsInitialiser />
 
+        {/* WF-053: Toast notification container */}
+        <ToastContainer />
+
         <Suspense fallback={<LoadingSpinner label="Loading page…" />}>
           <Routes>
             {/* Public routes */}
@@ -133,7 +140,9 @@ function App() {
               path="/dashboard"
               element={
                 <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                  <DashboardPage />
+                  <ErrorBoundary>
+                    <DashboardPage />
+                  </ErrorBoundary>
                 </ProtectedRoute>
               }
             />
@@ -173,7 +182,9 @@ function App() {
               path="/teacher"
               element={
                 <ProtectedRoute allowedRoles={[Role.TEACHER]}>
-                  <TeacherPage />
+                  <ErrorBoundary>
+                    <TeacherPage />
+                  </ErrorBoundary>
                 </ProtectedRoute>
               }
             />
@@ -224,6 +235,18 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={[Role.PUPIL]}>
                   <SettingsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* WF-056: Teacher onboarding wizard */}
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedRoute allowedRoles={[Role.TEACHER, Role.SCHOOL_ADMIN]}>
+                  <ErrorBoundary>
+                    <OnboardingPage />
+                  </ErrorBoundary>
                 </ProtectedRoute>
               }
             />

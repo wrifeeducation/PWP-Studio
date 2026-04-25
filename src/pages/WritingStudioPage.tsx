@@ -18,6 +18,8 @@ import { assessWriting } from '../lib/assessWriting'
 import type { AssessWritingOutput } from '../lib/assessWriting'
 import { calcWritingXP } from '../lib/xpEngine'
 import { Genre, WritingDimension } from '../types/index'
+import { sanitizeText } from '../lib/sanitize'
+import { SessionExpiryBanner } from '../components/ui/SessionExpiryBanner'
 import writingTasks from '../../content/writing-tasks.json'
 
 // ─── Local task type (from JSON) ──────────────────────────────────────────────
@@ -155,7 +157,7 @@ export default function WritingStudioPage() {
         await supabase
           .from('writing_pieces')
           .update({
-            full_text: plainText,
+            full_text: sanitizeText(plainText),
             word_count: wordCount,
             plan_data: planData,
             status: 'draft',
@@ -168,7 +170,7 @@ export default function WritingStudioPage() {
             pupil_id: profile.id,
             genre,
             task_prompt_text: task.prompt_text,
-            full_text: plainText,
+            full_text: sanitizeText(plainText),
             word_count: wordCount,
             plan_data: planData,
             status: 'draft',
@@ -198,7 +200,7 @@ export default function WritingStudioPage() {
             pupil_id: profile.id,
             genre,
             task_prompt_text: task.prompt_text,
-            full_text: plainText,
+            full_text: sanitizeText(plainText),
             word_count: wordCount,
             plan_data: planData,
             status: 'draft',
@@ -217,7 +219,7 @@ export default function WritingStudioPage() {
         genre,
         year_group: profile.year_group ?? 4,
         task_prompt_text: task.prompt_text,
-        full_text: plainText,
+        full_text: sanitizeText(plainText),
         word_count: wordCount,
         plan_submitted: Object.keys(planData).some((k) => !!planData[k]),
       })
@@ -307,6 +309,9 @@ export default function WritingStudioPage() {
       style={{ backgroundColor: 'var(--color-background)' }}
       data-testid="writing-studio-page"
     >
+      {/* WF-047: Session expiry warning */}
+      <SessionExpiryBanner />
+
       {/* Header */}
       <header
         className="px-4 py-3 flex items-center justify-between sticky top-0 z-10"

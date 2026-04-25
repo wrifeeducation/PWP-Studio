@@ -10,6 +10,7 @@ import { useAuthStore } from '../stores/authStore'
 import { classifyTransferGap, transferGapLabel, transferGapColour } from '../lib/transferGap'
 import { ConsolidationPackCard } from '../components/teacher/ConsolidationPackCard'
 import { WordBankEditor } from '../components/teacher/WordBankEditor'
+import { AnalyticsTab } from '../components/teacher/AnalyticsTab'
 import { generateConsolidationPack } from '../lib/consolidationPack'
 import type { ConsolidationPackData } from '../lib/consolidationPack'
 import type { PendingWritingReview, PupilTransferRate, InterventionLog, InterventionTrigger } from '../types/index'
@@ -37,7 +38,7 @@ interface WritingTask {
   prompt_text: string
 }
 
-type TabId = 'pending' | 'progress' | 'assign' | 'interventions' | 'wordbanks'
+type TabId = 'pending' | 'progress' | 'assign' | 'interventions' | 'wordbanks' | 'analytics'
 
 const TAB_LABELS: Record<TabId, string> = {
   pending: 'Pending Review',
@@ -45,6 +46,7 @@ const TAB_LABELS: Record<TabId, string> = {
   assign: 'Assign Task',
   interventions: 'Interventions',
   wordbanks: 'Word Banks',
+  analytics: 'Analytics',
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -106,7 +108,7 @@ export default function TeacherPage() {
 
       {/* Tabs */}
       <nav
-        className="flex border-b"
+        className="flex border-b no-print overflow-x-auto"
         style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
         data-testid="teacher-tabs"
       >
@@ -145,6 +147,7 @@ export default function TeacherPage() {
           <InterventionLogTab onResolve={() => setUnresolvedCount((c) => Math.max(0, c - 1))} />
         )}
         {activeTab === 'wordbanks' && <WordBankEditor />}
+        {activeTab === 'analytics' && <AnalyticsTab />}
       </main>
     </div>
   )
@@ -154,10 +157,13 @@ export default function TeacherPage() {
 
 function PendingReviewTab() {
   const navigate = useNavigate()
+  const { profile } = useAuthStore()
   const [reviews, setReviews] = useState<PendingWritingReview[]>([])
   const [loading, setLoading] = useState(true)
+  const [newIds, setNewIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
+    // Initial load
     supabase
       .from('v_pending_writing_reviews')
       .select('*')
@@ -167,6 +173,65 @@ function PendingReviewTab() {
         setLoading(false)
       })
   }, [])
+
+  // WF-054: Realtime subscription for writing_pieces
+  useEffect(() => {
+    if (!profile?.id) return
+
+    const channel = supabase
+      .channel('pending-reviews-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'writing_pieces',
+          filter: `status=eq.submitted`,
+        },
+        (payload) => {
+          const piece = payload.new as Record<string, unknown>
+          if (!piece.id) return
+          // Fetch the enriched view row and prepend
+          supabase
+            .from('v_pending_writing_reviews')
+            .select('*')
+            .eq('id', piece.id as string)
+            .single()
+            .then(({ data }) => {
+              if (data) {
+                setReviews((prev) => [data as PendingWritingReview, ...prev])
+                setNewIds((prev) => new Set([...prev, piece.id as string]))
+                setTimeout(() => {
+                  setNewIds((prev) => {
+                    const next = new Set(prev)
+                    next.delete(piece.id as string)
+                    return next
+                  })
+                }, 5000)
+              }
+            })
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'writing_pieces',
+        },
+        (payload) => {
+          const piece = payload.new as Record<string, unknown>
+          if (piece.status !== 'submitted') {
+            setReviews((prev) => prev.filter((r) => r.id !== piece.id))
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [profile?.id])
 
   if (loading) return <LoadingSpinner />
 
@@ -192,13 +257,23 @@ function PendingReviewTab() {
           className="w-full text-left rounded-xl p-4 flex items-center justify-between gap-4 transition-colors hover:opacity-80"
           style={{
             backgroundColor: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
+            border: `1px solid ${newIds.has(review.id) ? 'var(--color-brand-primary)' : 'var(--color-border)'}`,
           }}
         >
           <div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }} data-tts={review.pupil_name}>
-              {review.pupil_name}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }} data-tts={review.pupil_name}>
+                {review.pupil_name}
+              </p>
+              {newIds.has(review.id) && (
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded font-bold text-white animate-pulse"
+                  style={{ backgroundColor: 'var(--color-brand-primary)' }}
+                >
+                  New
+                </span>
+              )}
+            </div>
             <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
               {review.genre} · {review.word_count} words
             </p>
@@ -261,7 +336,7 @@ function ClassProgressTab() {
       </h2>
 
       <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid var(--color-border)' }}>
-        <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+        <table className="teacher-table w-full text-sm" style={{ borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ backgroundColor: 'var(--color-background)', borderBottom: '1px solid var(--color-border)' }}>
               {['Pupil', 'Level', 'Avg Score (L5)', 'Streak', 'XP', 'Studio', 'Transfer Rate'].map((h) => (
