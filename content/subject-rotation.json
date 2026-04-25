@@ -1,0 +1,788 @@
+{
+  "rotation_banks": {
+    "animals": [
+      {
+        "word": "dragon",
+        "bank": "animals",
+        "image_key": "subject_dragon",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["myths_legends", "fantasy", "ancient_cultures"]
+      },
+      {
+        "word": "tiger",
+        "bank": "animals",
+        "image_key": "subject_tiger",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["big_cats", "endangered_species", "habitats_asia"]
+      },
+      {
+        "word": "owl",
+        "bank": "animals",
+        "image_key": "subject_owl",
+        "determiner_options": ["The", "An", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["birds_of_prey", "nocturnal_animals", "forest_habitats"]
+      },
+      {
+        "word": "dolphin",
+        "bank": "animals",
+        "image_key": "subject_dolphin",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["ocean_mammals", "marine_life", "intelligence"]
+      },
+      {
+        "word": "bear",
+        "bank": "animals",
+        "image_key": "subject_bear",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["forest_animals", "endangered_species", "hibernation"]
+      },
+      {
+        "word": "leopard",
+        "bank": "animals",
+        "image_key": "subject_leopard",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["big_cats", "camouflage", "habitats_africa"]
+      },
+      {
+        "word": "eagle",
+        "bank": "animals",
+        "image_key": "subject_eagle",
+        "determiner_options": ["The", "An", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["birds_of_prey", "flight", "vision"]
+      },
+      {
+        "word": "wolf",
+        "bank": "animals",
+        "image_key": "subject_wolf",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["pack_animals", "predators", "wild_dogs"]
+      },
+      {
+        "word": "shark",
+        "bank": "animals",
+        "image_key": "subject_shark",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["ocean_predators", "fish", "ancient_creatures"]
+      },
+      {
+        "word": "fox",
+        "bank": "animals",
+        "image_key": "subject_fox",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["carnivores", "intelligence", "habitats_temperate"]
+      },
+      {
+        "word": "penguin",
+        "bank": "animals",
+        "image_key": "subject_penguin",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["flightless_birds", "polar_habitats", "family_groups"]
+      },
+      {
+        "word": "elephant",
+        "bank": "animals",
+        "image_key": "subject_elephant",
+        "determiner_options": ["The", "An", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["largest_animals", "endangered_species", "social_animals"]
+      }
+    ],
+    "nature": [
+      {
+        "word": "storm",
+        "bank": "nature",
+        "image_key": "subject_storm",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["weather", "forces_of_nature", "atmospheric_phenomena"]
+      },
+      {
+        "word": "river",
+        "bank": "nature",
+        "image_key": "subject_river",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["water_systems", "geography", "ecosystems"]
+      },
+      {
+        "word": "forest",
+        "bank": "nature",
+        "image_key": "subject_forest",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["woodland_habitats", "biodiversity", "climate"]
+      },
+      {
+        "word": "mountain",
+        "bank": "nature",
+        "image_key": "subject_mountain",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["landforms", "geology", "altitude"]
+      },
+      {
+        "word": "ocean",
+        "bank": "nature",
+        "image_key": "subject_ocean",
+        "determiner_options": ["The", "An", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["water_systems", "marine_life", "tides"]
+      },
+      {
+        "word": "volcano",
+        "bank": "nature",
+        "image_key": "subject_volcano",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["geology", "geological_activity", "natural_disasters"]
+      },
+      {
+        "word": "glacier",
+        "bank": "nature",
+        "image_key": "subject_glacier",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["ice_formations", "climate_change", "polar_regions"]
+      },
+      {
+        "word": "desert",
+        "bank": "nature",
+        "image_key": "subject_desert",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["arid_climates", "adaptation", "habitats"]
+      },
+      {
+        "word": "waterfall",
+        "bank": "nature",
+        "image_key": "subject_waterfall",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["water_features", "erosion", "gravity"]
+      },
+      {
+        "word": "meadow",
+        "bank": "nature",
+        "image_key": "subject_meadow",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["grasslands", "wildflowers", "habitats"]
+      },
+      {
+        "word": "canyon",
+        "bank": "nature",
+        "image_key": "subject_canyon",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["landforms", "erosion", "geological_time"]
+      },
+      {
+        "word": "lagoon",
+        "bank": "nature",
+        "image_key": "subject_lagoon",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["coastal_features", "water_systems", "marine_habitats"]
+      }
+    ],
+    "people_characters": [
+      {
+        "word": "explorer",
+        "bank": "people_characters",
+        "image_key": "subject_explorer",
+        "determiner_options": ["The", "An", "This"],
+        "gender_pronoun": "they",
+        "curriculum_topic_tags": ["discovery", "adventure", "history"]
+      },
+      {
+        "word": "knight",
+        "bank": "people_characters",
+        "image_key": "subject_knight",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "they",
+        "curriculum_topic_tags": ["medieval_period", "honour", "chivalry"]
+      },
+      {
+        "word": "scientist",
+        "bank": "people_characters",
+        "image_key": "subject_scientist",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "they",
+        "curriculum_topic_tags": ["scientific_method", "discovery", "knowledge"]
+      },
+      {
+        "word": "chef",
+        "bank": "people_characters",
+        "image_key": "subject_chef",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "they",
+        "curriculum_topic_tags": ["cooking", "food", "culture"]
+      },
+      {
+        "word": "pilot",
+        "bank": "people_characters",
+        "image_key": "subject_pilot",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "they",
+        "curriculum_topic_tags": ["aviation", "travel", "adventure"]
+      },
+      {
+        "word": "artist",
+        "bank": "people_characters",
+        "image_key": "subject_artist",
+        "determiner_options": ["The", "An", "This"],
+        "gender_pronoun": "they",
+        "curriculum_topic_tags": ["creativity", "art", "expression"]
+      },
+      {
+        "word": "inventor",
+        "bank": "people_characters",
+        "image_key": "subject_inventor",
+        "determiner_options": ["The", "An", "This"],
+        "gender_pronoun": "they",
+        "curriculum_topic_tags": ["innovation", "technology", "discovery"]
+      },
+      {
+        "word": "detective",
+        "bank": "people_characters",
+        "image_key": "subject_detective",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "they",
+        "curriculum_topic_tags": ["mystery", "investigation", "problem_solving"]
+      },
+      {
+        "word": "astronaut",
+        "bank": "people_characters",
+        "image_key": "subject_astronaut",
+        "determiner_options": ["The", "An", "This"],
+        "gender_pronoun": "they",
+        "curriculum_topic_tags": ["space_exploration", "science", "adventure"]
+      },
+      {
+        "word": "architect",
+        "bank": "people_characters",
+        "image_key": "subject_architect",
+        "determiner_options": ["The", "An", "This"],
+        "gender_pronoun": "they",
+        "curriculum_topic_tags": ["design", "buildings", "planning"]
+      },
+      {
+        "word": "poet",
+        "bank": "people_characters",
+        "image_key": "subject_poet",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "they",
+        "curriculum_topic_tags": ["literature", "creativity", "language"]
+      },
+      {
+        "word": "musician",
+        "bank": "people_characters",
+        "image_key": "subject_musician",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "they",
+        "curriculum_topic_tags": ["music", "creativity", "performance"]
+      }
+    ],
+    "urban": [
+      {
+        "word": "city",
+        "bank": "urban",
+        "image_key": "subject_city",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["urban_environments", "geography", "human_settlements"]
+      },
+      {
+        "word": "library",
+        "bank": "urban",
+        "image_key": "subject_library",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["knowledge", "learning", "literacy"]
+      },
+      {
+        "word": "market",
+        "bank": "urban",
+        "image_key": "subject_market",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["commerce", "communities", "culture"]
+      },
+      {
+        "word": "stadium",
+        "bank": "urban",
+        "image_key": "subject_stadium",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["sports", "gatherings", "community"]
+      },
+      {
+        "word": "museum",
+        "bank": "urban",
+        "image_key": "subject_museum",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["history", "art", "culture"]
+      },
+      {
+        "word": "harbour",
+        "bank": "urban",
+        "image_key": "subject_harbour",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["maritime", "trade", "geography"]
+      },
+      {
+        "word": "cathedral",
+        "bank": "urban",
+        "image_key": "subject_cathedral",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["architecture", "history", "culture"]
+      },
+      {
+        "word": "laboratory",
+        "bank": "urban",
+        "image_key": "subject_laboratory",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["science", "research", "discovery"]
+      },
+      {
+        "word": "lighthouse",
+        "bank": "urban",
+        "image_key": "subject_lighthouse",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["maritime", "safety", "guidance"]
+      },
+      {
+        "word": "tower",
+        "bank": "urban",
+        "image_key": "subject_tower",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["architecture", "landmarks", "height"]
+      },
+      {
+        "word": "bridge",
+        "bank": "urban",
+        "image_key": "subject_bridge",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["engineering", "connections", "infrastructure"]
+      },
+      {
+        "word": "garden",
+        "bank": "urban",
+        "image_key": "subject_garden",
+        "determiner_options": ["The", "A", "This"],
+        "gender_pronoun": "it",
+        "curriculum_topic_tags": ["plants", "growth", "nature_in_cities"]
+      }
+    ]
+  },
+  "weekly_schedule": {
+    "week_1": "animals",
+    "week_2": "nature",
+    "week_3": "people_characters",
+    "week_4": "urban"
+  },
+  "subjects": [
+    {
+      "word": "dragon",
+      "bank": "animals",
+      "image_key": "subject_dragon",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["myths_legends", "fantasy", "ancient_cultures"]
+    },
+    {
+      "word": "tiger",
+      "bank": "animals",
+      "image_key": "subject_tiger",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["big_cats", "endangered_species", "habitats_asia"]
+    },
+    {
+      "word": "owl",
+      "bank": "animals",
+      "image_key": "subject_owl",
+      "determiner_options": ["The", "An", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["birds_of_prey", "nocturnal_animals", "forest_habitats"]
+    },
+    {
+      "word": "dolphin",
+      "bank": "animals",
+      "image_key": "subject_dolphin",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["ocean_mammals", "marine_life", "intelligence"]
+    },
+    {
+      "word": "bear",
+      "bank": "animals",
+      "image_key": "subject_bear",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["forest_animals", "endangered_species", "hibernation"]
+    },
+    {
+      "word": "leopard",
+      "bank": "animals",
+      "image_key": "subject_leopard",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["big_cats", "camouflage", "habitats_africa"]
+    },
+    {
+      "word": "eagle",
+      "bank": "animals",
+      "image_key": "subject_eagle",
+      "determiner_options": ["The", "An", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["birds_of_prey", "flight", "vision"]
+    },
+    {
+      "word": "wolf",
+      "bank": "animals",
+      "image_key": "subject_wolf",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["pack_animals", "predators", "wild_dogs"]
+    },
+    {
+      "word": "shark",
+      "bank": "animals",
+      "image_key": "subject_shark",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["ocean_predators", "fish", "ancient_creatures"]
+    },
+    {
+      "word": "fox",
+      "bank": "animals",
+      "image_key": "subject_fox",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["carnivores", "intelligence", "habitats_temperate"]
+    },
+    {
+      "word": "penguin",
+      "bank": "animals",
+      "image_key": "subject_penguin",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["flightless_birds", "polar_habitats", "family_groups"]
+    },
+    {
+      "word": "elephant",
+      "bank": "animals",
+      "image_key": "subject_elephant",
+      "determiner_options": ["The", "An", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["largest_animals", "endangered_species", "social_animals"]
+    },
+    {
+      "word": "storm",
+      "bank": "nature",
+      "image_key": "subject_storm",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["weather", "forces_of_nature", "atmospheric_phenomena"]
+    },
+    {
+      "word": "river",
+      "bank": "nature",
+      "image_key": "subject_river",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["water_systems", "geography", "ecosystems"]
+    },
+    {
+      "word": "forest",
+      "bank": "nature",
+      "image_key": "subject_forest",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["woodland_habitats", "biodiversity", "climate"]
+    },
+    {
+      "word": "mountain",
+      "bank": "nature",
+      "image_key": "subject_mountain",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["landforms", "geology", "altitude"]
+    },
+    {
+      "word": "ocean",
+      "bank": "nature",
+      "image_key": "subject_ocean",
+      "determiner_options": ["The", "An", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["water_systems", "marine_life", "tides"]
+    },
+    {
+      "word": "volcano",
+      "bank": "nature",
+      "image_key": "subject_volcano",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["geology", "geological_activity", "natural_disasters"]
+    },
+    {
+      "word": "glacier",
+      "bank": "nature",
+      "image_key": "subject_glacier",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["ice_formations", "climate_change", "polar_regions"]
+    },
+    {
+      "word": "desert",
+      "bank": "nature",
+      "image_key": "subject_desert",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["arid_climates", "adaptation", "habitats"]
+    },
+    {
+      "word": "waterfall",
+      "bank": "nature",
+      "image_key": "subject_waterfall",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["water_features", "erosion", "gravity"]
+    },
+    {
+      "word": "meadow",
+      "bank": "nature",
+      "image_key": "subject_meadow",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["grasslands", "wildflowers", "habitats"]
+    },
+    {
+      "word": "canyon",
+      "bank": "nature",
+      "image_key": "subject_canyon",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["landforms", "erosion", "geological_time"]
+    },
+    {
+      "word": "lagoon",
+      "bank": "nature",
+      "image_key": "subject_lagoon",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["coastal_features", "water_systems", "marine_habitats"]
+    },
+    {
+      "word": "explorer",
+      "bank": "people_characters",
+      "image_key": "subject_explorer",
+      "determiner_options": ["The", "An", "This"],
+      "gender_pronoun": "they",
+      "curriculum_topic_tags": ["discovery", "adventure", "history"]
+    },
+    {
+      "word": "knight",
+      "bank": "people_characters",
+      "image_key": "subject_knight",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "they",
+      "curriculum_topic_tags": ["medieval_period", "honour", "chivalry"]
+    },
+    {
+      "word": "scientist",
+      "bank": "people_characters",
+      "image_key": "subject_scientist",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "they",
+      "curriculum_topic_tags": ["scientific_method", "discovery", "knowledge"]
+    },
+    {
+      "word": "chef",
+      "bank": "people_characters",
+      "image_key": "subject_chef",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "they",
+      "curriculum_topic_tags": ["cooking", "food", "culture"]
+    },
+    {
+      "word": "pilot",
+      "bank": "people_characters",
+      "image_key": "subject_pilot",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "they",
+      "curriculum_topic_tags": ["aviation", "travel", "adventure"]
+    },
+    {
+      "word": "artist",
+      "bank": "people_characters",
+      "image_key": "subject_artist",
+      "determiner_options": ["The", "An", "This"],
+      "gender_pronoun": "they",
+      "curriculum_topic_tags": ["creativity", "art", "expression"]
+    },
+    {
+      "word": "inventor",
+      "bank": "people_characters",
+      "image_key": "subject_inventor",
+      "determiner_options": ["The", "An", "This"],
+      "gender_pronoun": "they",
+      "curriculum_topic_tags": ["innovation", "technology", "discovery"]
+    },
+    {
+      "word": "detective",
+      "bank": "people_characters",
+      "image_key": "subject_detective",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "they",
+      "curriculum_topic_tags": ["mystery", "investigation", "problem_solving"]
+    },
+    {
+      "word": "astronaut",
+      "bank": "people_characters",
+      "image_key": "subject_astronaut",
+      "determiner_options": ["The", "An", "This"],
+      "gender_pronoun": "they",
+      "curriculum_topic_tags": ["space_exploration", "science", "adventure"]
+    },
+    {
+      "word": "architect",
+      "bank": "people_characters",
+      "image_key": "subject_architect",
+      "determiner_options": ["The", "An", "This"],
+      "gender_pronoun": "they",
+      "curriculum_topic_tags": ["design", "buildings", "planning"]
+    },
+    {
+      "word": "poet",
+      "bank": "people_characters",
+      "image_key": "subject_poet",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "they",
+      "curriculum_topic_tags": ["literature", "creativity", "language"]
+    },
+    {
+      "word": "musician",
+      "bank": "people_characters",
+      "image_key": "subject_musician",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "they",
+      "curriculum_topic_tags": ["music", "creativity", "performance"]
+    },
+    {
+      "word": "city",
+      "bank": "urban",
+      "image_key": "subject_city",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["urban_environments", "geography", "human_settlements"]
+    },
+    {
+      "word": "library",
+      "bank": "urban",
+      "image_key": "subject_library",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["knowledge", "learning", "literacy"]
+    },
+    {
+      "word": "market",
+      "bank": "urban",
+      "image_key": "subject_market",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["commerce", "communities", "culture"]
+    },
+    {
+      "word": "stadium",
+      "bank": "urban",
+      "image_key": "subject_stadium",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["sports", "gatherings", "community"]
+    },
+    {
+      "word": "museum",
+      "bank": "urban",
+      "image_key": "subject_museum",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["history", "art", "culture"]
+    },
+    {
+      "word": "harbour",
+      "bank": "urban",
+      "image_key": "subject_harbour",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["maritime", "trade", "geography"]
+    },
+    {
+      "word": "cathedral",
+      "bank": "urban",
+      "image_key": "subject_cathedral",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["architecture", "history", "culture"]
+    },
+    {
+      "word": "laboratory",
+      "bank": "urban",
+      "image_key": "subject_laboratory",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["science", "research", "discovery"]
+    },
+    {
+      "word": "lighthouse",
+      "bank": "urban",
+      "image_key": "subject_lighthouse",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["maritime", "safety", "guidance"]
+    },
+    {
+      "word": "tower",
+      "bank": "urban",
+      "image_key": "subject_tower",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["architecture", "landmarks", "height"]
+    },
+    {
+      "word": "bridge",
+      "bank": "urban",
+      "image_key": "subject_bridge",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["engineering", "connections", "infrastructure"]
+    },
+    {
+      "word": "garden",
+      "bank": "urban",
+      "image_key": "subject_garden",
+      "determiner_options": ["The", "A", "This"],
+      "gender_pronoun": "it",
+      "curriculum_topic_tags": ["plants", "growth", "nature_in_cities"]
+    }
+  ]
+}
