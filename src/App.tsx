@@ -9,7 +9,6 @@ import type { Profile } from './types/index'
 
 // Route guards
 import { ProtectedRoute } from './components/ui/ProtectedRoute'
-import { RoleRedirect } from './components/ui/RoleRedirect'
 import { LoadingSpinner } from './components/ui/LoadingSpinner'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { ToastContainer } from './components/ui/ToastContainer'
@@ -19,6 +18,7 @@ import { applyHighContrastPreference } from './lib/contrastMode'
 import { useSettingsStore } from './stores/settingsStore'
 
 // Static pages (small, load eagerly)
+import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import FormulaPage from './pages/FormulaPage'
@@ -132,8 +132,8 @@ function App() {
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
 
-            {/* WF-002: Role-based redirect from root */}
-            <Route path="/" element={<RoleRedirect />} />
+            {/* Landing page — redirects logged-in users to their dashboard */}
+            <Route path="/" element={<HomePage />} />
 
             {/* WF-003: Pupil dashboard — pupils only */}
             <Route
