@@ -11,18 +11,18 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['mascot/mascot_std_1.png'],
       manifest: {
         name: 'WriFe — Progressive Writing Practice',
-        short_name: 'WriFe',
+        short_name: 'WriFe PWP',
         description: 'Gamified grammar and writing practice for UK schools',
-        theme_color: '#4A9BD4',
-        background_color: '#D4EBF8',
+        theme_color: '#6C5CE7',
+        background_color: '#FDF8EE',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
-          { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: '/mascot/mascot_std_1.png', sizes: '192x192', type: 'image/png' },
+          { src: '/mascot/mascot_std_1.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
         ],
       },
       workbox: {
