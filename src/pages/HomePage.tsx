@@ -3,22 +3,24 @@ import { useAuthStore } from '../stores/authStore'
 import { Role } from '../types/index'
 
 // ---------------------------------------------------------------------------
-// Colour tokens (mapped from index.css CSS variables)
-// All hard-coded hex values below are the resolved values of CSS variables
-// declared in :root — the variables themselves are used inline where possible.
+// Colour tokens — all explicit hex values; NO CSS variables (index.css uses a
+// different colour scheme for the learning app UI, not this landing page).
 // ---------------------------------------------------------------------------
 const C = {
-  purple:  'var(--color-brand-primary)',   // #6C5CE7
-  orange:  'var(--color-brand-secondary)', // #F5A623
-  gold:    'var(--color-brand-accent)',    // #F5C500
-  cream:   '#FDF8EE',
-  dark:    '#2D3436',
-  muted:   '#636E72',
-  border:  '#E8E0D5',
-  teal:    '#00B894',
-  blue:    '#0984E3',
-  white:   '#fff',
-}
+  purple:   '#6C5CE7',
+  orange:   '#F5A623',
+  gold:     '#F5C500',
+  cream:    '#FDF8EE',
+  dark:     '#2D3436',
+  muted:    '#636E72',
+  border:   '#E8E0D5',
+  teal:     '#00B894',
+  blue:     '#0984E3',
+  white:    '#FFFFFF',
+  world1bg: '#F0EEFF',
+  world2bg: '#E0FAF4',
+  world3bg: '#FFF4E0',
+} as const
 
 // ---------------------------------------------------------------------------
 // Sub-components (inline, no external CSS classes)
@@ -38,11 +40,11 @@ function BookSVG() {
 // Badge data — exactly 5, one from each category to show the range
 // ---------------------------------------------------------------------------
 const BADGES = [
-  { emoji: '🎯', name: 'First Steps',         rarity: 'Common',   rarityColor: C.teal,   bg: '#E0FAF4' },
-  { emoji: '🔥', name: 'On Fire',             rarity: 'Common',   rarityColor: C.teal,   bg: '#FFF8D6' },
-  { emoji: '✏️', name: 'Paragraph Pioneer',   rarity: 'Common',   rarityColor: C.teal,   bg: '#E0FAF4' },
-  { emoji: '👑', name: 'Fortnight Champion',  rarity: 'Rare',     rarityColor: C.blue,   bg: '#E3F2FD' },
-  { emoji: '💎', name: 'Greater Depth',       rarity: 'Epic',     rarityColor: C.orange, bg: '#FFF4E0' },
+  { emoji: '🎯', name: 'First Steps',        rarity: 'Common', rarityColor: C.teal,   bg: '#E0FAF4', borderColor: '#00B894' },
+  { emoji: '🔥', name: 'On Fire',            rarity: 'Common', rarityColor: C.teal,   bg: '#FFE8D6', borderColor: '#F5A623' },
+  { emoji: '✏️', name: 'Paragraph Pioneer',  rarity: 'Common', rarityColor: C.teal,   bg: '#F0EEFF', borderColor: '#6C5CE7' },
+  { emoji: '👑', name: 'Fortnight Champion', rarity: 'Rare',   rarityColor: C.blue,   bg: '#E3F2FD', borderColor: '#0984E3' },
+  { emoji: '💎', name: 'Greater Depth',      rarity: 'Epic',   rarityColor: C.orange, bg: '#FFF4E0', borderColor: '#F5C500' },
 ]
 
 // ---------------------------------------------------------------------------
@@ -132,15 +134,15 @@ export default function HomePage() {
       </nav>
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <div style={{ padding: 20, maxWidth: 600, margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+      <div style={{ background: C.purple, padding: '28px 24px 24px', color: '#fff' }}>
+        <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', alignItems: 'flex-start', gap: 16 }}>
 
           {/* Hero text */}
           <div style={{ flex: 1 }}>
             <span style={{
               display: 'inline-block',
-              background: '#FFF4E0',
-              color: C.orange,
+              background: 'rgba(255,255,255,0.15)',
+              color: '#fff',
               fontSize: 10,
               fontWeight: 800,
               letterSpacing: '0.06em',
@@ -152,18 +154,17 @@ export default function HomePage() {
               Level up your writing
             </span>
 
-            <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.25, marginBottom: 8, margin: '0 0 8px' }}>
+            <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.25, margin: '0 0 8px', color: '#fff' }}>
               Write.{' '}
-              <span style={{ color: C.orange }}>Earn.</span>
+              <span style={{ color: C.gold }}>Earn.</span>
               {' '}Grow.
             </h1>
 
             <p style={{
               fontSize: 13,
-              color: C.muted,
+              color: 'rgba(255,255,255,0.8)',
               lineHeight: 1.55,
               maxWidth: 280,
-              marginBottom: 12,
               margin: '0 0 12px',
             }}>
               Daily grammar missions, XP rewards, streaks and badges — the most fun way to master writing.
@@ -191,7 +192,7 @@ export default function HomePage() {
           <div style={{
             background: C.white,
             borderRadius: 14,
-            border: `1.5px solid ${C.border}`,
+            border: 'none',
             padding: 12,
             width: 130,
             flexShrink: 0,
@@ -206,8 +207,8 @@ export default function HomePage() {
             </div>
 
             {/* Progress bar */}
-            <div style={{ background: '#F0EEFF', borderRadius: 20, height: 6, marginBottom: 6 }}>
-              <div style={{ background: C.purple, borderRadius: 20, height: 6, width: '65%' }} />
+            <div style={{ background: 'rgba(255,255,255,0.3)', borderRadius: 20, height: 6, marginBottom: 6 }}>
+              <div style={{ background: C.orange, borderRadius: 20, height: 6, width: '65%' }} />
             </div>
 
             {/* Level + XP */}
@@ -226,7 +227,6 @@ export default function HomePage() {
       {/* ── GAMIFICATION ROW ─────────────────────────────────────────────── */}
       <div style={{
         background: C.white,
-        borderTop: `1px solid ${C.border}`,
         borderBottom: `1px solid ${C.border}`,
         padding: '14px 20px',
         display: 'flex',
@@ -234,13 +234,23 @@ export default function HomePage() {
         textAlign: 'center',
       }}>
         {[
-          { icon: '⚡', name: 'XP every session',  desc: 'Earn more for harder levels' },
-          { icon: '🔥', name: 'Daily streaks',      desc: 'Protect with a shield' },
-          { icon: '🏅', name: '15 badges',          desc: 'Common to epic' },
-          { icon: '📜', name: 'Certificates',       desc: 'Earn at every gate' },
+          { icon: '⚡', name: 'XP every session',  desc: 'Earn more for harder levels', circleBg: '#FFF8D6' },
+          { icon: '🔥', name: 'Daily streaks',      desc: 'Protect with a shield',       circleBg: '#FFE8D6' },
+          { icon: '🏅', name: '15 badges',          desc: 'Common to epic',              circleBg: '#F0EEFF' },
+          { icon: '📜', name: 'Certificates',       desc: 'Earn at every gate',          circleBg: '#E0FAF4' },
         ].map((item) => (
           <div key={item.name}>
-            <div style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</div>
+            <div style={{
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              background: item.circleBg,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 18,
+              margin: '0 auto 6px',
+            }}>{item.icon}</div>
             <div style={{ fontSize: 11, fontWeight: 800, color: C.dark }}>{item.name}</div>
             <div style={{ fontSize: 9, color: C.muted, marginTop: 1 }}>{item.desc}</div>
           </div>
@@ -282,15 +292,16 @@ export default function HomePage() {
           {BADGES.map((badge) => (
             <div key={badge.name} style={{ textAlign: 'center' }}>
               <div style={{
-                width: 44,
-                height: 44,
+                width: 56,
+                height: 56,
                 borderRadius: '50%',
                 background: badge.bg,
+                border: `2px solid ${badge.borderColor}`,
                 margin: '0 auto 4px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 18,
+                fontSize: 22,
               }}>
                 {badge.emoji}
               </div>
@@ -318,7 +329,7 @@ export default function HomePage() {
           { num: '3',  label: 'Layers'  },
         ].map((item) => (
           <div key={item.label} style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 18, fontWeight: 800 }}>{item.num}</div>
+            <div style={{ fontSize: 20, fontWeight: 800 }}>{item.num}</div>
             <div style={{ fontSize: 9, opacity: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{item.label}</div>
           </div>
         ))}
@@ -326,6 +337,12 @@ export default function HomePage() {
 
       {/* ── CTA CARDS ────────────────────────────────────────────────────── */}
       <div style={{ padding: '16px 20px', maxWidth: 600, margin: '0 auto' }}>
+        <div style={{
+          background: C.white,
+          borderRadius: 16,
+          padding: '20px',
+          border: `1px solid ${C.border}`,
+        }}>
         <p style={{
           fontSize: 10,
           fontWeight: 700,
@@ -333,8 +350,9 @@ export default function HomePage() {
           letterSpacing: '0.06em',
           color: C.muted,
           marginBottom: 8,
+          margin: '0 0 8px',
         }}>
-          Join the adventure
+          Where would you like to start?
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
 
@@ -416,6 +434,7 @@ export default function HomePage() {
             </span>
           </button>
 
+        </div>
         </div>
       </div>
 
