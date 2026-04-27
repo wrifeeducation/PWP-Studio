@@ -51,6 +51,22 @@ const queryClient = new QueryClient({
  * AuthInitialiser — sets up Supabase auth listener and populates Zustand store.
  * Renders nothing; used at root so auth is ready before routes render.
  */
+
+/** Fetch a user profile, but give up after 5 s to avoid an infinite spinner. */
+async function fetchProfileWithTimeout(userId: string): Promise<Profile | null> {
+  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
+  const fetch = Promise.resolve(
+    supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+  )
+    .then(({ data, error }) => (data && !error ? (data as Profile) : null))
+    .catch(() => null)
+  return Promise.race([fetch, timeout])
+}
+
 function AuthInitialiser() {
   const { setSession, setProfile, setLoading, setInitialised, clearAuth } = useAuthStore()
 
@@ -59,16 +75,8 @@ function AuthInitialiser() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
       if (session?.user) {
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-          if (data && !error) setProfile(data as Profile)
-        } catch (_err) {
-          // Profile fetch failed — user proceeds without profile (will be redirected to onboarding)
-        }
+        const profile = await fetchProfileWithTimeout(session.user.id)
+        if (profile) setProfile(profile)
       } else {
         clearAuth()
       }
@@ -85,16 +93,8 @@ function AuthInitialiser() {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session)
       if (session?.user) {
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-          if (data && !error) setProfile(data as Profile)
-        } catch (_err) {
-          // Profile fetch failed — user proceeds without profile
-        }
+        const profile = await fetchProfileWithTimeout(session.user.id)
+        if (profile) setProfile(profile)
       } else {
         clearAuth()
       }
