@@ -38,9 +38,11 @@ interface WritingTask {
   prompt_text: string
 }
 
-type TabId = 'pending' | 'progress' | 'assign' | 'interventions' | 'wordbanks' | 'analytics'
+type TabId = 'pending' | 'progress' | 'assign' | 'interventions' | 'wordbanks' | 'analytics' | 'classes' | 'programme'
 
 const TAB_LABELS: Record<TabId, string> = {
+  classes: 'My Classes',
+  programme: 'Programme',
   pending: 'Pending Review',
   progress: 'Class Progress',
   assign: 'Assign Task',
@@ -140,6 +142,8 @@ export default function TeacherPage() {
 
       {/* Tab content */}
       <main className="flex-1 p-4 max-w-6xl mx-auto w-full">
+        {activeTab === 'classes' && <MyClassesTab />}
+        {activeTab === 'programme' && <ProgrammeTab onNavigate={setActiveTab} />}
         {activeTab === 'pending' && <PendingReviewTab />}
         {activeTab === 'progress' && <ClassProgressTab />}
         {activeTab === 'assign' && <AssignTaskTab />}
@@ -836,6 +840,644 @@ function InterventionLogTab({ onResolve }: { onResolve: () => void }) {
           )}
         </>
       )}
+    </div>
+  )
+}
+
+// ─── My Classes Tab ───────────────────────────────────────────────────────────
+
+interface ClassRow {
+  id: string
+  name: string
+  year_group: number
+  academic_year: string
+  teacher_id: string | null
+  school_id: string
+  created_at: string
+}
+
+interface PupilRow {
+  id: string
+  first_name: string
+  year_group: number | null
+  class_id: string | null
+}
+
+function MyClassesTab() {
+  const { profile } = useAuthStore()
+  const [classes, setClasses] = useState<ClassRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedClass, setSelectedClass] = useState<ClassRow | null>(null)
+  const [pupils, setPupils] = useState<PupilRow[]>([])
+  const [unassignedPupils, setUnassignedPupils] = useState<PupilRow[]>([])
+  const [loadingPupils, setLoadingPupils] = useState(false)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [newClass, setNewClass] = useState({ name: '', year_group: '3', academic_year: '2025/26' })
+  const [saving, setSaving] = useState(false)
+  const [addingPupil, setAddingPupil] = useState<string | null>(null)
+  const [removingPupil, setRemovingPupil] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!profile?.school_id) return
+    supabase
+      .from('classes')
+      .select('*')
+      .eq('school_id', profile.school_id)
+      .order('year_group')
+      .then(({ data }) => {
+        setClasses((data as ClassRow[]) ?? [])
+        setLoading(false)
+      })
+  }, [profile])
+
+  const loadClassPupils = async (cls: ClassRow) => {
+    setSelectedClass(cls)
+    setLoadingPupils(true)
+    const [enrolledRes, unassignedRes] = await Promise.all([
+      supabase.from('profiles').select('id, first_name, year_group, class_id')
+        .eq('class_id', cls.id).eq('role', 'pupil').order('first_name'),
+      supabase.from('profiles').select('id, first_name, year_group, class_id')
+        .eq('school_id', cls.school_id).eq('role', 'pupil').is('class_id', null).order('first_name'),
+    ])
+    setPupils((enrolledRes.data as PupilRow[]) ?? [])
+    setUnassignedPupils((unassignedRes.data as PupilRow[]) ?? [])
+    setLoadingPupils(false)
+  }
+
+  const handleCreateClass = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!profile?.school_id || !newClass.name.trim()) return
+    setSaving(true)
+    setError(null)
+    const { data, error: err } = await supabase.from('classes').insert({
+      name: newClass.name.trim(),
+      year_group: parseInt(newClass.year_group),
+      academic_year: newClass.academic_year,
+      school_id: profile.school_id,
+      teacher_id: profile.id,
+    }).select().single()
+    setSaving(false)
+    if (err) { setError(err.message); return }
+    setClasses((prev) => [...prev, data as ClassRow].sort((a, b) => a.year_group - b.year_group))
+    setNewClass({ name: '', year_group: '3', academic_year: '2025/26' })
+    setShowCreateForm(false)
+  }
+
+  const handleAddPupil = async (pupil: PupilRow) => {
+    if (!selectedClass) return
+    setAddingPupil(pupil.id)
+    await supabase.from('profiles').update({ class_id: selectedClass.id }).eq('id', pupil.id)
+    setPupils((prev) => [...prev, { ...pupil, class_id: selectedClass.id }].sort((a, b) => a.first_name.localeCompare(b.first_name)))
+    setUnassignedPupils((prev) => prev.filter((p) => p.id !== pupil.id))
+    setAddingPupil(null)
+  }
+
+  const handleRemovePupil = async (pupil: PupilRow) => {
+    setRemovingPupil(pupil.id)
+    await supabase.from('profiles').update({ class_id: null }).eq('id', pupil.id)
+    setPupils((prev) => prev.filter((p) => p.id !== pupil.id))
+    setUnassignedPupils((prev) => [...prev, { ...pupil, class_id: null }].sort((a, b) => a.first_name.localeCompare(b.first_name)))
+    setRemovingPupil(null)
+  }
+
+  if (loading) return <LoadingSpinner />
+
+  // ── Class detail view ──────────────────────────────────────────────────────
+  if (selectedClass) {
+    return (
+      <div className="space-y-5" data-testid="class-detail-view">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setSelectedClass(null)}
+            className="text-sm px-3 py-1.5 rounded-lg"
+            style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
+          >
+            ← Back
+          </button>
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
+            {selectedClass.name} — Year {selectedClass.year_group}
+          </h2>
+          <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+            {selectedClass.academic_year}
+          </span>
+        </div>
+
+        {loadingPupils ? <LoadingSpinner /> : (
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Enrolled pupils */}
+            <div>
+              <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text)' }}>
+                Enrolled pupils ({pupils.length})
+              </h3>
+              {pupils.length === 0 ? (
+                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                  No pupils in this class yet. Add some from the list on the right.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {pupils.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between rounded-lg px-3 py-2"
+                      style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+                      data-testid={`enrolled-pupil-${p.id}`}
+                    >
+                      <span className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+                        {p.first_name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePupil(p)}
+                        disabled={removingPupil === p.id}
+                        className="text-xs px-2 py-1 rounded"
+                        style={{ color: '#DC2626', border: '1px solid #FECACA' }}
+                      >
+                        {removingPupil === p.id ? '…' : 'Remove'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Unassigned pupils */}
+            <div>
+              <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text)' }}>
+                Pupils not in a class ({unassignedPupils.length})
+              </h3>
+              {unassignedPupils.length === 0 ? (
+                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                  All school pupils are already assigned to a class.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {unassignedPupils.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between rounded-lg px-3 py-2"
+                      style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)' }}
+                      data-testid={`unassigned-pupil-${p.id}`}
+                    >
+                      <span className="text-sm" style={{ color: 'var(--color-text)' }}>
+                        {p.first_name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleAddPupil(p)}
+                        disabled={addingPupil === p.id}
+                        className="text-xs px-2 py-1 rounded font-medium text-white"
+                        style={{ backgroundColor: 'var(--color-brand-primary)', opacity: addingPupil === p.id ? 0.6 : 1 }}
+                      >
+                        {addingPupil === p.id ? '…' : 'Add'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          To create new pupil accounts, use the School Admin panel → Manage Users.
+        </p>
+      </div>
+    )
+  }
+
+  // ── Class list view ────────────────────────────────────────────────────────
+  return (
+    <div className="space-y-5" data-testid="my-classes-tab">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }} data-tts="My classes">
+          My Classes
+        </h2>
+        <button
+          type="button"
+          onClick={() => setShowCreateForm((v) => !v)}
+          data-testid="create-class-button"
+          className="text-sm px-4 py-2 rounded-lg font-semibold text-white"
+          style={{ backgroundColor: 'var(--color-brand-primary)' }}
+        >
+          {showCreateForm ? 'Cancel' : '+ Create class'}
+        </button>
+      </div>
+
+      {/* Create class form */}
+      {showCreateForm && (
+        <form
+          onSubmit={handleCreateClass}
+          className="rounded-xl p-4 space-y-4"
+          style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+          data-testid="create-class-form"
+        >
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>New class</h3>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Class name</label>
+              <input
+                type="text"
+                required
+                value={newClass.name}
+                onChange={(e) => setNewClass((d) => ({ ...d, name: e.target.value }))}
+                placeholder="e.g. 3 Willow"
+                data-testid="new-class-name"
+                className="rounded-lg px-3 py-2 text-sm"
+                style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Year group</label>
+              <select
+                value={newClass.year_group}
+                onChange={(e) => setNewClass((d) => ({ ...d, year_group: e.target.value }))}
+                data-testid="new-class-year"
+                className="rounded-lg px-3 py-2 text-sm"
+                style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+              >
+                {[1,2,3,4,5,6,7,8,9].map((y) => (
+                  <option key={y} value={y}>Year {y}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Academic year</label>
+              <input
+                type="text"
+                value={newClass.academic_year}
+                onChange={(e) => setNewClass((d) => ({ ...d, academic_year: e.target.value }))}
+                placeholder="2025/26"
+                data-testid="new-class-acyear"
+                className="rounded-lg px-3 py-2 text-sm"
+                style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+              />
+            </div>
+          </div>
+          {error && <p className="text-xs" style={{ color: '#DC2626' }}>{error}</p>}
+          <button
+            type="submit"
+            disabled={saving}
+            data-testid="save-class-button"
+            className="px-5 py-2 rounded-lg text-sm font-semibold text-white"
+            style={{ backgroundColor: 'var(--color-brand-primary)', opacity: saving ? 0.6 : 1 }}
+          >
+            {saving ? 'Creating…' : 'Create class'}
+          </button>
+        </form>
+      )}
+
+      {/* Class list */}
+      {classes.length === 0 ? (
+        <div className="text-center py-16" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-lg">No classes yet.</p>
+          <p className="text-sm mt-1">Create your first class using the button above.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {classes.map((cls) => (
+            <button
+              key={cls.id}
+              type="button"
+              onClick={() => loadClassPupils(cls)}
+              data-testid={`class-row-${cls.id}`}
+              className="w-full text-left rounded-xl p-4 flex items-center justify-between gap-4 transition-opacity hover:opacity-80"
+              style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+            >
+              <div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>{cls.name}</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                  Year {cls.year_group} · {cls.academic_year}
+                </p>
+              </div>
+              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>View →</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Programme Tab ────────────────────────────────────────────────────────────
+
+interface FormulaLevel {
+  id: number
+  phase: string
+  nc_year_group_min: number
+  nc_year_group_max: number
+  paragraph_active: boolean
+  formula_elements: Array<{ word_class: string; example: string; position: number }>
+}
+
+interface PhaseInfo {
+  phase: string
+  label: string
+  description: string
+  color: string
+  bg: string
+}
+
+const PHASE_INFO: PhaseInfo[] = [
+  {
+    phase: 'A',
+    label: 'Phase A — Core Patterns',
+    description: 'Foundational sentence structures from simple noun + verb through to prepositional phrases. Suitable for Years 1–7.',
+    color: '#6C5CE7',
+    bg: '#F0EEFF',
+  },
+  {
+    phase: 'B',
+    label: 'Phase B — Extended Patterns',
+    description: 'More complex sentences with adverbs, conjunctions, and embedded clauses. Years 5–9.',
+    color: '#0984E3',
+    bg: '#EFF6FF',
+  },
+  {
+    phase: 'C',
+    label: 'Phase C — KS2 Complexity',
+    description: 'Relative clauses, fronted adverbials, and passive voice. Years 4–6.',
+    color: '#00B894',
+    bg: '#E0FAF4',
+  },
+  {
+    phase: 'D',
+    label: 'Phase D — KS3 Sophistication',
+    description: 'Syntactic embedding, rhetorical structures, and complex subordination. Years 5–9.',
+    color: '#F5A623',
+    bg: '#FFF4E0',
+  },
+]
+
+const WORD_CLASS_COLORS: Record<string, string> = {
+  noun: '#6C5CE7',
+  verb: '#00B894',
+  adjective: '#F5A623',
+  adverb: '#0984E3',
+  determiner: '#E17055',
+  preposition: '#A29BFE',
+  pronoun: '#74B9FF',
+  conjunction: '#FD79A8',
+  article: '#E17055',
+}
+
+function ProgrammeTab({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
+  const [levels, setLevels] = useState<FormulaLevel[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expandedPhase, setExpandedPhase] = useState<string | null>('A')
+  const [expandedLevel, setExpandedLevel] = useState<number | null>(null)
+
+  useEffect(() => {
+    supabase
+      .from('formula_levels')
+      .select('id, phase, nc_year_group_min, nc_year_group_max, paragraph_active, formula_elements')
+      .order('id')
+      .then(({ data }) => {
+        setLevels((data as FormulaLevel[]) ?? [])
+        setLoading(false)
+      })
+  }, [])
+
+  const byPhase = PHASE_INFO.map((pi) => ({
+    ...pi,
+    levels: levels.filter((l) => l.phase === pi.phase),
+  }))
+
+  if (loading) return <LoadingSpinner />
+
+  return (
+    <div className="space-y-8" data-testid="programme-tab">
+      <div>
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }} data-tts="Programme overview">
+          Programme Overview
+        </h2>
+        <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
+          WriFe teaches structured writing through four progressive layers. Pupils move through all layers as they develop mastery.
+        </p>
+      </div>
+
+      {/* ── Section 1: Word Learning ───────────────────────────────────────── */}
+      <section>
+        <div
+          className="rounded-xl p-5"
+          style={{ backgroundColor: '#F0EEFF', border: '1px solid #D4CAFE' }}
+        >
+          <div className="flex items-start gap-4">
+            <span style={{ fontSize: 28 }}>📚</span>
+            <div className="flex-1">
+              <h3 className="font-bold text-base" style={{ color: '#4C3BAA' }}>
+                Layer 0 — Word Learning
+              </h3>
+              <p className="text-sm mt-1" style={{ color: '#6C5CE7' }}>
+                Before pupils build sentences, they learn the vocabulary they'll need. Each formula level comes with a curated word bank for every word class in that formula.
+              </p>
+              <ul className="text-sm mt-3 space-y-1" style={{ color: '#4C3BAA' }}>
+                <li>• Word banks organised by word class (nouns, verbs, adjectives, etc.)</li>
+                <li>• You can customise word banks per level — add topic-specific vocabulary, remove words, set year-group relevance</li>
+                <li>• Pupils see only the words from their current formula level's bank during practice</li>
+              </ul>
+              <button
+                type="button"
+                onClick={() => onNavigate('wordbanks')}
+                className="mt-3 text-xs px-3 py-1.5 rounded-lg font-semibold"
+                style={{ backgroundColor: '#6C5CE7', color: '#fff' }}
+              >
+                Go to Word Banks →
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Section 2: Formula Practice ───────────────────────────────────── */}
+      <section>
+        <h3 className="text-base font-bold mb-1" style={{ color: 'var(--color-text)' }}>
+          Layer 1 — Formula Practice (L1–L67)
+        </h3>
+        <p className="text-sm mb-4" style={{ color: 'var(--color-text-muted)' }}>
+          Pupils build grammatically correct sentences by placing colour-coded word tiles into formula slots. Each level introduces a new syntactic structure. Pupils earn XP and unlock the next level on mastery (80%+ accuracy). 67 levels across 4 phases cover Years 1–9.
+        </p>
+
+        <div className="space-y-3">
+          {byPhase.map(({ phase, label, description, color, bg, levels: phaseLevels }) => (
+            <div
+              key={phase}
+              className="rounded-xl overflow-hidden"
+              style={{ border: `1px solid ${color}40` }}
+            >
+              {/* Phase header */}
+              <button
+                type="button"
+                onClick={() => setExpandedPhase(expandedPhase === phase ? null : phase)}
+                className="w-full flex items-center justify-between px-5 py-4 text-left"
+                style={{ backgroundColor: bg }}
+                data-testid={`phase-${phase}-toggle`}
+              >
+                <div>
+                  <span className="font-bold text-sm" style={{ color }}>{label}</span>
+                  <span className="ml-3 text-xs" style={{ color: color + 'AA' }}>
+                    L{phaseLevels[0]?.id}–L{phaseLevels[phaseLevels.length - 1]?.id} · {phaseLevels.length} levels
+                  </span>
+                  <p className="text-xs mt-0.5" style={{ color: color + 'CC' }}>{description}</p>
+                </div>
+                <span style={{ color, fontSize: 18 }}>{expandedPhase === phase ? '▲' : '▼'}</span>
+              </button>
+
+              {/* Level list */}
+              {expandedPhase === phase && (
+                <div
+                  className="divide-y"
+                  style={{ backgroundColor: 'var(--color-surface)', borderTop: `1px solid ${color}40` }}
+                >
+                  {phaseLevels.map((level) => (
+                    <div key={level.id}>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedLevel(expandedLevel === level.id ? null : level.id)}
+                        className="w-full flex items-center justify-between px-5 py-3 text-left hover:opacity-80"
+                        data-testid={`level-${level.id}-toggle`}
+                      >
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span
+                            className="text-xs font-bold px-2 py-0.5 rounded"
+                            style={{ backgroundColor: bg, color }}
+                          >
+                            L{level.id}
+                          </span>
+                          {/* Formula pattern summary */}
+                          <span className="text-sm" style={{ color: 'var(--color-text)' }}>
+                            {level.formula_elements.map((el) => el.word_class).join(' + ')}
+                          </span>
+                          {level.paragraph_active && (
+                            <span
+                              className="text-xs px-1.5 py-0.5 rounded"
+                              style={{ backgroundColor: '#F0FDF4', color: '#166534' }}
+                            >
+                              + Paragraph
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs flex-shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+                          Yr {level.nc_year_group_min}–{level.nc_year_group_max}
+                          <span className="ml-1">{expandedLevel === level.id ? '▲' : '▼'}</span>
+                        </span>
+                      </button>
+
+                      {expandedLevel === level.id && (
+                        <div
+                          className="px-5 pb-4 flex flex-wrap gap-2"
+                          style={{ backgroundColor: 'var(--color-background)' }}
+                        >
+                          {level.formula_elements.map((el) => (
+                            <div
+                              key={el.position}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                              style={{
+                                backgroundColor: (WORD_CLASS_COLORS[el.word_class] ?? '#636E72') + '1A',
+                                color: WORD_CLASS_COLORS[el.word_class] ?? '#636E72',
+                                border: `1px solid ${(WORD_CLASS_COLORS[el.word_class] ?? '#636E72')}40`,
+                              }}
+                            >
+                              <span className="opacity-60">#{el.position}</span>
+                              <span className="capitalize">{el.word_class}</span>
+                              <span className="opacity-50">— e.g. &ldquo;{el.example}&rdquo;</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Section 3: Paragraph Builder ──────────────────────────────────── */}
+      <section>
+        <div
+          className="rounded-xl p-5"
+          style={{ backgroundColor: '#E0FAF4', border: '1px solid #81ECE8' }}
+        >
+          <div className="flex items-start gap-4">
+            <span style={{ fontSize: 28 }}>✏️</span>
+            <div className="flex-1">
+              <h3 className="font-bold text-base" style={{ color: '#006B5E' }}>
+                Layer 2 — Paragraph Builder <span className="text-sm font-normal">(unlocks at L8)</span>
+              </h3>
+              <p className="text-sm mt-1" style={{ color: '#00897B' }}>
+                Once pupils reach Level 8, they extend their formula sentence into a full paragraph using the <strong>LSC scaffold</strong>: Lead → Support → Close.
+              </p>
+              <div className="grid gap-3 mt-3 sm:grid-cols-3">
+                {[
+                  { label: 'Lead', desc: 'Introduces the topic or action — the formula sentence becomes the Lead.' },
+                  { label: 'Support', desc: '1–2 sentences that add detail, evidence, or description.' },
+                  { label: 'Close', desc: 'Concludes the paragraph with a consequence, reflection, or summary.' },
+                ].map(({ label, desc }) => (
+                  <div
+                    key={label}
+                    className="rounded-lg p-3"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.6)', border: '1px solid #81ECE8' }}
+                  >
+                    <p className="text-xs font-bold" style={{ color: '#006B5E' }}>{label}</p>
+                    <p className="text-xs mt-1" style={{ color: '#00897B' }}>{desc}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs mt-3" style={{ color: '#006B5E' }}>
+                Four genre types: Narrative, Non-fiction, Persuasive, Poetry. Each genre has its own LSC constraints and vocabulary suggestions.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Section 4: Writing Studio ──────────────────────────────────────── */}
+      <section>
+        <div
+          className="rounded-xl p-5"
+          style={{ backgroundColor: '#FFF4E0', border: '1px solid #FFEAA7' }}
+        >
+          <div className="flex items-start gap-4">
+            <span style={{ fontSize: 28 }}>🏆</span>
+            <div className="flex-1">
+              <h3 className="font-bold text-base" style={{ color: '#8B6914' }}>
+                Layer 3 — Writing Studio <span className="text-sm font-normal">(teacher-assigned)</span>
+              </h3>
+              <p className="text-sm mt-1" style={{ color: '#A0740A' }}>
+                Extended writing tasks (400–700 words). You assign a prompt from the task library; the pupil composes a full piece. AI assesses it against UK National Curriculum rubrics — and you can review, override, and leave written feedback.
+              </p>
+              <div className="grid gap-3 mt-3 sm:grid-cols-2">
+                {[
+                  { label: 'KS1 (Yr 1–2)', desc: 'Phonics, spacing, basic punctuation, simple sentences.' },
+                  { label: 'KS2 (Yr 3–6)', desc: 'Sentence variety, paragraph organisation, spelling, grammar.' },
+                  { label: 'KS3 (Yr 7–9)', desc: 'Rhetoric, cohesion, audience awareness, technical accuracy.' },
+                  { label: 'AI + Teacher review', desc: 'AI produces a rubric score; you can add comments and override the grade.' },
+                ].map(({ label, desc }) => (
+                  <div
+                    key={label}
+                    className="rounded-lg p-3"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.6)', border: '1px solid #FFEAA7' }}
+                  >
+                    <p className="text-xs font-bold" style={{ color: '#8B6914' }}>{label}</p>
+                    <p className="text-xs mt-1" style={{ color: '#A0740A' }}>{desc}</p>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate('assign')}
+                className="mt-3 text-xs px-3 py-1.5 rounded-lg font-semibold"
+                style={{ backgroundColor: '#F5A623', color: '#fff' }}
+              >
+                Go to Assign Task →
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

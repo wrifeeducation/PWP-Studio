@@ -1,6 +1,13 @@
-import { useNavigate, Navigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { Role } from '../types/index'
+
+function getDashboardRoute(role: string): string {
+  if (role === Role.TEACHER)      return '/teacher'
+  if (role === Role.SCHOOL_ADMIN) return '/admin'
+  if (role === Role.PARENT)       return '/parent'
+  return '/dashboard'
+}
 
 // ---------------------------------------------------------------------------
 // Colour tokens — all explicit hex values; NO CSS variables (index.css uses a
@@ -57,13 +64,8 @@ export default function HomePage() {
   // While auth initialises, show nothing (prevents flash)
   if (!isInitialised) return null
 
-  // Redirect logged-in users to their dashboard
-  if (session && profile) {
-    if (profile.role === Role.TEACHER)      return <Navigate to="/teacher"   replace />
-    if (profile.role === Role.SCHOOL_ADMIN) return <Navigate to="/admin"     replace />
-    if (profile.role === Role.PARENT)       return <Navigate to="/parent"    replace />
-    return <Navigate to="/dashboard" replace />
-  }
+  const isLoggedIn = !!(session && profile)
+  const dashboardRoute = isLoggedIn ? getDashboardRoute(profile!.role) : '/'
 
   return (
     <div style={{ fontFamily: "'Nunito', sans-serif", background: C.cream, color: C.dark, minHeight: '100vh' }}>
@@ -98,38 +100,59 @@ export default function HomePage() {
 
         {/* Nav actions */}
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => navigate('/login')}
-            style={{
-              background: 'none',
-              border: '1.5px solid rgba(255,255,255,0.6)',
-              color: C.white,
-              padding: '5px 14px',
-              borderRadius: 8,
-              fontFamily: 'inherit',
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            Log in
-          </button>
-          <button
-            onClick={() => navigate('/login')}
-            style={{
-              background: C.white,
-              border: 'none',
-              color: C.purple,
-              padding: '5px 14px',
-              borderRadius: 8,
-              fontFamily: 'inherit',
-              fontSize: 13,
-              fontWeight: 800,
-              cursor: 'pointer',
-            }}
-          >
-            Sign up free
-          </button>
+          {isLoggedIn ? (
+            <button
+              onClick={() => navigate(dashboardRoute)}
+              style={{
+                background: C.white,
+                border: 'none',
+                color: C.purple,
+                padding: '5px 14px',
+                borderRadius: 8,
+                fontFamily: 'inherit',
+                fontSize: 13,
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              Go to Dashboard →
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => navigate('/login')}
+                style={{
+                  background: 'none',
+                  border: '1.5px solid rgba(255,255,255,0.6)',
+                  color: C.white,
+                  padding: '5px 14px',
+                  borderRadius: 8,
+                  fontFamily: 'inherit',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Log in
+              </button>
+              <button
+                onClick={() => navigate('/login')}
+                style={{
+                  background: C.white,
+                  border: 'none',
+                  color: C.purple,
+                  padding: '5px 14px',
+                  borderRadius: 8,
+                  fontFamily: 'inherit',
+                  fontSize: 13,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                Sign up free
+              </button>
+            </>
+          )}
         </div>
       </nav>
 
