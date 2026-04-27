@@ -59,17 +59,24 @@ function AuthInitialiser() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
       if (session?.user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-        if (data) setProfile(data as Profile)
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+          if (data && !error) setProfile(data as Profile)
+        } catch (_err) {
+          // Profile fetch failed — user proceeds without profile (will be redirected to onboarding)
+        }
       } else {
         clearAuth()
       }
       setInitialised(true)
       setLoading(false)
+    }).catch(() => {
+      // getSession itself failed — mark as initialised so the app doesn't hang
+      clearAuth()
     })
 
     // Subscribe to future auth state changes
@@ -78,12 +85,16 @@ function AuthInitialiser() {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session)
       if (session?.user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-        if (data) setProfile(data as Profile)
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+          if (data && !error) setProfile(data as Profile)
+        } catch (_err) {
+          // Profile fetch failed — user proceeds without profile
+        }
       } else {
         clearAuth()
       }
