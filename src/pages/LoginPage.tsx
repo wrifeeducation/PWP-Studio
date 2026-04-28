@@ -127,22 +127,18 @@ export default function LoginPage() {
 
     setIsLoading(true)
     try {
-      // Look up pupil by PIN in profiles table
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('id, role')
-        .eq('pin_code', pin)
-        .single()
+      // Each pupil has a Supabase Auth account: pupil-{pin}@wrife.school / password = pin
+      const email = `pupil-${pin}@wrife.school`
+      const { error } = await supabase.auth.signInWithPassword({ email, password: pin })
 
-      if (error || !profile) {
+      if (error) {
         setErrors({ pin: 'Invalid PIN. Please check with your teacher.' })
         return
       }
 
-      // Sign in anonymously using the pupil's pre-set credentials
-      // (In production, PIN auth uses a custom Edge Function / magic link)
-      // For now we record the pupil_id and redirect
-      localStorage.setItem('wrifeapp_pupil_id', profile.id)
+      // AuthInitialiser's onAuthStateChange picks up the new session,
+      // fetches the profile, and populates the store — then ProtectedRoute
+      // allows /dashboard access automatically.
       navigate('/dashboard', { replace: true })
     } catch {
       setErrors({ general: 'An unexpected error occurred. Please try again.' })
