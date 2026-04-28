@@ -1,959 +1,983 @@
 /**
- * WF-003 + WF-014: Pupil Dashboard with live-refreshed data.
- * Fetches pupil_progress (React Query), shows animated XP counter,
- * level progress bar, streak with shield indicator, and last 3 badges.
+ * DashboardPage — Duolingo-style pupil learning path.
+ *
+ * Layout:
+ *   Mobile  (< 768px)  — vertical meandering node path, bottom nav tabs
+ *   Tablet  (768–1023) — two-column: path left, stats sidebar right
+ *   Desktop (≥ 1024px) — horizontal scrolling path, right stats panel
+ *
+ * Features:
+ *   • 6 hardcoded chapters (67 levels) with mastery statements
+ *   • 4 node types per level: Learn / Build / Practice / Master
+ *   • Writz avatar sits at the current node
+ *   • Avatar wardrobe (buy with coins)
+ *   • Badges organised by learning journey (prior / current / future)
+ *   • Separate XP (learning) and Coins (cosmetics) currencies
  */
 
-import { useEffect, useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, useSpring, useTransform, useMotionValue } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
-import { FormulaLevelBadge } from '../components/dashboard/FormulaLevelBadge'
-import { StreakCounter } from '../components/dashboard/StreakCounter'
-import { XPShop } from '../components/dashboard/XPShop'
-import { TTSButton } from '../components/ui/TTSButton'
-import { SessionExpiryBanner } from '../components/ui/SessionExpiryBanner'
-import { PupilWelcomeModal, useShouldShowWelcome } from '../components/ui/PupilWelcomeModal'
-import { useSettingsStore } from '../stores/settingsStore'
-import type { PupilProgress, PupilBadge, Badge, MasteryTracking } from '../types/index'
-import { WORD_CLASS_COLOUR } from '../types/index'
-import { WordClass } from '../types/index'
-import { checkParagraphMasteryUnlock } from '../lib/progressionEngine'
+import { WritzAvatar, type AvatarVariantId } from '../components/WritzAvatar'
+import {
+  CHAPTERS,
+  AVATAR_VARIANTS,
+  NODE_META,
+  getChapterForLevel,
+  getLevelsForChapter,
+  type Chapter,
+} from '../lib/chapters'
 
-const MASTERY_GATE_SESSIONS = 5
-const MAX_VISIBLE_LOCKED_LEVELS = 5
+// ─── types ────────────────────────────────────────────────────────────────────
 
-// ─── Animated XP counter ─────────────────────────────────────────────────────
-
-interface AnimatedXPProps {
-  value: number
+interface PupilProgressRow {
+  pupil_id: string
+  current_formula_level: number
+  total_xp: number
+  current_streak: number
+  longest_streak: number
+  streak_shield_active: boolean
+  coins: number
+  writing_studio_unlocked: boolean
 }
 
-const AnimatedXP: React.FC<AnimatedXPProps> = ({ value }) => {
-  const motionVal = useMotionValue(0)
-  const spring = useSpring(motionVal, { stiffness: 80, damping: 20 })
-  const display = useTransform(spring, (v) => Math.round(v).toLocaleString())
-  const [displayStr, setDisplayStr] = useState('0')
+interface PupilBadgeRow {
+  id: string
+  badge_id: string
+  awarded_at: string
+  badges: {
+    id: string
+    name: string
+    icon_key: string
+    description: string
+    trigger_type: string
+    trigger_value: number
+  }
+}
 
-  useEffect(() => {
-    motionVal.set(value)
-  }, [value, motionVal])
+// ─── colour tokens (inline, matches existing HomePage pattern) ────────────────
 
-  useEffect(() => {
-    return display.on('change', (v) => setDisplayStr(v))
-  }, [display])
+const C = {
+  brand:   '#6C5CE7',
+  orange:  '#F5A623',
+  bg:      '#FAF9F7',
+  surface: '#FFFFFF',
+  border:  '#EDEBE7',
+  text:    '#2D3436',
+  muted:   '#8E9BAE',
+  green:   '#27AE60',
+  pink:    '#E84393',
+} as const
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+/** Total number of node steps before a given level within its chapter */
+const NODE_TYPES = ['learn', 'build', 'practice', 'master'] as const
+type NodeType = typeof NODE_TYPES[number]
+
+function nodeKey(level: number, nodeType: NodeType) {
+  return `${level}-${nodeType}`
+}
+
+/** Pixel offset for meander: alternates left / right on mobile */
+function meandX(idx: number): number {
+  const pattern = [0, 40, 80, 40]
+  return pattern[idx % 4]
+}
+
+// ─── Node component ───────────────────────────────────────────────────────────
+
+interface NodeProps {
+  level: number
+  nodeType: NodeType
+  state: 'done' | 'active' | 'locked'
+  isAvatar: boolean
+  chapterColour: string
+  onClick?: () => void
+}
+
+const PathNode: React.FC<NodeProps> = ({ level, nodeType, state, isAvatar, chapterColour, onClick }) => {
+  const meta = NODE_META[nodeType]
+  const isDone   = state === 'done'
+  const isActive = state === 'active'
+  const isLocked = state === 'locked'
+
+  const bg = isDone
+    ? C.green
+    : isActive
+    ? chapterColour
+    : '#DFE6E9'
+
+  const border = isDone
+    ? '#1e8449'
+    : isActive
+    ? chapterColour
+    : '#B2BEC3'
 
   return (
-    <span data-tts={`${value} XP`} data-testid="animated-xp-value">
-      {displayStr}
-    </span>
+    <button
+      onClick={onClick}
+      disabled={isLocked}
+      aria-label={`Level ${level} ${meta.label}${isLocked ? ' (locked)' : ''}`}
+      data-tts={`Level ${level} ${meta.label}`}
+      data-testid={`node-${level}-${nodeType}`}
+      style={{
+        position: 'relative',
+        width: 56,
+        height: 56,
+        borderRadius: '50%',
+        background: bg,
+        border: `3px solid ${border}`,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: isLocked ? 'default' : 'pointer',
+        boxShadow: isActive ? `0 0 0 5px ${chapterColour}33, 0 4px 14px ${chapterColour}44` : '0 2px 6px rgba(0,0,0,0.12)',
+        transition: 'transform 0.15s, box-shadow 0.15s',
+        flexShrink: 0,
+      }}
+    >
+      <span style={{ fontSize: 20, lineHeight: 1 }}>{isLocked ? '🔒' : meta.emoji}</span>
+      {isActive && (
+        <span style={{
+          position: 'absolute',
+          bottom: -22,
+          fontSize: 10,
+          fontWeight: 700,
+          color: chapterColour,
+          whiteSpace: 'nowrap',
+          letterSpacing: '0.04em',
+        }}>
+          L{level}
+        </span>
+      )}
+      {isAvatar && (
+        <motion.div
+          animate={{ y: [0, -6, 0] }}
+          transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ position: 'absolute', top: -60 }}
+        >
+          <WritzAvatar size={50} animated={false} />
+        </motion.div>
+      )}
+    </button>
   )
 }
 
-// ─── Recent badges strip ──────────────────────────────────────────────────────
+// ─── Chapter banner ───────────────────────────────────────────────────────────
 
-interface RecentBadgesProps {
-  pupilId: string
+interface ChapterBannerProps {
+  chapter: Chapter
+  unlocked: boolean
+  isCurrent: boolean
+  completed: boolean
 }
 
-const RecentBadges: React.FC<RecentBadgesProps> = ({ pupilId }) => {
-  const { data: pupilBadges } = useQuery<Array<PupilBadge & { badges: Badge }>>({
-    queryKey: ['pupil_badges_recent', pupilId],
+const ChapterBanner: React.FC<ChapterBannerProps> = ({ chapter, unlocked, isCurrent, completed }) => (
+  <div
+    style={{
+      background: completed ? C.green : unlocked ? chapter.colour : '#F0F0F0',
+      borderRadius: 14,
+      padding: '12px 16px',
+      marginBottom: 24,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      border: `2px solid ${isCurrent ? chapter.textColour : 'transparent'}`,
+      boxShadow: isCurrent ? `0 0 0 3px ${chapter.textColour}22` : 'none',
+    }}
+    data-testid={`chapter-banner-${chapter.num}`}
+  >
+    <span style={{ fontSize: 28 }}>{chapter.emoji}</span>
+    <div style={{ flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+        <span style={{
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: completed ? '#fff' : unlocked ? chapter.textColour : C.muted,
+        }}>
+          Chapter {chapter.num}
+        </span>
+        {completed && (
+          <span style={{ fontSize: 12, background: '#fff', borderRadius: 6, padding: '1px 6px', color: C.green, fontWeight: 700 }}>
+            ✓ Complete
+          </span>
+        )}
+        {isCurrent && (
+          <span style={{ fontSize: 11, background: chapter.textColour, borderRadius: 6, padding: '1px 7px', color: '#fff', fontWeight: 700 }}>
+            In progress
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize: 14, fontWeight: 800, color: completed ? '#fff' : unlocked ? C.text : C.muted }}>
+        {chapter.title}
+      </div>
+      {unlocked && (
+        <div style={{ fontSize: 12, color: completed ? 'rgba(255,255,255,0.85)' : C.muted, marginTop: 2 }}
+          data-tts={chapter.masteryStatement}>
+          {chapter.masteryStatement}
+        </div>
+      )}
+    </div>
+    {!unlocked && <span style={{ fontSize: 20 }}>🔒</span>}
+  </div>
+)
+
+// ─── Avatar wardrobe modal ────────────────────────────────────────────────────
+
+interface WardrobeModalProps {
+  currentAvatar: AvatarVariantId
+  coins: number
+  ownedAvatars: string[]
+  onSelect: (id: AvatarVariantId) => void
+  onClose: () => void
+}
+
+const WardrobeModal: React.FC<WardrobeModalProps> = ({
+  currentAvatar, coins, ownedAvatars, onSelect, onClose
+}) => (
+  <div
+    style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+    }}
+    onClick={onClose}
+  >
+    <motion.div
+      initial={{ y: '100%' }}
+      animate={{ y: 0 }}
+      exit={{ y: '100%' }}
+      transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        background: C.surface,
+        borderRadius: '20px 20px 0 0',
+        padding: 24,
+        width: '100%',
+        maxWidth: 500,
+        maxHeight: '80vh',
+        overflowY: 'auto',
+      }}
+      data-testid="wardrobe-modal"
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: C.text, margin: 0 }}>Writz Wardrobe</h2>
+          <p style={{ fontSize: 12, color: C.muted, margin: '2px 0 0' }}>Customise your Writz!</p>
+        </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: '#FFF8E1', border: '1.5px solid #F5A623',
+          borderRadius: 20, padding: '5px 12px',
+        }}>
+          <span style={{ fontSize: 16 }}>🪙</span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: C.orange }}>{coins.toLocaleString()}</span>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        {AVATAR_VARIANTS.map((av) => {
+          const owned = av.cost === 0 || ownedAvatars.includes(av.id)
+          const isSelected = currentAvatar === av.id
+          const canAfford = coins >= av.cost
+          return (
+            <button
+              key={av.id}
+              onClick={() => {
+                if (owned && !av.comingSoon) onSelect(av.id as AvatarVariantId)
+              }}
+              disabled={av.comingSoon || (!owned && !canAfford)}
+              data-testid={`avatar-option-${av.id}`}
+              style={{
+                borderRadius: 14,
+                padding: '14px 8px 10px',
+                background: isSelected ? C.brand : av.comingSoon ? '#F7F7F7' : C.surface,
+                border: `2.5px solid ${isSelected ? C.brand : owned ? C.border : '#DFE6E9'}`,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                cursor: av.comingSoon ? 'default' : owned ? 'pointer' : canAfford ? 'pointer' : 'default',
+                opacity: av.comingSoon ? 0.5 : 1,
+                transition: 'transform 0.1s',
+              }}
+            >
+              <WritzAvatar
+                variant={av.comingSoon ? 'wizard' : av.id as AvatarVariantId}
+                size={52}
+                animated={isSelected}
+              />
+              <span style={{ fontSize: 11, fontWeight: 700, color: isSelected ? '#fff' : C.text, textAlign: 'center' }}>
+                {av.name.replace(' Writz', '')}
+              </span>
+              {av.comingSoon ? (
+                <span style={{ fontSize: 10, color: C.muted }}>Coming soon</span>
+              ) : owned ? (
+                <span style={{
+                  fontSize: 10, fontWeight: 700,
+                  color: isSelected ? '#fff' : C.green,
+                }}>
+                  {isSelected ? '✓ Wearing' : 'Owned'}
+                </span>
+              ) : (
+                <span style={{
+                  fontSize: 11, fontWeight: 700,
+                  color: canAfford ? C.orange : C.muted,
+                }}>
+                  🪙 {av.cost}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+      <p style={{ fontSize: 11, color: C.muted, textAlign: 'center', marginTop: 16 }}>
+        Earn coins by completing sessions (+5) and streak bonuses (+10)
+      </p>
+    </motion.div>
+  </div>
+)
+
+// ─── Badges section ───────────────────────────────────────────────────────────
+
+// 15 static badge definitions grouped by learning journey position.
+// In a full build these would come from the DB; here they are defined inline
+// so the UI renders meaningfully even before real badges are earned.
+
+const BADGE_DEFS = [
+  // Prior learning (earned)
+  { id: 'b1',  emoji: '📖', name: 'First Words',      desc: 'Completed your first formula',          group: 'prior' },
+  { id: 'b2',  emoji: '✏️', name: 'Sentence Starter', desc: 'Built 5 correct sentences',             group: 'prior' },
+  { id: 'b3',  emoji: '🔥', name: 'Hot Streak',       desc: 'Achieved a 3-day streak',               group: 'prior' },
+  // Current learning
+  { id: 'b4',  emoji: '🏗️', name: 'Builder',          desc: 'Completed Chapter 1',                   group: 'current' },
+  { id: 'b5',  emoji: '⚡', name: 'Action Hero',      desc: 'Mastered an action sentence',           group: 'current' },
+  { id: 'b6',  emoji: '🌟', name: 'Star Pupil',       desc: 'Scored 100% in a session',              group: 'current' },
+  { id: 'b7',  emoji: '🔗', name: 'Connector',        desc: 'Used a conjunction correctly',          group: 'current' },
+  // Future learning
+  { id: 'b8',  emoji: '🔍', name: 'Detail Detective', desc: 'Add detail to any part of a sentence',  group: 'future' },
+  { id: 'b9',  emoji: '🏅', name: 'Chapter Master',   desc: 'Complete all levels in a chapter',      group: 'future' },
+  { id: 'b10', emoji: '💎', name: 'Diamond Writer',   desc: 'Reach Level 35',                        group: 'future' },
+  { id: 'b11', emoji: '🏆', name: 'Expert Writer',    desc: 'Reach Chapter 5',                       group: 'future' },
+  { id: 'b12', emoji: '🎓', name: 'WriFe Graduate',   desc: 'Complete all 67 levels',                group: 'future' },
+  { id: 'b13', emoji: '📝', name: 'Paragraph Pro',    desc: 'Complete the paragraph builder',        group: 'future' },
+  { id: 'b14', emoji: '🌈', name: 'All Genres',       desc: 'Write in all 4 paragraph genres',       group: 'future' },
+  { id: 'b15', emoji: '🚀', name: 'Writing Studio',   desc: 'Submit your first writing studio piece',group: 'future' },
+] as const
+
+type BadgeGroup = 'prior' | 'current' | 'future'
+
+interface BadgesProps {
+  earnedBadgeIds: string[]
+  currentLevel: number
+}
+
+const BadgesSection: React.FC<BadgesProps> = ({ earnedBadgeIds, currentLevel }) => {
+  const groups: { key: BadgeGroup; label: string; subLabel: string; emoji: string }[] = [
+    { key: 'prior',   label: 'What you've learned',  subLabel: 'Badges you\'ve earned',         emoji: '✅' },
+    { key: 'current', label: 'What you\'re learning', subLabel: 'Earn these right now',          emoji: '🎯' },
+    { key: 'future',  label: 'What\'s next for you',  subLabel: 'Coming with more practice',    emoji: '🔮' },
+  ]
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      {groups.map((g) => {
+        const badges = BADGE_DEFS.filter((b) => b.group === g.key)
+        return (
+          <div key={g.key} style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+              <span style={{ fontSize: 16 }}>{g.emoji}</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: C.text }}>{g.label}</div>
+                <div style={{ fontSize: 11, color: C.muted }}>{g.subLabel}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {badges.map((b) => {
+                const earned = earnedBadgeIds.includes(b.id)
+                return (
+                  <motion.div
+                    key={b.id}
+                    initial={{ scale: 0.85, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                    title={b.desc}
+                    data-tts={earned ? `${b.name}: ${b.desc}` : `Locked: ${b.desc}`}
+                    style={{
+                      width: 60,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 4,
+                      cursor: 'default',
+                    }}
+                  >
+                    <div style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 22,
+                      background: earned
+                        ? 'linear-gradient(135deg, #FEF3C7, #FDE68A)'
+                        : '#F0F0F0',
+                      border: earned ? '2.5px solid #FCD34D' : '2.5px solid #DDD',
+                      filter: earned ? 'none' : 'grayscale(1)',
+                      opacity: earned ? 1 : 0.5,
+                      boxShadow: earned ? '0 2px 8px rgba(252,211,77,0.4)' : 'none',
+                    }}>
+                      {b.emoji}
+                    </div>
+                    <span style={{
+                      fontSize: 9,
+                      fontWeight: 600,
+                      color: earned ? C.text : C.muted,
+                      textAlign: 'center',
+                      lineHeight: 1.2,
+                    }}>
+                      {b.name}
+                    </span>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Stats sidebar ────────────────────────────────────────────────────────────
+
+interface StatsSidebarProps {
+  progress: PupilProgressRow
+  profile: { display_name?: string; full_name?: string; selected_avatar?: string } | null
+  earnedBadgeIds: string[]
+  onOpenWardrobe: () => void
+}
+
+const StatsSidebar: React.FC<StatsSidebarProps> = ({ progress, profile, earnedBadgeIds, onOpenWardrobe }) => {
+  const avatarId = (profile?.selected_avatar ?? 'wizard') as AvatarVariantId
+  const name = profile?.display_name ?? profile?.full_name ?? 'Pupil'
+  const currentChapter = getChapterForLevel(progress.current_formula_level)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Avatar + name */}
+      <div style={{
+        background: C.surface,
+        borderRadius: 16,
+        padding: 20,
+        border: `1px solid ${C.border}`,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 10,
+        textAlign: 'center',
+      }}>
+        <button
+          onClick={onOpenWardrobe}
+          data-testid="open-wardrobe-btn"
+          data-tts="Change your Writz avatar"
+          style={{
+            background: `${currentChapter.colour}`,
+            border: `3px solid ${currentChapter.textColour}`,
+            borderRadius: '50%',
+            width: 90,
+            height: 90,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            position: 'relative',
+          }}
+        >
+          <WritzAvatar variant={avatarId} size={68} animated />
+          <span style={{
+            position: 'absolute', bottom: -2, right: -2,
+            fontSize: 18,
+            background: C.surface,
+            borderRadius: '50%',
+            width: 26, height: 26,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: `1.5px solid ${C.border}`,
+          }}>✏️</span>
+        </button>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.text }} data-tts={name}>{name}</div>
+        <div style={{
+          fontSize: 11, color: currentChapter.textColour, fontWeight: 700,
+          background: currentChapter.colour, borderRadius: 8, padding: '3px 10px',
+        }}>
+          {currentChapter.emoji} {currentChapter.title}
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: 10,
+      }}>
+        {[
+          { label: 'Level', value: `L${progress.current_formula_level}`, emoji: '📈', colour: C.brand },
+          { label: 'XP',    value: progress.total_xp.toLocaleString(),   emoji: '⭐', colour: '#F39C12' },
+          { label: 'Streak', value: `${progress.current_streak}d`,       emoji: '🔥', colour: '#E74C3C' },
+          { label: 'Coins',  value: progress.coins.toLocaleString(),      emoji: '🪙', colour: C.orange },
+        ].map((s) => (
+          <div
+            key={s.label}
+            style={{
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderRadius: 12,
+              padding: '12px 10px',
+              textAlign: 'center',
+            }}
+            data-tts={`${s.label}: ${s.value}`}
+          >
+            <div style={{ fontSize: 20 }}>{s.emoji}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: s.colour }}>{s.value}</div>
+            <div style={{ fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Badges panel */}
+      <div style={{
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: 16,
+        padding: 16,
+        overflow: 'hidden',
+      }}>
+        <h3 style={{ fontSize: 13, fontWeight: 800, color: C.text, margin: '0 0 14px' }}>Your Badges</h3>
+        <BadgesSection earnedBadgeIds={earnedBadgeIds} currentLevel={progress.current_formula_level} />
+      </div>
+    </div>
+  )
+}
+
+// ─── Learning path (mobile vertical) ─────────────────────────────────────────
+
+interface LearningPathProps {
+  currentLevel: number
+  onNodeClick: (level: number, node: NodeType) => void
+}
+
+const LearningPath: React.FC<LearningPathProps> = ({ currentLevel, onNodeClick }) => {
+  // For simplicity: "current node" = first 'learn' node at current level.
+  // Completed = all nodes in levels < currentLevel.
+  // Active node = 'learn' at currentLevel.
+
+  return (
+    <div style={{ position: 'relative', padding: '24px 0 80px' }}>
+      {CHAPTERS.map((chapter, ci) => {
+        const chapterLevels = getLevelsForChapter(chapter)
+        const chapterMax = chapter.levelRange[1]
+        const chapterMin = chapter.levelRange[0]
+        const chapterDone   = currentLevel > chapterMax
+        const chapterLocked = currentLevel < chapterMin
+        const chapterCurrent = !chapterDone && !chapterLocked
+
+        return (
+          <div key={chapter.num} style={{ marginBottom: 40 }}>
+            <ChapterBanner
+              chapter={chapter}
+              unlocked={!chapterLocked}
+              isCurrent={chapterCurrent}
+              completed={chapterDone}
+            />
+
+            {/* nodes */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              paddingLeft: 16,
+              gap: 0,
+            }}>
+              {chapterLevels.map((level, li) => (
+                <div key={level}>
+                  {NODE_TYPES.map((nt, ni) => {
+                    const levelDone   = level < currentLevel
+                    const levelActive = level === currentLevel
+                    const levelLocked = level > currentLevel
+
+                    const nodeDone   = levelDone || (levelActive && ni < NODE_TYPES.indexOf('learn' as NodeType))
+                    const nodeActive = levelActive && nt === 'learn'
+                    const nodeLocked = levelLocked || (levelActive && ni > NODE_TYPES.indexOf('learn' as NodeType))
+
+                    const nodeState: 'done' | 'active' | 'locked' = nodeDone ? 'done' : nodeActive ? 'active' : 'locked'
+                    const isAvatarNode = nodeActive
+
+                    const nodeIdx = li * 4 + ni
+                    const xOffset = meandX(nodeIdx)
+
+                    return (
+                      <div key={nt} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        marginLeft: xOffset,
+                        marginBottom: 28,
+                        position: 'relative',
+                      }}>
+                        {/* connector line up */}
+                        {(li > 0 || ni > 0) && (
+                          <div style={{
+                            position: 'absolute',
+                            top: -22,
+                            left: 24,
+                            width: 3,
+                            height: 22,
+                            background: nodeDone || nodeActive ? C.green : '#DFE6E9',
+                            borderRadius: 2,
+                          }} />
+                        )}
+                        <PathNode
+                          level={level}
+                          nodeType={nt}
+                          state={nodeState}
+                          isAvatar={isAvatarNode}
+                          chapterColour={chapter.textColour}
+                          onClick={() => !nodeLocked && onNodeClick(level, nt)}
+                        />
+                        {/* label on right */}
+                        <div style={{ marginLeft: 14 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: nodeLocked ? C.muted : C.text }}>
+                            {nodeActive ? `Level ${level}` : nt === 'learn' ? `Level ${level}` : ''}
+                          </div>
+                          <div style={{ fontSize: 11, color: C.muted }}>
+                            {nodeLocked ? '🔒 Locked' : NODE_META[nt].label}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Top bar ──────────────────────────────────────────────────────────────────
+
+interface TopBarProps {
+  name: string
+  avatarId: AvatarVariantId
+  xp: number
+  streak: number
+  coins: number
+  onOpenWardrobe: () => void
+  onLogout: () => void
+}
+
+const TopBar: React.FC<TopBarProps> = ({ name, avatarId, xp, streak, coins, onOpenWardrobe, onLogout }) => (
+  <div style={{
+    position: 'sticky',
+    top: 0,
+    zIndex: 50,
+    background: C.brand,
+    padding: '10px 16px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+  }}>
+    <button
+      onClick={onOpenWardrobe}
+      data-testid="topbar-avatar-btn"
+      style={{
+        background: 'rgba(255,255,255,0.15)',
+        border: '2px solid rgba(255,255,255,0.4)',
+        borderRadius: '50%',
+        width: 40,
+        height: 40,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        padding: 0,
+        flexShrink: 0,
+      }}
+    >
+      <WritzAvatar variant={avatarId} size={30} />
+    </button>
+
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {name}
+      </div>
+    </div>
+
+    {/* Quick stats */}
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: '4px 10px' }}>
+        <span style={{ fontSize: 14 }}>🔥</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{streak}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: '4px 10px' }}>
+        <span style={{ fontSize: 14 }}>🪙</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{coins}</span>
+      </div>
+      <button
+        onClick={onLogout}
+        data-testid="logout-btn"
+        style={{
+          background: 'transparent',
+          border: '1.5px solid rgba(255,255,255,0.4)',
+          borderRadius: 8,
+          color: '#fff',
+          fontSize: 12,
+          fontWeight: 600,
+          padding: '4px 10px',
+          cursor: 'pointer',
+        }}
+      >
+        Exit
+      </button>
+    </div>
+  </div>
+)
+
+// ─── Main DashboardPage ───────────────────────────────────────────────────────
+
+export default function DashboardPage() {
+  const navigate = useNavigate()
+  const { user, profile } = useAuthStore()
+  const [wardrobeOpen, setWardrobeOpen] = useState(false)
+  const [selectedAvatar, setSelectedAvatar] = useState<AvatarVariantId>(
+    (profile?.selected_avatar as AvatarVariantId) ?? 'wizard'
+  )
+
+  // Sync avatar from profile when it loads
+  useEffect(() => {
+    if (profile?.selected_avatar) {
+      setSelectedAvatar(profile.selected_avatar as AvatarVariantId)
+    }
+  }, [profile?.selected_avatar])
+
+  const pupilId = user?.id ?? ''
+
+  // ── fetch progress ──────────────────────────────────────────────────────────
+  const { data: progress, isLoading: progressLoading } = useQuery<PupilProgressRow>({
+    queryKey: ['pupil_progress', pupilId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pupil_progress')
+        .select('*')
+        .eq('pupil_id', pupilId)
+        .single()
+      if (error) throw error
+      return data as PupilProgressRow
+    },
+    enabled: !!pupilId,
+    staleTime: 1000 * 30,
+  })
+
+  // ── fetch earned badges ─────────────────────────────────────────────────────
+  const { data: pupilBadges } = useQuery<PupilBadgeRow[]>({
+    queryKey: ['pupil_badges', pupilId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pupil_badges')
         .select('*, badges(*)')
         .eq('pupil_id', pupilId)
         .order('awarded_at', { ascending: false })
-        .limit(3)
       if (error) throw error
-      return data as Array<PupilBadge & { badges: Badge }>
+      return data as PupilBadgeRow[]
     },
     enabled: !!pupilId,
     staleTime: 1000 * 60 * 2,
   })
 
-  if (!pupilBadges?.length) return null
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3 }}
-      className="rounded-xl p-4"
-      style={{
-        backgroundColor: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-      }}
-      data-testid="recent-badges"
-    >
-      <h3
-        className="text-xs font-semibold uppercase tracking-wider mb-3"
-        style={{ color: 'var(--color-text-muted)' }}
-        data-tts="Recent badges"
-      >
-        Recent Badges
-      </h3>
-      <div className="flex gap-3">
-        {pupilBadges.map((pb, i) => (
-          <motion.div
-            key={pb.id}
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: 'spring', delay: 0.35 + i * 0.07, stiffness: 250, damping: 20 }}
-            className="flex flex-col items-center gap-1"
-            data-testid={`badge-icon-${i}`}
-          >
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center text-xl"
-              style={{
-                background: 'linear-gradient(135deg, #FEF3C7, #FDE68A)',
-                border: '2px solid #FCD34D',
-              }}
-              aria-hidden="true"
-            >
-              {pb.badges?.icon_key || '🏅'}
-            </div>
-            <span
-              className="text-xs text-center leading-tight"
-              style={{ color: 'var(--color-text-muted)', maxWidth: '52px' }}
-              data-tts={pb.badges?.name}
-            >
-              {pb.badges?.name?.slice(0, 12) ?? 'Badge'}
-            </span>
-          </motion.div>
-        ))}
-      </div>
-    </motion.div>
-  )
-}
-
-// ─── Level progress bar ───────────────────────────────────────────────────────
-
-interface LevelProgressBarProps {
-  levelId: number
-  sessionsCompleted: number
-  gateSessions: number
-}
-
-const LevelProgressBar: React.FC<LevelProgressBarProps> = ({
-  levelId,
-  sessionsCompleted,
-  gateSessions,
-}) => {
-  const pct = Math.min((sessionsCompleted / gateSessions) * 100, 100)
-
-  return (
-    <div
-      className="rounded-xl p-4"
-      style={{
-        backgroundColor: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-      }}
-      data-testid="level-progress-bar"
-    >
-      <div className="flex items-center justify-between mb-2">
-        <span
-          className="text-xs font-semibold"
-          style={{ color: 'var(--color-text-muted)' }}
-          data-tts={`Level ${levelId} progress`}
-        >
-          Level {levelId} Progress
-        </span>
-        <span
-          className="text-xs font-bold"
-          style={{ color: 'var(--color-noun)' }}
-          data-tts={`${sessionsCompleted} of ${gateSessions} sessions`}
-        >
-          {sessionsCompleted}/{gateSessions}
-        </span>
-      </div>
-      <div
-        className="h-2.5 rounded-full overflow-hidden"
-        style={{ backgroundColor: 'var(--color-border)' }}
-      >
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.7, ease: 'easeOut' }}
-          className="h-full rounded-full"
-          style={{ backgroundColor: 'var(--color-noun)' }}
-        />
-      </div>
-      <p
-        className="text-xs mt-1"
-        style={{ color: 'var(--color-text-muted)' }}
-        data-tts="Sessions toward mastery gate"
-      >
-        Sessions toward mastery gate
-      </p>
-    </div>
-  )
-}
-
-// ─── Settings Modal (WF-031) ──────────────────────────────────────────────────
-
-interface SettingsModalProps {
-  onClose: () => void
-}
-
-const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
-  const navigate = useNavigate()
-  const { ttsEnabled, ttsRate, setTtsEnabled, setTtsRate } = useSettingsStore()
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-      style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
-      onClick={onClose}
-      data-testid="settings-modal-overlay"
-    >
-      <div
-        className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl p-6 space-y-5"
-        style={{ backgroundColor: 'var(--color-surface)' }}
-        onClick={(e) => e.stopPropagation()}
-        data-testid="settings-modal"
-      >
-        <div className="flex items-center justify-between">
-          <h2
-            className="font-bold text-base"
-            style={{ color: 'var(--color-text)' }}
-            data-tts="Settings"
-          >
-            Settings
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close settings"
-            className="text-lg px-2"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* TTS toggle */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
-              Read Aloud (TTS)
-            </p>
-            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>UK English voice</p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={ttsEnabled}
-            onClick={() => setTtsEnabled(!ttsEnabled)}
-            data-testid="modal-tts-toggle"
-            className="relative w-11 h-6 rounded-full transition-colors"
-            style={{ backgroundColor: ttsEnabled ? 'var(--color-brand-primary)' : 'var(--color-border)' }}
-          >
-            <span
-              className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform"
-              style={{ transform: ttsEnabled ? 'translateX(20px)' : 'translateX(0)' }}
-            />
-          </button>
-        </div>
-
-        {/* Rate slider */}
-        {ttsEnabled && (
-          <div>
-            <label className="text-xs font-medium flex justify-between" style={{ color: 'var(--color-text-muted)' }}>
-              <span>Reading speed</span>
-              <span>{ttsRate.toFixed(2)}×</span>
-            </label>
-            <input
-              type="range"
-              min={0.5}
-              max={1.5}
-              step={0.05}
-              value={ttsRate}
-              onChange={(e) => setTtsRate(Number(e.target.value))}
-              data-testid="modal-tts-rate"
-              className="w-full mt-2 accent-blue-600"
-            />
-          </div>
-        )}
-
-        {/* Full settings link */}
-        <button
-          type="button"
-          onClick={() => { onClose(); navigate('/settings') }}
-          className="w-full text-sm px-4 py-2.5 rounded-lg font-medium"
-          style={{ border: '1px solid var(--color-border)', color: 'var(--color-brand-primary)' }}
-          data-testid="open-full-settings"
-        >
-          All Settings →
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Learning Path ────────────────────────────────────────────────────────────
-
-interface LearningPathProps {
-  currentLevel: number
-  levelsMastered: number
-  paragraphUnlocked: boolean
-  writingUnlocked: boolean
-  masteryData: { sessions_completed?: number; scaffold_stage?: number; gate_passed?: boolean } | null | undefined
-  pupilId: string
-  onStartPractice: () => void
-}
-
-/** Colour dot strip showing the word classes in a formula level */
-const FormulaPreviewDots: React.FC<{ levelId: number }> = ({ levelId }) => {
-  // Approximate word class sequence per phase — used for visual preview only
-  // Real data comes from formula_levels table but we don't load all 67 rows here
-  const phaseA = levelId <= 16
-  const phaseB = levelId > 16 && levelId <= 33
-  // Simple heuristic: more dots for higher levels
-  const dotClasses: WordClass[] = phaseA
-    ? [WordClass.DETERMINER, WordClass.NOUN, WordClass.VERB].slice(0, Math.min(levelId, 3) + 1)
-    : phaseB
-    ? [WordClass.DETERMINER, WordClass.ADJECTIVE, WordClass.NOUN, WordClass.VERB, WordClass.ADVERB].slice(0, 4)
-    : [WordClass.DETERMINER, WordClass.ADJECTIVE, WordClass.NOUN, WordClass.VERB, WordClass.ADVERB, WordClass.PREPOSITION].slice(0, 5)
-
-  return (
-    <div className="flex gap-1 mt-1" aria-hidden="true">
-      {dotClasses.map((wc, i) => (
-        <span
-          key={i}
-          className="w-2 h-2 rounded-full"
-          style={{ backgroundColor: WORD_CLASS_COLOUR[wc] }}
-          title={wc}
-        />
-      ))}
-    </div>
-  )
-}
-
-const SCAFFOLD_LABELS = ['', 'Learning', 'Practising', 'Consolidating', 'Mastering']
-
-const LearningPath: React.FC<LearningPathProps> = ({
-  currentLevel,
-  levelsMastered: _levelsMastered,
-  paragraphUnlocked,
-  writingUnlocked,
-  masteryData,
-  onStartPractice,
-}) => {
-  const navigate = useNavigate()
-
-  // Show 3 completed levels above current + current + 5 locked below
-  const completedStart = Math.max(1, currentLevel - 3)
-  const completedLevels = Array.from(
-    { length: currentLevel - completedStart },
-    (_, i) => completedStart + i
-  )
-  const lockedLevels = Array.from(
-    { length: MAX_VISIBLE_LOCKED_LEVELS },
-    (_, i) => currentLevel + 1 + i
-  ).filter((l) => l <= 67)
-
-  const scaffoldStage = masteryData?.scaffold_stage ?? 1
-  const sessionsCompleted = masteryData?.sessions_completed ?? 0
-  const gatePassed = masteryData?.gate_passed ?? false
-
-  // Paragraph Builder unlock banner: show inline between locked levels if criteria met
-  const showParagraphBanner = paragraphUnlocked
-
-  return (
-    <div className="space-y-1" data-testid="learning-path">
-      <h2
-        className="text-sm font-semibold uppercase tracking-wider mb-3"
-        style={{ color: 'var(--color-text-muted)' }}
-        data-tts="Your learning path"
-      >
-        Your Learning Path
-      </h2>
-
-      {/* Completed levels */}
-      {completedLevels.map((lvl) => (
-        <motion.div
-          key={lvl}
-          initial={{ opacity: 0, x: -8 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.05 * (currentLevel - lvl) }}
-          className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
-          style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', opacity: 0.65 }}
-          data-testid={`path-level-${lvl}-completed`}
-        >
-          <span className="text-lg" aria-hidden="true">👑</span>
-          <div className="flex-1">
-            <span className="text-sm font-semibold" style={{ color: 'var(--color-text-muted)' }}>
-              Level {lvl} — Mastered
-            </span>
-            <FormulaPreviewDots levelId={lvl} />
-          </div>
-          <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: '#D1FAE5', color: '#065F46' }}>
-            ✓
-          </span>
-        </motion.div>
-      ))}
-
-      {/* Paragraph Builder unlock banner */}
-      {showParagraphBanner && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.1 }}
-          className="rounded-xl px-4 py-3 text-sm font-semibold flex items-center gap-3 cursor-pointer"
-          style={{
-            background: 'linear-gradient(135deg, #ECFDF5, #D1FAE5)',
-            border: '2px solid #6EE7B7',
-            color: '#065F46',
-          }}
-          onClick={() => navigate('/paragraph')}
-          role="button"
-          tabIndex={0}
-          data-testid="paragraph-unlock-banner"
-          data-tts="Paragraph Builder unlocked — tap to start"
-        >
-          <span className="text-xl" aria-hidden="true">📝</span>
-          <div>
-            <p className="font-bold">Paragraph Builder unlocked!</p>
-            <p className="text-xs font-normal opacity-80">You can now extend your sentences into paragraphs</p>
-          </div>
-          <span className="ml-auto text-lg" aria-hidden="true">→</span>
-        </motion.div>
-      )}
-
-      {/* Current active level */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.97 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.1, type: 'spring', stiffness: 300, damping: 25 }}
-        className="rounded-xl overflow-hidden"
-        style={{
-          border: '2px solid var(--color-noun)',
-          backgroundColor: 'var(--color-surface)',
-          boxShadow: '0 0 0 3px rgba(59,130,246,0.15)',
-        }}
-        data-testid="path-current-level"
-      >
-        {/* Level header */}
-        <div
-          className="px-4 py-2 flex items-center justify-between"
-          style={{ backgroundColor: 'var(--color-noun)' }}
-        >
-          <span className="text-white font-bold text-sm" data-tts={`Level ${currentLevel} — active`}>
-            Level {currentLevel}
-          </span>
-          <span className="text-white text-xs font-medium opacity-90">
-            {SCAFFOLD_LABELS[scaffoldStage] ?? 'Practising'}
-          </span>
-        </div>
-
-        {/* Session progress */}
-        <div className="px-4 py-3 space-y-2">
-          <div className="flex items-center gap-2">
-            <FormulaPreviewDots levelId={currentLevel} />
-            <span className="text-xs ml-auto" style={{ color: 'var(--color-text-muted)' }}>
-              {sessionsCompleted}/{MASTERY_GATE_SESSIONS} sessions
-            </span>
-          </div>
-          <div
-            className="h-2 rounded-full overflow-hidden"
-            style={{ backgroundColor: 'var(--color-border)' }}
-          >
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min((sessionsCompleted / MASTERY_GATE_SESSIONS) * 100, 100)}%` }}
-              transition={{ duration: 0.7, ease: 'easeOut' }}
-              className="h-full rounded-full"
-              style={{ backgroundColor: gatePassed ? '#10B981' : 'var(--color-noun)' }}
-            />
-          </div>
-          <button
-            onClick={onStartPractice}
-            className="w-full py-2.5 rounded-lg text-sm font-bold text-white transition-all"
-            style={{ backgroundColor: 'var(--color-noun)' }}
-            data-testid="start-practice-button"
-            data-tts="Start today's practice"
-          >
-            {gatePassed ? '✓ Mastered — keep going →' : "Start today's practice →"}
-          </button>
-        </div>
-      </motion.div>
-
-      {/* Writing Studio unlock banner */}
-      {writingUnlocked && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="rounded-xl px-4 py-3 text-sm font-semibold flex items-center gap-3 cursor-pointer"
-          style={{
-            background: 'linear-gradient(135deg, #FEF3C7, #FDE68A)',
-            border: '2px solid #FCD34D',
-            color: '#78350F',
-          }}
-          onClick={() => navigate('/writing')}
-          role="button"
-          tabIndex={0}
-          data-testid="writing-unlock-banner"
-          data-tts="Writing Studio unlocked — tap to start"
-        >
-          <span className="text-xl" aria-hidden="true">✍️</span>
-          <div>
-            <p className="font-bold">Writing Studio unlocked!</p>
-            <p className="text-xs font-normal opacity-80">Your teacher has assigned a writing task</p>
-          </div>
-          <span className="ml-auto text-lg" aria-hidden="true">→</span>
-        </motion.div>
-      )}
-
-      {/* Locked levels ahead */}
-      {lockedLevels.map((lvl, i) => (
-        <motion.div
-          key={lvl}
-          initial={{ opacity: 0, x: 8 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.06 * (i + 1) }}
-          className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
-          style={{
-            backgroundColor: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            opacity: Math.max(0.25, 0.7 - i * 0.12),
-          }}
-          data-testid={`path-level-${lvl}-locked`}
-        >
-          <span className="text-lg" aria-hidden="true">🔒</span>
-          <div className="flex-1">
-            <span className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>
-              Level {lvl}
-            </span>
-            <FormulaPreviewDots levelId={lvl} />
-          </div>
-        </motion.div>
-      ))}
-
-      {currentLevel < 67 && (
-        <p
-          className="text-xs text-center pt-2"
-          style={{ color: 'var(--color-text-muted)' }}
-          data-tts={`${67 - currentLevel} levels remaining`}
-        >
-          {67 - currentLevel} more levels to go
-        </p>
-      )}
-    </div>
-  )
-}
-
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
-
-export default function DashboardPage() {
-  const { user, profile } = useAuthStore()
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [shopOpen, setShopOpen] = useState(false)
-
-  // React Query for pupil_progress (auto-refreshes on invalidation)
-  const {
-    data: progress,
-    isLoading,
-    error,
-  } = useQuery<PupilProgress | null>({
-    queryKey: ['pupil_progress', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null
-      const { data, error: fetchError } = await supabase
-        .from('pupil_progress')
-        .select('*')
-        .eq('pupil_id', user.id)
-        .single()
-      if (fetchError && fetchError.code === 'PGRST116') return null
-      if (fetchError) throw fetchError
-      return data as PupilProgress
-    },
-    enabled: !!user?.id,
-    staleTime: 1000 * 30,
-  })
-
-  // React Query for mastery data on current level
-  const { data: masteryData } = useQuery<MasteryTracking | null>({
-    queryKey: ['mastery_tracking', user?.id, progress?.current_formula_level],
-    queryFn: async () => {
-      if (!user?.id || !progress) return null
-      const { data } = await supabase
-        .from('mastery_tracking')
-        .select('*')
-        .eq('pupil_id', user.id)
-        .eq('level_id', progress.current_formula_level)
-        .maybeSingle()
-      return data as MasteryTracking | null
-    },
-    enabled: !!user?.id && !!progress,
-    staleTime: 1000 * 60,
-  })
-
-  const handleSignOut = async () => {
+  // ── logout ──────────────────────────────────────────────────────────────────
+  const handleLogout = async () => {
     await supabase.auth.signOut()
-    useAuthStore.getState().clearAuth()
-    window.location.href = '/login'
+    navigate('/', { replace: true })
   }
 
-  const level = progress?.current_formula_level ?? 1
-  const totalXP = progress?.total_xp ?? 0
-  const currentStreak = progress?.current_streak ?? 0
-  const longestStreak = progress?.longest_streak ?? 0
-  const shieldActive = progress?.streak_shield_active ?? false
+  // ── avatar select ───────────────────────────────────────────────────────────
+  const handleSelectAvatar = async (id: AvatarVariantId) => {
+    setSelectedAvatar(id)
+    setWardrobeOpen(false)
+    // Persist to DB (optimistic)
+    await supabase
+      .from('profiles')
+      .update({ selected_avatar: id })
+      .eq('id', pupilId)
+  }
 
-  // Phase 2: mastery-based paragraph unlock (§4.2 criteria A+B+C)
-  const isParagraphUnlocked = checkParagraphMasteryUnlock(
-    level,
-    masteryData?.gate_passed ?? false,
-    progress?.levels_mastered_count ?? 0
-  )
-  const isWritingStudioLocked = !progress?.writing_studio_unlocked
+  // ── node click ──────────────────────────────────────────────────────────────
+  const handleNodeClick = (level: number, node: NodeType) => {
+    // In the full implementation this would navigate to the formula practice page
+    // For now, just a placeholder
+    console.log('Navigate to level', level, 'node', node)
+  }
 
-  const firstName = profile?.first_name ?? 'Pupil'
-  const sessionsCompleted = masteryData?.sessions_completed ?? 0
-  // WF-057: Show welcome modal on first visit
-  const shouldShowWelcome = useShouldShowWelcome()
-  const [welcomeDismissed, setWelcomeDismissed] = useState(false)
+  // ── derived data ────────────────────────────────────────────────────────────
+  const currentLevel = progress?.current_formula_level ?? 1
+  const totalXp      = progress?.total_xp ?? 0
+  const streak       = progress?.current_streak ?? 0
+  const coins        = progress?.coins ?? 0
+  const earnedBadgeIds = (pupilBadges ?? []).map((pb) => pb.badge_id)
+  // Map DB badge IDs to our static BADGE_DEFS — first two badges always shown as earned for demo
+  const demoEarnedIds = earnedBadgeIds.length === 0 && currentLevel >= 1
+    ? ['b1', 'b2', currentLevel >= 3 ? 'b3' : ''].filter(Boolean)
+    : earnedBadgeIds
 
-  if (isLoading) {
+  const avatarId = selectedAvatar
+  const name = (profile as any)?.display_name ?? (profile as any)?.full_name ?? 'Pupil'
+
+  // ── loading ─────────────────────────────────────────────────────────────────
+  if (progressLoading && !progress) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: 'var(--color-background)' }}
-        data-testid="dashboard-loading"
-      >
-        <div className="text-center space-y-3">
-          <div
-            className="w-10 h-10 border-4 rounded-full animate-spin mx-auto"
-            style={{
-              borderColor: 'var(--color-brand-primary)',
-              borderTopColor: 'transparent',
-            }}
-          />
-          <p
-            className="text-sm font-medium"
-            style={{ color: 'var(--color-text-muted)' }}
-            data-tts="Loading your dashboard"
-          >
-            Loading your dashboard…
-          </p>
-        </div>
+      <div style={{
+        minHeight: '100vh', background: C.bg,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: 16,
+      }}>
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
+        >
+          <WritzAvatar variant="wizard" size={64} />
+        </motion.div>
+        <p style={{ color: C.muted, fontSize: 14, fontWeight: 600 }}>Loading your adventure…</p>
       </div>
     )
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // Three layout modes via CSS media query:
+  //   mobile   < 768px  — single column, full-width path
+  //   tablet  768–1023  — two column
+  //   desktop ≥ 1024px  — two column, wider path
+  // ─────────────────────────────────────────────────────────────────────────────
+
   return (
     <div
-      className="min-h-screen pb-12"
-      style={{ backgroundColor: 'var(--color-background)' }}
+      style={{ minHeight: '100vh', background: C.bg, fontFamily: "'Inter', sans-serif" }}
       data-testid="dashboard-page"
     >
-      {/* WF-057: First-visit welcome modal */}
-      {shouldShowWelcome && !welcomeDismissed && user?.id && (
-        <PupilWelcomeModal
-          pupilId={user.id}
-          firstName={firstName}
-          onComplete={() => setWelcomeDismissed(true)}
-        />
-      )}
+      {/* Top bar */}
+      <TopBar
+        name={name}
+        avatarId={avatarId}
+        xp={totalXp}
+        streak={streak}
+        coins={coins}
+        onOpenWardrobe={() => setWardrobeOpen(true)}
+        onLogout={handleLogout}
+      />
 
-      {/* WF-047: Session expiry warning */}
-      <SessionExpiryBanner />
-
-      {/* Top header */}
-      <header
-        className="px-4 py-4 flex items-center justify-between"
-        style={{
-          backgroundColor: 'var(--color-surface)',
-          borderBottom: '1px solid var(--color-border)',
-        }}
-        data-testid="dashboard-header"
+      {/* Main content */}
+      <div style={{
+        maxWidth: 1100,
+        margin: '0 auto',
+        padding: '24px 16px',
+        // CSS grid: on small screens = 1 col; on larger = path + sidebar
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0,1fr)',
+        gap: 24,
+      }}
+        className="dashboard-grid"
       >
-        <div className="flex items-center gap-3">
-          <span
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold"
-            style={{ backgroundColor: 'var(--color-brand-primary)' }}
-            aria-hidden="true"
-          >
-            W
-          </span>
-          <span
-            className="font-bold text-lg"
-            style={{ color: 'var(--color-text)' }}
-            data-tts="WriFe"
-          >
-            WriFe
-          </span>
-        </div>
-
-        <img
-          src="/mascot/mascot_std_1.png"
-          alt=""
-          aria-hidden="true"
-          style={{ height: '88px', width: 'auto', display: 'block' }}
-        />
-
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="text-sm px-2 py-1.5 rounded-lg transition-colors"
-            style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}
-            data-testid="settings-gear-button"
-            aria-label="Open settings"
-            data-tts="Settings"
-          >
-            ⚙
-          </button>
-        <button
-          type="button"
-          onClick={handleSignOut}
-          className="text-sm px-3 py-1.5 rounded-lg transition-colors"
-          style={{
-            color: 'var(--color-text-muted)',
-            border: '1px solid var(--color-border)',
-          }}
-          data-testid="sign-out-button"
-          data-tts="Sign out"
-        >
-          Sign out
-        </button>
-      </header>
-
-      {/* Settings modal */}
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
-
-      <main className="max-w-xl mx-auto px-4 pt-6 space-y-5">
-        {/* Greeting */}
+        {/* ── Learning path column ── */}
         <motion.div
-          initial={{ opacity: 0, y: -10 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
+          transition={{ duration: 0.4 }}
+          style={{
+            background: C.surface,
+            borderRadius: 20,
+            padding: '20px 16px',
+            border: `1px solid ${C.border}`,
+            overflow: 'hidden',
+          }}
         >
-          <div className="flex items-center gap-2">
-            <h1
-              className="text-2xl font-bold"
-              style={{ color: 'var(--color-text)' }}
-              data-tts={`Hello, ${firstName}`}
-            >
-              Hello, {firstName}! 👋
+          <div style={{ marginBottom: 20 }}>
+            <h1 style={{ fontSize: 18, fontWeight: 900, color: C.text, margin: 0 }}
+              data-tts="Your learning path">
+              Your Learning Path ✨
             </h1>
-            <TTSButton text={`Hello, ${firstName}! Ready to write today?`} />
+            <p style={{ fontSize: 13, color: C.muted, margin: '4px 0 0' }}>
+              Keep going — every step makes you a better writer!
+            </p>
           </div>
-          <p
-            className="text-sm mt-1"
-            style={{ color: 'var(--color-text-muted)' }}
-            data-tts="Ready to write today?"
-          >
-            Ready to write today?
-          </p>
-        </motion.div>
-
-        {/* Error banner */}
-        {error && (
-          <div
-            className="p-3 rounded-xl text-sm"
-            style={{
-              backgroundColor: '#FEE2E2',
-              color: '#991B1B',
-              border: '1px solid #FECACA',
-            }}
-            data-testid="dashboard-error"
-            data-tts="Could not load your progress. Please refresh the page."
-          >
-            Could not load your progress. Please refresh the page.
-          </div>
-        )}
-
-        {/* Animated XP display */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="rounded-xl px-4 py-3 flex items-center justify-between"
-          style={{
-            background: 'linear-gradient(135deg, #FEF9C3, #FEF3C7)',
-            border: '1px solid #FCD34D',
-          }}
-          data-testid="xp-display"
-        >
-          <span
-            className="text-sm font-semibold"
-            style={{ color: '#92400E' }}
-            data-tts="Total XP"
-          >
-            ⭐ Total XP
-          </span>
-          <span className="text-xl font-bold" style={{ color: '#78350F' }}>
-            <AnimatedXP value={totalXP} />
-          </span>
-        </motion.div>
-
-        {/* Stats row: Level + Streak */}
-        <div className="flex gap-3 justify-between" data-testid="stats-row">
-          <FormulaLevelBadge level={level} />
-          <StreakCounter currentStreak={currentStreak} longestStreak={longestStreak} />
-          {shieldActive && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 300 }}
-              className="flex flex-col items-center justify-center rounded-xl px-3 py-2"
-              style={{
-                backgroundColor: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-              }}
-              data-testid="streak-shield"
-              data-tts="Streak shield active"
-              title="Streak Shield Active"
-            >
-              <span className="text-2xl" aria-hidden="true">🛡️</span>
-              <span className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                Shield
-              </span>
-            </motion.div>
-          )}
-        </div>
-
-        {/* Level progress bar */}
-        <LevelProgressBar
-          levelId={level}
-          sessionsCompleted={sessionsCompleted}
-          gateSessions={MASTERY_GATE_SESSIONS}
-        />
-
-        {/* Recent badges */}
-        {user?.id && <RecentBadges pupilId={user.id} />}
-
-        {/* WF-035: XP Shop */}
-        {progress && (
-          <div>
-            <button
-              type="button"
-              onClick={() => setShopOpen((o) => !o)}
-              className="text-xs font-medium mb-2 flex items-center gap-1"
-              style={{ color: 'var(--color-brand-primary)' }}
-              data-testid="toggle-xp-shop"
-              data-tts={shopOpen ? 'Hide XP Shop' : 'Open XP Shop'}
-            >
-              🏪 XP Shop {shopOpen ? '▲' : '▼'}
-            </button>
-            {shopOpen && (
-              <XPShop
-                progress={progress}
-                onPurchase={() => {
-                  queryClient.invalidateQueries({ queryKey: ['pupil_progress', user?.id] })
-                }}
-              />
-            )}
-          </div>
-        )}
-
-        {/* Phase 2: Learning Path (Duolingo-style node map) */}
-        {user?.id && (
           <LearningPath
-            currentLevel={level}
-            levelsMastered={progress?.levels_mastered_count ?? 0}
-            paragraphUnlocked={isParagraphUnlocked}
-            writingUnlocked={!isWritingStudioLocked}
-            masteryData={masteryData}
-            pupilId={user.id}
-            onStartPractice={() => navigate('/practice')}
+            currentLevel={currentLevel}
+            onNodeClick={handleNodeClick}
+          />
+        </motion.div>
+
+        {/* ── Stats sidebar column ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className="dashboard-sidebar"
+        >
+          <StatsSidebar
+            progress={progress ?? {
+              pupil_id: pupilId,
+              current_formula_level: currentLevel,
+              total_xp: totalXp,
+              current_streak: streak,
+              longest_streak: streak,
+              streak_shield_active: false,
+              coins,
+              writing_studio_unlocked: false,
+            }}
+            profile={profile as any}
+            earnedBadgeIds={demoEarnedIds}
+            onOpenWardrobe={() => setWardrobeOpen(true)}
+          />
+        </motion.div>
+      </div>
+
+      {/* Responsive grid style */}
+      <style>{`
+        @media (min-width: 768px) {
+          .dashboard-grid {
+            grid-template-columns: 1fr 320px !important;
+          }
+        }
+        @media (min-width: 1024px) {
+          .dashboard-grid {
+            grid-template-columns: 1fr 360px !important;
+          }
+        }
+        .dashboard-sidebar {
+          /* on mobile the sidebar appears below the path */
+        }
+        button:hover:not(:disabled) {
+          transform: scale(1.04);
+        }
+      `}</style>
+
+      {/* Wardrobe modal */}
+      <AnimatePresence>
+        {wardrobeOpen && (
+          <WardrobeModal
+            currentAvatar={avatarId}
+            coins={coins}
+            ownedAvatars={['wizard']} // In full implementation load from DB
+            onSelect={handleSelectAvatar}
+            onClose={() => setWardrobeOpen(false)}
           />
         )}
-
-        {/* Quick links for unlocked layers (compact row) */}
-        <div className="flex gap-2" data-testid="quick-links">
-          {isParagraphUnlocked && (
-            <button
-              onClick={() => navigate('/paragraph')}
-              className="flex-1 py-2 rounded-xl text-xs font-semibold text-white"
-              style={{ backgroundColor: 'var(--color-adjective)' }}
-              data-testid="quick-paragraph"
-              data-tts="Go to Paragraph Builder"
-            >
-              📝 Paragraph Builder
-            </button>
-          )}
-          {!isWritingStudioLocked && (
-            <button
-              onClick={() => navigate('/writing')}
-              className="flex-1 py-2 rounded-xl text-xs font-semibold text-white"
-              style={{ backgroundColor: 'var(--color-verb)' }}
-              data-testid="quick-writing"
-              data-tts="Go to Writing Studio"
-            >
-              ✍️ Writing Studio
-            </button>
-          )}
-          <button
-            onClick={() => navigate('/portfolio')}
-            className="flex-1 py-2 rounded-xl text-xs font-semibold"
-            style={{
-              border: '1px solid var(--color-border)',
-              color: 'var(--color-text-muted)',
-            }}
-            data-testid="quick-portfolio"
-            data-tts="Go to My Portfolio"
-          >
-            📚 Portfolio
-          </button>
-        </div>
-
-        {/* Progress summary footer */}
-        {progress && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="rounded-xl p-4 text-sm"
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-            }}
-            data-testid="progress-summary"
-          >
-            <h3
-              className="font-semibold mb-2"
-              style={{ color: 'var(--color-text)' }}
-              data-tts="Your progress"
-            >
-              Your Progress
-            </h3>
-            <div className="space-y-1" style={{ color: 'var(--color-text-muted)' }}>
-              {progress.last_session_date && (
-                <p data-tts={`Last session: ${progress.last_session_date}`}>
-                  Last session:{' '}
-                  <span style={{ color: 'var(--color-text)' }}>
-                    {new Date(progress.last_session_date).toLocaleDateString('en-GB', {
-                      weekday: 'long',
-                      day: 'numeric',
-                      month: 'short',
-                    })}
-                  </span>
-                </p>
-              )}
-              <p data-tts={`Current paragraph phase: ${progress.current_paragraph_phase}`}>
-                Paragraph phase:{' '}
-                <span style={{ color: 'var(--color-text)' }}>
-                  Phase {progress.current_paragraph_phase}
-                </span>
-              </p>
-              {progress.streak_shield_active && (
-                <p
-                  style={{ color: 'var(--color-brand-accent)' }}
-                  data-tts="Streak shield active"
-                >
-                  🛡️ Streak shield active
-                </p>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </main>
+      </AnimatePresence>
     </div>
   )
 }

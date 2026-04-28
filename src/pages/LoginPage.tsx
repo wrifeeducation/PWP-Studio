@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase'
 import { Role } from '../types/index'
 import type { Profile } from '../types/index'
 import { APP_VERSION } from '../lib/version'
+import { WritzAvatar } from '../components/WritzAvatar'
+import type { AvatarVariantId } from '../components/WritzAvatar'
 
 type LoginMode = 'teacher' | 'pupil'
 type AuthMode = 'login' | 'signup'
@@ -30,6 +32,8 @@ export default function LoginPage() {
 
   // Pupil fields
   const [pin, setPin] = useState('')
+  // Avatar displayed on pupil PIN screen (defaults to wizard; updated after login from profile)
+  const [loginAvatar] = useState<AvatarVariantId>('wizard')
 
   const [errors, setErrors] = useState<FormErrors>({})
   const [isLoading, setIsLoading] = useState(false)
@@ -468,12 +472,36 @@ export default function LoginPage() {
           <>
             {/* Pupil PIN login */}
             <div className="text-center mb-6">
+              {/* Writz avatar — bounces to greet the pupil */}
+              <motion.div
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 280, damping: 18 }}
+                className="flex justify-center mb-4"
+              >
+                <div
+                  style={{
+                    background: '#EDE7F6',
+                    border: '3px solid #6C5CE7',
+                    borderRadius: '50%',
+                    width: 90,
+                    height: 90,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  aria-hidden="true"
+                >
+                  <WritzAvatar variant={loginAvatar} size={66} animated />
+                </div>
+              </motion.div>
+
               <h2
                 className="text-xl font-bold mb-1"
                 style={{ color: 'var(--color-text)' }}
                 data-tts="Enter your PIN"
               >
-                Enter Your PIN
+                Hey there! Enter Your PIN
               </h2>
               <p
                 className="text-sm"
