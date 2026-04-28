@@ -58,6 +58,21 @@ interface PupilBadgeRow {
   }
 }
 
+// ─── Gold coin SVG (replaces 🪙 which renders as a grey blob on Chrome/Windows) ─
+
+const CoinIcon: React.FC<{ size?: number; style?: React.CSSProperties }> = ({ size = 18, style }) => (
+  <svg
+    width={size} height={size} viewBox="0 0 20 20"
+    style={{ display: 'inline-block', flexShrink: 0, ...style }}
+    aria-hidden="true"
+  >
+    <circle cx="10" cy="10" r="9.5" fill="#F5A623" />
+    <circle cx="10" cy="10" r="8"   fill="#FFD966" />
+    <circle cx="10" cy="10" r="6.5" fill="none" stroke="#d4891c" strokeWidth="0.8" />
+    <text x="10" y="14" textAnchor="middle" fontSize="8" fontWeight="900" fill="#7a4500">✦</text>
+  </svg>
+)
+
 // ─── colour tokens (inline, matches existing HomePage pattern) ────────────────
 
 const C = {
@@ -72,95 +87,174 @@ const C = {
   pink:    '#E84393',
 } as const
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+// ─── Path geometry ────────────────────────────────────────────────────────────
 
-/** Total number of node steps before a given level within its chapter */
 const NODE_TYPES = ['learn', 'build', 'practice', 'master'] as const
 type NodeType = typeof NODE_TYPES[number]
 
-/** Pixel offset for meander: alternates left / right on mobile */
-function meandX(idx: number): number {
-  const pattern = [0, 40, 80, 40]
-  return pattern[idx % 4]
+/** Three column X-centres in a PATH_W-wide container, creating a smooth S-curve */
+const PATH_W    = 300
+const COL_X     = [52, 150, 248]           // left / centre / right
+const COL_PAT   = [0, 1, 2, 1]            // L→C→R→C→L repeating
+const NODE_STEP = 100                      // vertical px between node centres
+const AVATAR_LIFT = 95                     // px above active node centre
+
+function colX(nodeIdx: number): number {
+  return COL_X[COL_PAT[nodeIdx % 4]]
+}
+function nodeRadius(state: 'done' | 'active' | 'locked'): number {
+  return state === 'active' ? 33 : state === 'done' ? 27 : 22
 }
 
-// ─── Node component ───────────────────────────────────────────────────────────
+// ─── SVG connector between two adjacent nodes ─────────────────────────────────
 
-interface NodeProps {
+interface ConnSVGProps {
+  x1: number; y1: number; r1: number
+  x2: number; y2: number; r2: number
+  done: boolean
+}
+
+const NodeConnector: React.FC<ConnSVGProps> = ({ x1, y1, r1, x2, y2, r2, done }) => {
+  const sy   = y1 + r1 + 3
+  const ey   = y2 - r2 - 3
+  const midY = (sy + ey) / 2
+  // Bezier: depart vertically from x1, arrive vertically at x2
+  const d = `M ${x1} ${sy} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${ey}`
+  return (
+    <path
+      d={d}
+      stroke={done ? C.green : '#DFE6E9'}
+      strokeWidth={3.5}
+      fill="none"
+      strokeLinecap="round"
+      strokeDasharray={done ? 'none' : '6 4'}
+    />
+  )
+}
+
+// ─── Single path node button ──────────────────────────────────────────────────
+
+interface PathNodeProps {
   level: number
   nodeType: NodeType
   state: 'done' | 'active' | 'locked'
   isAvatar: boolean
+  avatarVariant: AvatarVariantId
   chapterColour: string
+  cx: number   // centre X in the PATH_W container
+  cy: number   // centre Y in the full chapter SVG container
   onClick?: () => void
 }
 
-const PathNode: React.FC<NodeProps> = ({ level, nodeType, state, isAvatar, chapterColour, onClick }) => {
-  const meta = NODE_META[nodeType]
-  const isDone   = state === 'done'
+const PathNode: React.FC<PathNodeProps> = ({
+  level, nodeType, state, isAvatar, avatarVariant,
+  chapterColour, cx, cy, onClick,
+}) => {
+  const meta    = NODE_META[nodeType]
+  const r       = nodeRadius(state)
+  const isDone  = state === 'done'
   const isActive = state === 'active'
   const isLocked = state === 'locked'
 
-  const bg = isDone
-    ? C.green
-    : isActive
-    ? chapterColour
-    : '#DFE6E9'
+  const bg     = isDone ? C.green : isActive ? chapterColour : '#E8ECF0'
+  const border = isDone ? '#1e8449' : isActive ? chapterColour : '#C8D0D9'
 
-  const border = isDone
-    ? '#1e8449'
-    : isActive
-    ? chapterColour
-    : '#B2BEC3'
+  // Label: alternate side based on column position
+  const labelRight = cx <= 150   // nodes on left/centre → label right; right column → label left
+  const labelLeft  = cx - r - 8
+  const labelRight2 = cx + r + 8
 
   return (
-    <button
-      onClick={onClick}
-      disabled={isLocked}
-      aria-label={`Level ${level} ${meta.label}${isLocked ? ' (locked)' : ''}`}
-      data-tts={`Level ${level} ${meta.label}`}
-      data-testid={`node-${level}-${nodeType}`}
-      style={{
-        position: 'relative',
-        width: 56,
-        height: 56,
-        borderRadius: '50%',
-        background: bg,
-        border: `3px solid ${border}`,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: isLocked ? 'default' : 'pointer',
-        boxShadow: isActive ? `0 0 0 5px ${chapterColour}33, 0 4px 14px ${chapterColour}44` : '0 2px 6px rgba(0,0,0,0.12)',
-        transition: 'transform 0.15s, box-shadow 0.15s',
-        flexShrink: 0,
-      }}
-    >
-      <span style={{ fontSize: 20, lineHeight: 1 }}>{isLocked ? '🔒' : meta.emoji}</span>
+    <g data-testid={`node-${level}-${nodeType}`}>
+      {/* Pulsing outer ring for active node */}
       {isActive && (
-        <span style={{
-          position: 'absolute',
-          bottom: -22,
-          fontSize: 10,
-          fontWeight: 700,
-          color: chapterColour,
-          whiteSpace: 'nowrap',
-          letterSpacing: '0.04em',
-        }}>
-          L{level}
-        </span>
+        <>
+          <circle cx={cx} cy={cy} r={r + 12} fill={`${chapterColour}18`} />
+          <circle cx={cx} cy={cy} r={r + 7}  fill={`${chapterColour}28`} />
+        </>
       )}
-      {isAvatar && (
-        <motion.div
-          animate={{ y: [0, -6, 0] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ position: 'absolute', top: -60 }}
+
+      {/* Main circle (as foreignObject button for click handling) */}
+      <foreignObject
+        x={cx - r} y={cy - r} width={r * 2} height={r * 2}
+      >
+        <button
+          onClick={onClick}
+          disabled={isLocked}
+          aria-label={`Level ${level} ${meta.label}${isLocked ? ' (locked)' : ''}`}
+          data-tts={`Level ${level} ${meta.label}`}
+          style={{
+            width: r * 2, height: r * 2, borderRadius: '50%',
+            background: bg,
+            border: `3px solid ${border}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: isLocked ? 'default' : 'pointer',
+            boxShadow: isActive
+              ? `0 0 0 4px ${chapterColour}30, 0 4px 18px ${chapterColour}55`
+              : isDone
+              ? '0 2px 8px rgba(39,174,96,0.3)'
+              : '0 1px 4px rgba(0,0,0,0.1)',
+            fontSize: isActive ? 20 : isDone ? 17 : 15,
+            transition: 'transform 0.12s',
+            padding: 0,
+          }}
         >
-          <WritzAvatar size={50} animated={false} />
-        </motion.div>
+          {isLocked ? '🔒' : isDone ? '✓' : meta.emoji}
+        </button>
+      </foreignObject>
+
+      {/* Level label for active node */}
+      {isActive && (
+        <text
+          x={cx} y={cy + r + 16}
+          textAnchor="middle"
+          fontSize={11} fontWeight={800}
+          fill={chapterColour}
+          style={{ letterSpacing: '0.04em' }}
+        >
+          Level {level}
+        </text>
       )}
-    </button>
+
+      {/* Node-type label (done and active only) */}
+      {!isLocked && (
+        <text
+          x={labelRight ? labelRight2 : labelLeft}
+          y={cy + 4}
+          textAnchor={labelRight ? 'start' : 'end'}
+          fontSize={11} fontWeight={isDone ? 600 : 700}
+          fill={isDone ? C.muted : isActive ? chapterColour : C.muted}
+        >
+          {meta.label}
+        </text>
+      )}
+
+      {/* Writz avatar above active node */}
+      {isAvatar && (
+        <foreignObject
+          x={cx - 42} y={cy - AVATAR_LIFT - 42}
+          width={84} height={84}
+        >
+          <div style={{ position: 'relative' }}>
+            {/* Glow disc behind avatar */}
+            <div style={{
+              position: 'absolute',
+              width: 84, height: 84,
+              borderRadius: '50%',
+              background: `radial-gradient(circle, ${chapterColour}40 0%, transparent 70%)`,
+              top: 0, left: 0,
+            }} />
+            <motion.div
+              animate={{ y: [0, -7, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ position: 'relative', zIndex: 1 }}
+            >
+              <WritzAvatar variant={avatarVariant} size={80} animated={false} />
+            </motion.div>
+          </div>
+        </foreignObject>
+      )}
+    </g>
   )
 }
 
@@ -273,7 +367,7 @@ const WardrobeModal: React.FC<WardrobeModalProps> = ({
           background: '#FFF8E1', border: '1.5px solid #F5A623',
           borderRadius: 20, padding: '5px 12px',
         }}>
-          <span style={{ fontSize: 16 }}>🪙</span>
+          <CoinIcon size={16} />
           <span style={{ fontSize: 14, fontWeight: 800, color: C.orange }}>{coins.toLocaleString()}</span>
         </div>
       </div>
@@ -323,8 +417,9 @@ const WardrobeModal: React.FC<WardrobeModalProps> = ({
                 <span style={{
                   fontSize: 11, fontWeight: 700,
                   color: canAfford ? C.orange : C.muted,
+                  display: 'flex', alignItems: 'center', gap: 3,
                 }}>
-                  🪙 {av.cost}
+                  <CoinIcon size={13} /> {av.cost}
                 </span>
               )}
             </button>
@@ -454,14 +549,14 @@ const BadgesSection: React.FC<BadgesProps> = ({ earnedBadgeIds, currentLevel: _c
 
 interface StatsSidebarProps {
   progress: PupilProgressRow
-  profile: { display_name?: string; full_name?: string; selected_avatar?: string } | null
+  profile: { first_name?: string; selected_avatar?: string } | null
   earnedBadgeIds: string[]
   onOpenWardrobe: () => void
 }
 
 const StatsSidebar: React.FC<StatsSidebarProps> = ({ progress, profile, earnedBadgeIds, onOpenWardrobe }) => {
   const avatarId = (profile?.selected_avatar ?? 'wizard') as AvatarVariantId
-  const name = profile?.display_name ?? profile?.full_name ?? 'Pupil'
+  const name = profile?.first_name ?? 'Pupil'
   const currentChapter = getChapterForLevel(progress.current_formula_level)
 
   return (
@@ -522,10 +617,30 @@ const StatsSidebar: React.FC<StatsSidebarProps> = ({ progress, profile, earnedBa
         gap: 10,
       }}>
         {[
-          { label: 'Level', value: `L${progress.current_formula_level}`, emoji: '📈', colour: C.brand },
-          { label: 'XP',    value: progress.total_xp.toLocaleString(),   emoji: '⭐', colour: '#F39C12' },
-          { label: 'Streak', value: `${progress.current_streak}d`,       emoji: '🔥', colour: '#E74C3C' },
-          { label: 'Coins',  value: progress.coins.toLocaleString(),      emoji: '🪙', colour: C.orange },
+          {
+            label: 'Level',
+            value: `L${progress.current_formula_level}`,
+            icon: <span style={{ fontSize: 20 }}>📈</span>,
+            colour: C.brand,
+          },
+          {
+            label: 'XP',
+            value: progress.total_xp.toLocaleString(),
+            icon: <span style={{ fontSize: 20 }}>⭐</span>,
+            colour: '#F39C12',
+          },
+          {
+            label: 'Streak',
+            value: progress.current_streak > 0 ? `${progress.current_streak}d` : '–',
+            icon: <span style={{ fontSize: 20 }}>🔥</span>,
+            colour: '#E74C3C',
+          },
+          {
+            label: 'Coins',
+            value: progress.coins.toLocaleString(),
+            icon: <CoinIcon size={22} />,
+            colour: C.orange,
+          },
         ].map((s) => (
           <div
             key={s.label}
@@ -538,7 +653,7 @@ const StatsSidebar: React.FC<StatsSidebarProps> = ({ progress, profile, earnedBa
             }}
             data-tts={`${s.label}: ${s.value}`}
           >
-            <div style={{ fontSize: 20 }}>{s.emoji}</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 2 }}>{s.icon}</div>
             <div style={{ fontSize: 16, fontWeight: 800, color: s.colour }}>{s.value}</div>
             <div style={{ fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
           </div>
@@ -560,30 +675,72 @@ const StatsSidebar: React.FC<StatsSidebarProps> = ({ progress, profile, earnedBa
   )
 }
 
-// ─── Learning path (mobile vertical) ─────────────────────────────────────────
+// ─── Learning path ────────────────────────────────────────────────────────────
 
 interface LearningPathProps {
   currentLevel: number
+  avatarVariant: AvatarVariantId
   onNodeClick: (level: number, node: NodeType) => void
 }
 
-const LearningPath: React.FC<LearningPathProps> = ({ currentLevel, onNodeClick }) => {
-  // For simplicity: "current node" = first 'learn' node at current level.
-  // Completed = all nodes in levels < currentLevel.
-  // Active node = 'learn' at currentLevel.
-
+const LearningPath: React.FC<LearningPathProps> = ({ currentLevel, avatarVariant, onNodeClick }) => {
   return (
-    <div style={{ position: 'relative', padding: '24px 0 80px' }}>
+    <div style={{ padding: '8px 0 48px' }}>
       {CHAPTERS.map((chapter) => {
         const chapterLevels = getLevelsForChapter(chapter)
-        const chapterMax = chapter.levelRange[1]
-        const chapterMin = chapter.levelRange[0]
+        const chapterMax    = chapter.levelRange[1]
+        const chapterMin    = chapter.levelRange[0]
         const chapterDone   = currentLevel > chapterMax
         const chapterLocked = currentLevel < chapterMin
         const chapterCurrent = !chapterDone && !chapterLocked
 
+        // Flatten all nodes for this chapter into an array with state + geometry
+        type NodeEntry = {
+          level: number
+          nt: NodeType
+          ni: number
+          globalIdx: number
+          state: 'done' | 'active' | 'locked'
+          isAvatar: boolean
+          cx: number
+          cy: number
+        }
+
+        const nodes: NodeEntry[] = chapterLevels.flatMap((level, li) =>
+          NODE_TYPES.map((nt, ni): NodeEntry => {
+            const globalIdx  = li * 4 + ni
+            const levelDone  = level < currentLevel
+            const levelActive = level === currentLevel
+
+            const isActive = levelActive && nt === 'learn'
+            const isDone   = levelDone
+            const isLocked = !isDone && !isActive
+
+            const state: 'done' | 'active' | 'locked' = isDone ? 'done' : isActive ? 'active' : 'locked'
+
+            // Y: extra top padding when this chapter has an active node (room for avatar)
+            const hasActiveNode = chapterLevels.some(l => l === currentLevel)
+            const topPad = hasActiveNode ? AVATAR_LIFT + 20 : 40
+
+            return {
+              level, nt, ni, globalIdx,
+              state,
+              isAvatar: isActive,
+              cx: colX(globalIdx),
+              cy: topPad + globalIdx * NODE_STEP,
+            }
+          })
+        )
+
+        if (nodes.length === 0) return null
+
+        const lastNode   = nodes[nodes.length - 1]
+        const hasActive  = chapterLevels.some(l => l === currentLevel)
+        const topPad     = hasActive ? AVATAR_LIFT + 20 : 40
+        const svgHeight  = topPad + nodes.length * NODE_STEP + 40
+
         return (
-          <div key={chapter.num} style={{ marginBottom: 40 }}>
+          <div key={chapter.num} style={{ marginBottom: 32 }}>
             <ChapterBanner
               chapter={chapter}
               unlocked={!chapterLocked}
@@ -591,73 +748,44 @@ const LearningPath: React.FC<LearningPathProps> = ({ currentLevel, onNodeClick }
               completed={chapterDone}
             />
 
-            {/* nodes */}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-start',
-              paddingLeft: 16,
-              gap: 0,
-            }}>
-              {chapterLevels.map((level, li) => (
-                <div key={level}>
-                  {NODE_TYPES.map((nt, ni) => {
-                    const levelDone   = level < currentLevel
-                    const levelActive = level === currentLevel
-                    const levelLocked = level > currentLevel
+            {/* SVG canvas for this chapter's nodes + connectors */}
+            <div style={{ overflowX: 'auto' }}>
+              <svg
+                width={PATH_W}
+                height={svgHeight}
+                style={{ display: 'block', margin: '0 auto', overflow: 'visible' }}
+                aria-label={`Chapter ${chapter.num} learning path`}
+              >
+                {/* Connectors (drawn first, behind nodes) */}
+                {nodes.map((node, i) => {
+                  if (i === 0) return null
+                  const prev = nodes[i - 1]
+                  return (
+                    <NodeConnector
+                      key={`conn-${i}`}
+                      x1={prev.cx} y1={prev.cy} r1={nodeRadius(prev.state)}
+                      x2={node.cx} y2={node.cy} r2={nodeRadius(node.state)}
+                      done={prev.state === 'done'}
+                    />
+                  )
+                })}
 
-                    const nodeDone   = levelDone || (levelActive && ni < NODE_TYPES.indexOf('learn' as NodeType))
-                    const nodeActive = levelActive && nt === 'learn'
-                    const nodeLocked = levelLocked || (levelActive && ni > NODE_TYPES.indexOf('learn' as NodeType))
-
-                    const nodeState: 'done' | 'active' | 'locked' = nodeDone ? 'done' : nodeActive ? 'active' : 'locked'
-                    const isAvatarNode = nodeActive
-
-                    const nodeIdx = li * 4 + ni
-                    const xOffset = meandX(nodeIdx)
-
-                    return (
-                      <div key={nt} style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        marginLeft: xOffset,
-                        marginBottom: 28,
-                        position: 'relative',
-                      }}>
-                        {/* connector line up */}
-                        {(li > 0 || ni > 0) && (
-                          <div style={{
-                            position: 'absolute',
-                            top: -22,
-                            left: 24,
-                            width: 3,
-                            height: 22,
-                            background: nodeDone || nodeActive ? C.green : '#DFE6E9',
-                            borderRadius: 2,
-                          }} />
-                        )}
-                        <PathNode
-                          level={level}
-                          nodeType={nt}
-                          state={nodeState}
-                          isAvatar={isAvatarNode}
-                          chapterColour={chapter.textColour}
-                          onClick={() => !nodeLocked && onNodeClick(level, nt)}
-                        />
-                        {/* label on right */}
-                        <div style={{ marginLeft: 14 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: nodeLocked ? C.muted : C.text }}>
-                            {nodeActive ? `Level ${level}` : nt === 'learn' ? `Level ${level}` : ''}
-                          </div>
-                          <div style={{ fontSize: 11, color: C.muted }}>
-                            {nodeLocked ? '🔒 Locked' : NODE_META[nt].label}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              ))}
+                {/* Nodes */}
+                {nodes.map((node) => (
+                  <PathNode
+                    key={`${node.level}-${node.nt}`}
+                    level={node.level}
+                    nodeType={node.nt}
+                    state={node.state}
+                    isAvatar={node.isAvatar}
+                    avatarVariant={avatarVariant}
+                    chapterColour={chapter.textColour}
+                    cx={node.cx}
+                    cy={node.cy}
+                    onClick={() => node.state !== 'locked' && onNodeClick(node.level, node.nt)}
+                  />
+                ))}
+              </svg>
             </div>
           </div>
         )
@@ -748,7 +876,7 @@ const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWa
         padding: '5px 12px',
         boxShadow: '0 1px 6px rgba(0,0,0,0.15)',
       }}>
-        <span style={{ fontSize: 15 }}>🪙</span>
+        <CoinIcon size={15} />
         <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{coins}</span>
       </div>
       <button
@@ -862,7 +990,8 @@ export default function DashboardPage() {
     : earnedBadgeIds
 
   const avatarId = selectedAvatar
-  const name = (profile as any)?.display_name ?? (profile as any)?.full_name ?? 'Pupil'
+  // Profile.first_name is the correct field (no full_name/display_name on this schema)
+  const name = profile?.first_name ?? 'Pupil'
 
   // ── loading ─────────────────────────────────────────────────────────────────
   if (progressLoading && !progress) {
@@ -991,6 +1120,7 @@ export default function DashboardPage() {
           </div>
           <LearningPath
             currentLevel={currentLevel}
+            avatarVariant={avatarId}
             onNodeClick={handleNodeClick}
           />
         </motion.div>
@@ -1013,7 +1143,7 @@ export default function DashboardPage() {
               coins,
               writing_studio_unlocked: false,
             }}
-            profile={profile as any}
+            profile={profile as { first_name?: string; selected_avatar?: string } | null}
             earnedBadgeIds={demoEarnedIds}
             onOpenWardrobe={() => setWardrobeOpen(true)}
           />
