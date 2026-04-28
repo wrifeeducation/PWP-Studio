@@ -1,5 +1,5 @@
 # WriFe PWP — Adaptive Progression Architecture
-**Version:** 1.0  
+**Version:** 1.1  
 **Date:** 28 April 2026  
 **Status:** Design plan — approved for implementation
 
@@ -295,18 +295,150 @@ CREATE TABLE teacher_notifications (
 
 ## 9. Pupil-Facing Experience
 
-From the pupil's perspective, the system should feel like a game that knows them:
+### 9.1 The Duolingo Path Model
 
-- They open the app and see **"Today's practice"** — no choices needed. The system has prepared their session.
-- After completing a session, they see their score and a brief AI-generated sentence of feedback ("Great use of the adjective! Try varying your nouns next time.")
-- When they **master a level**, they see an unlock animation + XP reward + "You've unlocked Level [X]!"
-- When **Paragraph Builder unlocks**, a story is told: "You've mastered 2 sentence patterns — now let's build a whole paragraph around them." The first session is scaffolded generously.
-- The **XP shop, streaks, and badges** remain unchanged — they motivate daily engagement while the progression system manages the learning.
-- Pupils never see terms like "scaffold stage" or "mastery gate" — they see levels, locks/unlocks, and XP.
+The majority of the adaptive system's design surfaces on the pupil UI. The pupil never navigates a settings screen or picks their level — they see a single **Learning Path**: a vertical scroll of nodes representing formula levels, moving from completed levels at the top down to locked levels below.
+
+```
+  ● L1  ✓ Mastered          (faded green, crown icon)
+  ● L2  ✓ Mastered          (faded green, crown icon)
+  ● L3  ✓ Mastered          (faded green, crown icon)
+  ● L4  ↻ In progress       (bright, pulsing — TODAY's practice)
+         [Start today's session]
+  ● L5  🔒 Locked            (greyed, padlock icon)
+  ● L6  🔒 Locked
+  ...
+```
+
+Each **level node** shows:
+- Word classes in the formula (colour-coded dots — purple for determiner, blue for noun, etc.)
+- Mastery progress bar (if in progress) or crown (if mastered)
+- Scaffold stage indicator: small icons for Acquisition / Practice / Consolidation / Transfer
+
+Between certain levels, **layer unlock banners** appear inline on the path:
+- After mastering 2 levels with structural richness: **"Paragraph Builder unlocked!"** banner
+- After Writing Studio is confirmed: **"Writing Studio unlocked!"** banner
+
+The path scrolls to show approximately 3 levels above and 5 levels ahead — enough to feel like meaningful progress exists, not so many that it feels overwhelming.
+
+### 9.2 What the pupil sees in a session
+
+1. **Today's practice** card — level name, today's subject/context ("Today you're writing about a snowy morning"), start button
+2. **Concept cards** (see §10) — before the formula session begins
+3. **Formula builder** — colour-coded slots with word tiles (scaffold varies by stage)
+4. **Session result** — score, XP earned, brief AI feedback sentence, progress toward next mastery gate
+5. **Celebration moments** — level mastery animation, layer unlock reveal, badge award
+
+### 9.3 What pupils never see
+
+Pupils never see: scaffold stage numbers, mastery gate percentages, consolidation flags, teacher notification data, or the terms "acquisition", "transfer", or "mastery gate". They see levels, locks, XP, streaks, and badges.
 
 ---
 
-## 10. Implementation Phases
+## 10. Pre-Session Concept Learning
+
+### 10.1 Principle
+
+Before a pupil practices a formula, they must understand what each word class *means*. Without this, formula practice is pattern-matching by position — pupils learn that the third tile tends to be blue without understanding why. The definitions anchor the learning: a pupil who knows that "a verb is a doing, being or feeling word" can self-check their word choice independently of the colour of the tile.
+
+This mirrors how a skilled teacher would introduce a lesson: "Today we're using adjectives. An adjective is a describing word — it tells you more about a noun. Words like tall, red, and busy are all adjectives. Now let's build our sentence."
+
+### 10.2 Concept card flow
+
+When a pupil starts a session, before the formula builder appears, they move through a short sequence of **concept cards** — one per word class appearing in today's formula (deduplicated by word class, not by position).
+
+**Card structure:**
+
+```
+┌─────────────────────────────────┐
+│  🟣  DETERMINER                 │
+│                                 │
+│  A determiner introduces a      │
+│  noun. It tells you which one   │
+│  or how many.                   │
+│                                 │
+│  Examples: the  a  my  some     │
+│                          [Got it →]
+└─────────────────────────────────┘
+```
+
+- Cards use the same colour coding as the formula tiles (purple for determiner, blue for noun, etc.)
+- The examples shown are drawn from **today's word bank** — not abstract examples, but the actual words the pupil will see in a few seconds
+- Cards are swipeable; a progress indicator shows "1 of 4 word classes"
+- Pupils cannot skip on their **first encounter** with a word class. After that, a "Skip all" option appears for pupils who have seen these cards before
+
+### 10.3 Concept card trigger logic
+
+| Scenario | Behaviour |
+|----------|-----------|
+| First time a word class appears in the pupil's formula history | Card shown; no skip option |
+| Word class seen in a previous level but not recently (>7 sessions ago) | Card shown with "Remember?" framing; skip available |
+| Word class introduced in the previous session | Skip available by default; card collapsed to a reminder chip |
+| Scaffold stage 1 (Acquisition) | All cards shown in full |
+| Scaffold stages 2–4 | Cards available as optional pre-session review; brief reminder chip shown instead |
+
+### 10.4 Hints during the session
+
+Every slot in the formula builder has a **hint button** (? icon, minimum 44×44px tap target). Tapping it reveals a tooltip or bottom sheet with:
+
+- Word class name + colour
+- Definition (from the definitions in §10.6)
+- Two examples drawn from today's word bank
+
+**Hint availability by scaffold stage:**
+
+| Stage | Hint behaviour |
+|-------|---------------|
+| 1 — Acquisition | Hints auto-appear for each slot on first interaction; dismiss manually |
+| 2 — Practice | Hints available on demand; not auto-shown |
+| 3 — Consolidation | Hints available but cost a 5-point deduction (shown clearly: "Using a hint: −5 pts") |
+| 4 — Transfer | No hints available; pupil must apply knowledge independently |
+
+Hint usage is logged in `formula_sessions.scaffold_type` as `{ hints_used: ["noun", "verb"], concept_cards_viewed: true }`. This informs the AI mastery check — a pupil consistently needing hints on the same word class at Stage 3 triggers `weak_word_class`.
+
+### 10.5 Definitions as session feedback
+
+When the AI scores a session and identifies a weak word class (e.g. the pupil placed an adverb where the slot required a verb), the feedback screen references the definition:
+
+> "Check your verb slot — remember, a verb is a doing, being or feeling word. 'Quickly' describes how something is done, so it's an adverb, not a verb."
+
+This closes the loop: the definition taught before the session is the same language used in the correction.
+
+### 10.6 Canonical word class definitions
+
+These definitions are the authoritative source across the entire platform — concept cards, hints, feedback messages, teacher explainers, and any future print materials. They are stored in `src/lib/definitions.ts` (not in the database — they are static and version-controlled).
+
+#### Word Classes
+
+| Word class | Definition | Examples |
+|------------|-----------|---------|
+| **Noun** | A noun is the name of a person, place, thing or idea. | *teacher, London, table, happiness* |
+| **Verb** | A verb is a doing, being or feeling word. | *run, was, love, think* |
+| **Adjective** | An adjective is a describing word. It tells you more about a noun. | *tall, red, busy, ancient* |
+| **Determiner** | A determiner introduces a noun. It tells you which one or how many. | *the, a, my, some, this, every* |
+| **Adverb** | An adverb describes a verb, an adjective or another adverb. It often tells you how, when or where. | *quickly, always, very, nearly* |
+| **Preposition** | A preposition shows the relationship between one thing and another. It tells you position, direction or time. | *on, under, before, through, beside* |
+| **Pronoun** | A pronoun takes the place of a noun. It saves you repeating the same name. | *he, she, it, they, we, who* |
+| **Conjunction** | A conjunction is a joining word. It connects words, phrases or clauses. | *and, but, because, although, so, when* |
+
+#### Punctuation
+
+| Mark | Name | Definition |
+|------|------|-----------|
+| **.** | Full stop | A full stop ends a statement. It tells the reader the sentence is complete. |
+| **?** | Question mark | A question mark ends a sentence that asks a question. |
+| **!** | Exclamation mark | An exclamation mark ends a sentence with strong feeling or a command. |
+| **,** | Comma | A comma separates items in a list, or divides a longer sentence into clearer parts. |
+| **'** | Apostrophe | An apostrophe shows that letters are missing (*it's*) or that something belongs to someone (*the dog's lead*). |
+| **A** | Capital letter | A capital letter starts a sentence, a proper noun, or the pronoun I. |
+
+> **Note on verbs:** The verb is the most difficult word class for primary pupils because it encompasses doing words (*run, jump*), being words (*is, was, were*), and feeling words (*love, fear, enjoy*). Many pupils recognise action verbs but miss linking verbs and stative verbs. The definition above is deliberately broad and should be reinforced with all three types in concept card examples.
+
+---
+
+---
+
+## 11. Implementation Phases
 
 ### Phase 1 — Data foundation (1 week)
 - Apply DB migrations: `pupil_progress` columns, `mastery_events`, `teacher_notifications` tables
@@ -314,11 +446,18 @@ From the pupil's perspective, the system should feel like a game that knows them
 - Add `session_number_on_level`, `scaffold_stage` to `formula_sessions`
 - Update BUG-002 fix: auto-create `pupil_progress` row on profile INSERT (trigger)
 
-### Phase 2 — Formula mastery engine (1–2 weeks)
-- Build `useMasteryState` hook: reads sessions history for current level, computes scaffold stage and mastery status
+### Phase 2 — Formula mastery engine + concept cards (2 weeks)
+- Build `useMasteryState` hook: reads session history for current level, computes scaffold stage and mastery status
 - Update `FormulaPage` to pass correct scaffold configuration to `FormulaBuilder` based on stage
 - Implement auto-advance logic: on session save, check gate → advance level + write mastery_event
 - Implement stuck detection: if sessions_on_current_level > 12 without mastery → create teacher_notification
+- Create `src/lib/definitions.ts`: canonical word class and punctuation definitions (§10.6)
+- Build `ConceptCard` component: word class name, definition, examples from today's word bank, colour-coded
+- Build `ConceptCardSequence` component: orchestrates card flow before session, manages skip logic by scaffold stage
+- Add hint button (? icon) to `FormulaSlot`: tooltip/bottom sheet with definition + 2 word bank examples
+- Implement hint deduction logic in scoring (Stage 3: −5pts per hint used)
+- Log hint usage in `formula_sessions.scaffold_type` JSON
+- Build **Learning Path** UI: vertical node map, completed/active/locked states, level formula preview, layer unlock banners
 
 ### Phase 3 — Session content generation (1 week)
 - Edge Function: `generate-session-content` — takes current level + recent sessions → returns subject, context, word bank subset, distractor words
@@ -350,7 +489,7 @@ From the pupil's perspective, the system should feel like a game that knows them
 
 ---
 
-## 11. Success Metrics
+## 12. Success Metrics
 
 | Metric | Target | Measure |
 |--------|--------|---------|
