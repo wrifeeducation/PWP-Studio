@@ -682,60 +682,88 @@ const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWa
     position: 'sticky',
     top: 0,
     zIndex: 50,
-    background: C.brand,
+    background: 'linear-gradient(135deg, #7C6FF7 0%, #6C5CE7 50%, #8B5CF6 100%)',
+    boxShadow: '0 4px 24px rgba(108,92,231,0.55), 0 1px 0 rgba(255,255,255,0.12) inset',
     padding: '10px 16px',
     display: 'flex',
     alignItems: 'center',
     gap: 12,
   }}>
+    {/* Avatar button — white circle so Writz is visible */}
     <button
       onClick={onOpenWardrobe}
       data-testid="topbar-avatar-btn"
       style={{
-        background: 'rgba(255,255,255,0.15)',
-        border: '2px solid rgba(255,255,255,0.4)',
+        background: '#fff',
+        border: '2.5px solid rgba(255,255,255,0.9)',
         borderRadius: '50%',
-        width: 40,
-        height: 40,
+        width: 44,
+        height: 44,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         cursor: 'pointer',
         padding: 0,
         flexShrink: 0,
+        boxShadow: '0 0 0 3px rgba(245,166,35,0.5), 0 2px 10px rgba(0,0,0,0.25)',
       }}
     >
-      <WritzAvatar variant={avatarId} size={30} />
+      <WritzAvatar variant={avatarId} size={34} />
     </button>
 
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        {name}
-      </div>
+    {/* Brand name — centred */}
+    <div style={{ flex: 1, textAlign: 'center' }}>
+      <span style={{
+        fontSize: 16,
+        fontWeight: 900,
+        color: '#fff',
+        letterSpacing: '0.02em',
+        textShadow: '0 1px 8px rgba(108,92,231,0.6)',
+      }}>
+        Writz Studio
+      </span>
+      <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginLeft: 6 }}>
+        · {name}
+      </span>
     </div>
 
     {/* Quick stats */}
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: '4px 10px' }}>
-        <span style={{ fontSize: 14 }}>🔥</span>
-        <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{streak}</span>
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        background: 'rgba(255,255,255,0.18)',
+        border: '1px solid rgba(255,255,255,0.25)',
+        borderRadius: 20,
+        padding: '5px 12px',
+        boxShadow: '0 1px 6px rgba(0,0,0,0.15)',
+      }}>
+        <span style={{ fontSize: 15 }}>🔥</span>
+        <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{streak}</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: '4px 10px' }}>
-        <span style={{ fontSize: 14 }}>🪙</span>
-        <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{coins}</span>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        background: 'rgba(255,255,255,0.18)',
+        border: '1px solid rgba(255,255,255,0.25)',
+        borderRadius: 20,
+        padding: '5px 12px',
+        boxShadow: '0 1px 6px rgba(0,0,0,0.15)',
+      }}>
+        <span style={{ fontSize: 15 }}>🪙</span>
+        <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{coins}</span>
       </div>
       <button
         onClick={onLogout}
         data-testid="logout-btn"
         style={{
-          background: 'transparent',
-          border: '1.5px solid rgba(255,255,255,0.4)',
-          borderRadius: 8,
+          background: 'rgba(255,255,255,0.15)',
+          border: '1.5px solid rgba(255,255,255,0.35)',
+          borderRadius: 10,
           color: '#fff',
           fontSize: 12,
-          fontWeight: 600,
-          padding: '4px 10px',
+          fontWeight: 700,
+          padding: '5px 12px',
           cursor: 'pointer',
+          letterSpacing: '0.04em',
         }}
       >
         Exit
@@ -903,14 +931,63 @@ export default function DashboardPage() {
             overflow: 'hidden',
           }}
         >
-          <div style={{ marginBottom: 20 }}>
-            <h1 style={{ fontSize: 18, fontWeight: 900, color: C.text, margin: 0 }}
-              data-tts="Your learning path">
-              Your Learning Path ✨
-            </h1>
-            <p style={{ fontSize: 13, color: C.muted, margin: '4px 0 0' }}>
+          <div style={{ marginBottom: 28, textAlign: 'center', padding: '8px 0 4px' }}>
+            {/* Animated gradient heading */}
+            <motion.h1
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              data-tts="Your learning path"
+              style={{
+                fontSize: 'clamp(22px, 5vw, 32px)',
+                fontWeight: 900,
+                margin: '0 0 6px',
+                letterSpacing: '-0.01em',
+                lineHeight: 1.1,
+                background: 'linear-gradient(90deg, #6C5CE7, #a855f7, #F5A623, #6C5CE7)',
+                backgroundSize: '300% 100%',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                animation: 'gradientShift 4s ease-in-out infinite',
+                display: 'inline-block',
+              }}
+            >
+              Your Learning Path
+              {' '}
+              <motion.span
+                style={{ display: 'inline-block', WebkitTextFillColor: 'initial', backgroundClip: 'unset' }}
+                animate={{ rotate: [0, 15, -10, 15, 0], scale: [1, 1.3, 1.1, 1.3, 1] }}
+                transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 3 }}
+                aria-hidden="true"
+              >
+                ✨
+              </motion.span>
+            </motion.h1>
+
+            {/* Animated underline */}
+            <motion.div
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ duration: 0.6, delay: 0.3, ease: 'easeOut' }}
+              style={{
+                height: 3,
+                borderRadius: 2,
+                background: 'linear-gradient(90deg, #6C5CE7, #F5A623)',
+                maxWidth: 260,
+                margin: '0 auto 10px',
+                transformOrigin: 'left',
+              }}
+            />
+
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.45 }}
+              style={{ fontSize: 13, color: C.muted, margin: 0 }}
+            >
               Keep going — every step makes you a better writer!
-            </p>
+            </motion.p>
           </div>
           <LearningPath
             currentLevel={currentLevel}
@@ -955,11 +1032,13 @@ export default function DashboardPage() {
             grid-template-columns: 1fr 360px !important;
           }
         }
-        .dashboard-sidebar {
-          /* on mobile the sidebar appears below the path */
-        }
         button:hover:not(:disabled) {
           transform: scale(1.04);
+        }
+        @keyframes gradientShift {
+          0%   { background-position: 0%   50%; }
+          50%  { background-position: 100% 50%; }
+          100% { background-position: 0%   50%; }
         }
       `}</style>
 
