@@ -337,7 +337,7 @@ const SCAFFOLD_LABELS = ['', 'Learning', 'Practising', 'Consolidating', 'Masteri
 
 const LearningPath: React.FC<LearningPathProps> = ({
   currentLevel,
-  levelsMastered,
+  levelsMastered: _levelsMastered,
   paragraphUnlocked,
   writingUnlocked,
   masteryData,
@@ -550,6 +550,7 @@ const LearningPath: React.FC<LearningPathProps> = ({
 
 export default function DashboardPage() {
   const { user, profile } = useAuthStore()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shopOpen, setShopOpen] = useState(false)

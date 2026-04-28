@@ -152,15 +152,16 @@ export default function FormulaPage() {
         profile?.class_id
       ) {
         stuckNotifiedRef.current = true
-        // Find the teacher for this class and send a notification
-        supabase
-          .from('classes')
-          .select('teacher_id')
-          .eq('id', profile.class_id)
-          .maybeSingle()
-          .then(({ data: classRow }) => {
+        // Find the teacher for this class and send a notification (fire-and-forget)
+        ;(async () => {
+          try {
+            const { data: classRow } = await supabase
+              .from('classes')
+              .select('teacher_id')
+              .eq('id', profile.class_id)
+              .maybeSingle()
             if (classRow?.teacher_id) {
-              supabase.from('teacher_notifications').insert({
+              await supabase.from('teacher_notifications').insert({
                 teacher_id: classRow.teacher_id,
                 pupil_id: user.id,
                 notification_type: 'stuck_pupil_alert',
@@ -174,8 +175,10 @@ export default function FormulaPage() {
                 action_required: false,
               })
             }
-          })
-          .catch(() => {/* silent — don't block session */})
+          } catch {
+            // silent — don't block session
+          }
+        })()
       }
 
       // WF-007: call assess-formula edge function + save session

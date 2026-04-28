@@ -78,7 +78,7 @@ export const ConceptCard: React.FC<ConceptCardProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <TTSButton text={ttsText} variant="light" />
+          <TTSButton text={ttsText} />
           <span
             className="text-xs font-semibold text-white opacity-80"
             aria-label={`Card ${cardIndex} of ${totalCards}`}
