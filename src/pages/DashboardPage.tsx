@@ -378,7 +378,7 @@ interface BadgesProps {
 
 const BadgesSection: React.FC<BadgesProps> = ({ earnedBadgeIds, currentLevel }) => {
   const groups: { key: BadgeGroup; label: string; subLabel: string; emoji: string }[] = [
-    { key: 'prior',   label: 'What you've learned',  subLabel: 'Badges you\'ve earned',         emoji: '✅' },
+    { key: 'prior',   label: 'What you\'ve learned',  subLabel: 'Badges you\'ve earned',         emoji: '✅' },
     { key: 'current', label: 'What you\'re learning', subLabel: 'Earn these right now',          emoji: '🎯' },
     { key: 'future',  label: 'What\'s next for you',  subLabel: 'Coming with more practice',    emoji: '🔮' },
   ]
