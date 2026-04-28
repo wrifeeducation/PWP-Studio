@@ -15,6 +15,7 @@ import { generateConsolidationPack } from '../lib/consolidationPack'
 import type { ConsolidationPackData } from '../lib/consolidationPack'
 import type { PendingWritingReview, PupilTransferRate, InterventionLog, InterventionTrigger } from '../types/index'
 import { Genre } from '../types/index'
+import { NCProgressReport } from '../components/dashboard/NCProgressReport'
 
 // ─── Local types for views ─────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ interface WritingTask {
   prompt_text: string
 }
 
-type TabId = 'pending' | 'progress' | 'assign' | 'interventions' | 'wordbanks' | 'analytics' | 'classes' | 'programme'
+type TabId = 'pending' | 'progress' | 'assign' | 'interventions' | 'wordbanks' | 'analytics' | 'classes' | 'programme' | 'nc-report'
 
 const TAB_LABELS: Record<TabId, string> = {
   classes: 'My Classes',
@@ -49,6 +50,7 @@ const TAB_LABELS: Record<TabId, string> = {
   interventions: 'Interventions',
   wordbanks: 'Word Banks',
   analytics: 'Analytics',
+  'nc-report': 'NC Report',
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -152,6 +154,7 @@ export default function TeacherPage() {
         )}
         {activeTab === 'wordbanks' && <WordBankEditor />}
         {activeTab === 'analytics' && <AnalyticsTab />}
+        {activeTab === 'nc-report' && <NCProgressReport />}
       </main>
     </div>
   )
