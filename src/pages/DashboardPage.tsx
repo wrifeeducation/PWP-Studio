@@ -25,7 +25,6 @@ import { WritzAvatar, type AvatarVariantId } from '../components/WritzAvatar'
 import {
   CHAPTERS,
   AVATAR_VARIANTS,
-  NODE_META,
   getChapterForLevel,
   getLevelsForChapter,
   type Chapter,
