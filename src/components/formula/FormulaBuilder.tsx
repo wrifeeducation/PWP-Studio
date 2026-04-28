@@ -110,7 +110,10 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
       .join(' ')
   }
 
-  const allFilled = areAllSlotsFilled(totalSlots)
+  // Compute allFilled directly from the subscribed slotSelections snapshot rather than
+  // going through areAllSlotsFilled()'s internal get() call, which can return stale state
+  // when the store is updated from outside React's event system (WF-BUG-003).
+  const allFilled = level.formula_elements.every((el) => !!slotSelections[el.position])
 
   // Gather used words (for submission payload)
   const getUsedWords = (): string[] =>

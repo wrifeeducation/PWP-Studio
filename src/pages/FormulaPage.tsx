@@ -549,7 +549,7 @@ export default function FormulaPage() {
       navigate('/paragraph', {
         state: {
           leadSentence: data.level.formula_elements
-            .map((_el, i) => useFormulaStore.getState().slotSelections[i] ?? '')
+            .map((el) => useFormulaStore.getState().slotSelections[el.position] ?? '')
             .filter(Boolean)
             .join(' '),
           levelId: levelUpData.newLevel,
@@ -572,7 +572,7 @@ export default function FormulaPage() {
       navigate('/paragraph', {
         state: {
           leadSentence: data.level.formula_elements
-            .map((_el, i) => useFormulaStore.getState().slotSelections[i] ?? '')
+            .map((el) => useFormulaStore.getState().slotSelections[el.position] ?? '')
             .filter(Boolean)
             .join(' '),
           levelId: data.level.id,
@@ -811,7 +811,7 @@ export default function FormulaPage() {
             xpEarned={xpEarned}
             sentence={
               data.level.formula_elements
-                .map((_el, i) => useFormulaStore.getState().slotSelections[i] ?? '_')
+                .map((el) => useFormulaStore.getState().slotSelections[el.position] ?? '_')
                 .join(' ')
             }
             onRetry={handleRetry}
