@@ -714,8 +714,6 @@ const LearningPath: React.FC<LearningPathProps> = ({ currentLevel, avatarVariant
 
             const isActive = levelActive && nt === 'learn'
             const isDone   = levelDone
-            const isLocked = !isDone && !isActive
-
             const state: 'done' | 'active' | 'locked' = isDone ? 'done' : isActive ? 'active' : 'locked'
 
             // Y: extra top padding when this chapter has an active node (room for avatar)
@@ -734,7 +732,6 @@ const LearningPath: React.FC<LearningPathProps> = ({ currentLevel, avatarVariant
 
         if (nodes.length === 0) return null
 
-        const lastNode   = nodes[nodes.length - 1]
         const hasActive  = chapterLevels.some(l => l === currentLevel)
         const topPad     = hasActive ? AVATAR_LIFT + 20 : 40
         const svgHeight  = topPad + nodes.length * NODE_STEP + 40
