@@ -339,8 +339,35 @@ const ChapterBanner: React.FC<ChapterBannerProps> = ({ chapter, unlocked, isCurr
       <div style={{ fontSize: 14, fontWeight: 800, color: completed ? '#fff' : unlocked ? C.text : C.muted }}>
         {chapter.title}
       </div>
+      {/* Concept tags */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+        {chapter.concepts.map((concept) => (
+          <span
+            key={concept}
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              padding: '2px 7px',
+              borderRadius: 20,
+              background: completed
+                ? 'rgba(255,255,255,0.2)'
+                : unlocked
+                  ? `${chapter.textColour}18`
+                  : 'rgba(0,0,0,0.06)',
+              color: completed
+                ? 'rgba(255,255,255,0.9)'
+                : unlocked
+                  ? chapter.textColour
+                  : C.muted,
+              border: `1px solid ${completed ? 'rgba(255,255,255,0.3)' : unlocked ? `${chapter.textColour}35` : 'rgba(0,0,0,0.1)'}`,
+            }}
+          >
+            {concept}
+          </span>
+        ))}
+      </div>
       {unlocked && (
-        <div style={{ fontSize: 12, color: completed ? 'rgba(255,255,255,0.85)' : C.muted, marginTop: 2 }}
+        <div style={{ fontSize: 11, color: completed ? 'rgba(255,255,255,0.75)' : C.muted, marginTop: 5, fontStyle: 'italic' }}
           data-tts={chapter.masteryStatement}>
           {chapter.masteryStatement}
         </div>

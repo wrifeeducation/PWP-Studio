@@ -16,6 +16,7 @@ export interface Chapter {
   title: string
   levelRange: [number, number] // inclusive
   masteryStatement: string
+  concepts: string[]           // grammatical concepts taught in this chapter
   colour: string   // background for chapter banner
   textColour: string
   emoji: string
@@ -27,6 +28,7 @@ export const CHAPTERS: Chapter[] = [
     title: 'The Building Blocks',
     levelRange: [1, 8],
     masteryStatement: 'I can name and describe things using the right words.',
+    concepts: ['Nouns', 'Determiners', 'Adjectives', 'Noun phrases'],
     colour: '#EDE7F6',
     textColour: '#6C5CE7',
     emoji: '🧱',
@@ -36,6 +38,7 @@ export const CHAPTERS: Chapter[] = [
     title: 'Adding Action',
     levelRange: [9, 20],
     masteryStatement: 'I can write complete sentences that show action.',
+    concepts: ['Verbs', 'Adverbs', 'Subject & verb', 'Verb phrases'],
     colour: '#FFF3E0',
     textColour: '#F5A623',
     emoji: '⚡',
@@ -45,6 +48,7 @@ export const CHAPTERS: Chapter[] = [
     title: 'The Detail Makers',
     levelRange: [21, 35],
     masteryStatement: 'I can add detail to any part of a sentence.',
+    concepts: ['Prepositional phrases', 'Adverbials', 'Fronted adverbials', 'Relative clauses'],
     colour: '#E8F5E9',
     textColour: '#27AE60',
     emoji: '🔍',
@@ -54,6 +58,7 @@ export const CHAPTERS: Chapter[] = [
     title: 'Joining Ideas',
     levelRange: [36, 50],
     masteryStatement: 'I can connect and extend ideas across sentences.',
+    concepts: ['Coordinating conjunctions', 'Subordinating conjunctions', 'Compound sentences', 'Complex sentences'],
     colour: '#E3F2FD',
     textColour: '#2980B9',
     emoji: '🔗',
@@ -63,6 +68,7 @@ export const CHAPTERS: Chapter[] = [
     title: 'The Expert Writer',
     levelRange: [51, 60],
     masteryStatement: 'I write with sophistication and control.',
+    concepts: ['Embedded clauses', 'Passive voice', 'Varied sentence openers', 'Sophisticated vocabulary'],
     colour: '#FCE4EC',
     textColour: '#E84393',
     emoji: '✍️',
@@ -72,6 +78,7 @@ export const CHAPTERS: Chapter[] = [
     title: 'Mastery Showcase',
     levelRange: [61, 67],
     masteryStatement: 'I can demonstrate mastery across all writing patterns.',
+    concepts: ['Multi-clause sentences', 'Extended writing', 'All grammar patterns', 'Writer\'s craft'],
     colour: '#FFF8E1',
     textColour: '#F39C12',
     emoji: '🏆',
