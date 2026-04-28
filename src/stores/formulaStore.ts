@@ -84,7 +84,8 @@ export const useFormulaStore = create<FormulaSlotState & FormulaStoreActions>((s
 
   areAllSlotsFilled: (totalSlots) => {
     const { slotSelections } = get()
-    for (let i = 0; i < totalSlots; i++) {
+    // Formula positions are 1-indexed (position 1 … totalSlots)
+    for (let i = 1; i <= totalSlots; i++) {
       if (!slotSelections[i]) return false
     }
     return true
