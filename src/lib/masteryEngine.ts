@@ -150,5 +150,10 @@ export const buildMasteryUpsert = (
     pupil_id: pupilId as import('../types/index').UUID,
     level_id: levelId,
     ...update,
+    // Phase 1: scaffold defaults (preserve existing if present)
+    scaffold_stage: existing?.scaffold_stage ?? 1,
+    scaffold_advanced_at: existing?.scaffold_advanced_at ?? null,
+    weak_word_class: existing?.weak_word_class ?? null,
+    ai_mastery_check: existing?.ai_mastery_check ?? null,
   }
 }
