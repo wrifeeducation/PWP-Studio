@@ -92,164 +92,198 @@ const C = {
 const NODE_TYPES = ['learn', 'build', 'practice', 'master'] as const
 type NodeType = typeof NODE_TYPES[number]
 
-/** Three column X-centres in a PATH_W-wide container, creating a smooth S-curve */
+/** Three column X-centres creating a smooth S-curve */
 const PATH_W    = 300
-const COL_X     = [52, 150, 248]           // left / centre / right
-const COL_PAT   = [0, 1, 2, 1]            // L→C→R→C→L repeating
-const NODE_STEP = 100                      // vertical px between node centres
-const AVATAR_LIFT = 95                     // px above active node centre
+const COL_X     = [52, 150, 248]   // left / centre / right
+const COL_PAT   = [0, 1, 2, 1]    // L→C→R→C→L
+const NODE_STEP = 100              // vertical px between level centres
+const AVATAR_LIFT = 95             // px above active node centre
 
-function colX(nodeIdx: number): number {
-  return COL_X[COL_PAT[nodeIdx % 4]]
-}
-function nodeRadius(state: 'done' | 'active' | 'locked'): number {
-  return state === 'active' ? 33 : state === 'done' ? 27 : 22
+/**
+ * Node appearance tiers:
+ *   done      — completed level (green ✓)
+ *   active    — current level (large, pulsing ring, Writz above)
+ *   next      — immediately next level (chapter colour, dimmed — "coming up")
+ *   upcoming  — 2–4 levels ahead (neutral, chapter-tinted, no lock)
+ *   future    — 5+ levels ahead (very small grey, subtle)
+ */
+type LevelTier = 'done' | 'active' | 'next' | 'upcoming' | 'future'
+
+function levelTier(level: number, currentLevel: number): LevelTier {
+  if (level < currentLevel)  return 'done'
+  if (level === currentLevel) return 'active'
+  if (level === currentLevel + 1) return 'next'
+  if (level <= currentLevel + 4)  return 'upcoming'
+  return 'future'
 }
 
-// ─── SVG connector between two adjacent nodes ─────────────────────────────────
+function tierRadius(tier: LevelTier): number {
+  switch (tier) {
+    case 'active':   return 33
+    case 'done':     return 26
+    case 'next':     return 26
+    case 'upcoming': return 22
+    case 'future':   return 18
+  }
+}
+
+function colX(idx: number): number {
+  return COL_X[COL_PAT[idx % 4]]
+}
+
+// ─── SVG connector between two adjacent level nodes ───────────────────────────
 
 interface ConnSVGProps {
   x1: number; y1: number; r1: number
   x2: number; y2: number; r2: number
-  done: boolean
+  tier: LevelTier
 }
 
-const NodeConnector: React.FC<ConnSVGProps> = ({ x1, y1, r1, x2, y2, r2, done }) => {
+const NodeConnector: React.FC<ConnSVGProps> = ({ x1, y1, r1, x2, y2, r2, tier }) => {
   const sy   = y1 + r1 + 3
   const ey   = y2 - r2 - 3
   const midY = (sy + ey) / 2
-  // Bezier: depart vertically from x1, arrive vertically at x2
-  const d = `M ${x1} ${sy} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${ey}`
+  const d    = `M ${x1} ${sy} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${ey}`
+  const colour =
+    tier === 'done'     ? C.green   :
+    tier === 'active'   ? C.green   :
+    tier === 'next'     ? '#B2BEC3' :
+    '#DFE6E9'
+  const dash = (tier === 'done' || tier === 'active') ? undefined : '6 5'
   return (
-    <path
-      d={d}
-      stroke={done ? C.green : '#DFE6E9'}
-      strokeWidth={3.5}
-      fill="none"
-      strokeLinecap="round"
-      strokeDasharray={done ? 'none' : '6 4'}
-    />
+    <path d={d} stroke={colour} strokeWidth={3} fill="none"
+      strokeLinecap="round" strokeDasharray={dash} />
   )
 }
 
-// ─── Single path node button ──────────────────────────────────────────────────
+// ─── Single level node ────────────────────────────────────────────────────────
 
-interface PathNodeProps {
+interface LevelNodeProps {
   level: number
-  nodeType: NodeType
-  state: 'done' | 'active' | 'locked'
-  isAvatar: boolean
-  avatarVariant: AvatarVariantId
+  tier: LevelTier
   chapterColour: string
-  cx: number   // centre X in the PATH_W container
-  cy: number   // centre Y in the full chapter SVG container
+  chapterEmoji: string
+  avatarVariant: AvatarVariantId
+  cx: number
+  cy: number
   onClick?: () => void
 }
 
-const PathNode: React.FC<PathNodeProps> = ({
-  level, nodeType, state, isAvatar, avatarVariant,
-  chapterColour, cx, cy, onClick,
+const LevelNode: React.FC<LevelNodeProps> = ({
+  level, tier, chapterColour, chapterEmoji, avatarVariant, cx, cy, onClick,
 }) => {
-  const meta    = NODE_META[nodeType]
-  const r       = nodeRadius(state)
-  const isDone  = state === 'done'
-  const isActive = state === 'active'
-  const isLocked = state === 'locked'
+  const r        = tierRadius(tier)
+  const isActive = tier === 'active'
+  const isDone   = tier === 'done'
+  const isNext   = tier === 'next'
+  const isFuture = tier === 'future'
 
-  const bg     = isDone ? C.green : isActive ? chapterColour : '#E8ECF0'
-  const border = isDone ? '#1e8449' : isActive ? chapterColour : '#C8D0D9'
+  const bg =
+    isDone     ? C.green :
+    isActive   ? chapterColour :
+    isNext     ? `${chapterColour}55` :
+    tier === 'upcoming' ? `${chapterColour}25` :
+    '#E8ECF0'
 
-  // Label: alternate side based on column position
-  const labelRight = cx <= 150   // nodes on left/centre → label right; right column → label left
-  const labelLeft  = cx - r - 8
-  const labelRight2 = cx + r + 8
+  const border =
+    isDone     ? '#1e8449' :
+    isActive   ? chapterColour :
+    isNext     ? `${chapterColour}99` :
+    tier === 'upcoming' ? `${chapterColour}55` :
+    '#D0D5DD'
+
+  const emoji =
+    isDone   ? '✓' :
+    isActive ? chapterEmoji :
+    isNext   ? chapterEmoji :
+    tier === 'upcoming' ? chapterEmoji :
+    '·'
+
+  const labelRight = cx <= 150
+  const labelX = labelRight ? cx + r + 8 : cx - r - 8
+  const labelAnchor = labelRight ? 'start' : 'end'
+
+  const labelText =
+    isDone   ? `L${level}` :
+    isActive ? `Level ${level}` :
+    isNext   ? `Level ${level}` :
+    tier === 'upcoming' ? `L${level}` :
+    ''
+
+  const labelColour =
+    isDone   ? C.muted :
+    isActive ? chapterColour :
+    isNext   ? chapterColour :
+    C.muted
+
+  const subLabel =
+    isActive ? 'You are here' :
+    isNext   ? 'Up next ✨' :
+    ''
 
   return (
-    <g data-testid={`node-${level}-${nodeType}`}>
-      {/* Pulsing outer ring for active node */}
+    <g data-testid={`level-node-${level}`} style={{ cursor: isActive || isDone ? 'pointer' : 'default' }}
+      onClick={isActive || isDone ? onClick : undefined}>
+
+      {/* Pulsing glow rings behind active node */}
       {isActive && (
         <>
-          <circle cx={cx} cy={cy} r={r + 12} fill={`${chapterColour}18`} />
-          <circle cx={cx} cy={cy} r={r + 7}  fill={`${chapterColour}28`} />
+          <circle cx={cx} cy={cy} r={r + 14} fill={`${chapterColour}14`} />
+          <circle cx={cx} cy={cy} r={r +  8} fill={`${chapterColour}24`} />
         </>
       )}
 
-      {/* Main circle (as foreignObject button for click handling) */}
-      <foreignObject
-        x={cx - r} y={cy - r} width={r * 2} height={r * 2}
+      {/* Node circle */}
+      <circle
+        cx={cx} cy={cy} r={r}
+        fill={bg}
+        stroke={border}
+        strokeWidth={isActive ? 3 : 2}
+        opacity={isFuture ? 0.4 : 1}
+      />
+
+      {/* Icon / tick */}
+      <text
+        x={cx} y={cy + (isDone ? 5 : 6)}
+        textAnchor="middle"
+        fontSize={isDone ? r * 0.8 : isActive ? r * 0.72 : r * 0.72}
+        fill={isDone ? '#fff' : isActive ? '#fff' : isFuture ? '#B2BEC3' : `${chapterColour}cc`}
+        fontWeight={isDone ? 900 : 700}
       >
-        <button
-          onClick={onClick}
-          disabled={isLocked}
-          aria-label={`Level ${level} ${meta.label}${isLocked ? ' (locked)' : ''}`}
-          data-tts={`Level ${level} ${meta.label}`}
-          style={{
-            width: r * 2, height: r * 2, borderRadius: '50%',
-            background: bg,
-            border: `3px solid ${border}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: isLocked ? 'default' : 'pointer',
-            boxShadow: isActive
-              ? `0 0 0 4px ${chapterColour}30, 0 4px 18px ${chapterColour}55`
-              : isDone
-              ? '0 2px 8px rgba(39,174,96,0.3)'
-              : '0 1px 4px rgba(0,0,0,0.1)',
-            fontSize: isActive ? 20 : isDone ? 17 : 15,
-            transition: 'transform 0.12s',
-            padding: 0,
-          }}
-        >
-          {isLocked ? '🔒' : isDone ? '✓' : meta.emoji}
-        </button>
-      </foreignObject>
+        {emoji}
+      </text>
 
-      {/* Level label for active node */}
+      {/* Level label beside node */}
+      {labelText !== '' && (
+        <text x={labelX} y={cy - 3} textAnchor={labelAnchor}
+          fontSize={isActive ? 13 : 11} fontWeight={isActive ? 800 : 600}
+          fill={labelColour} opacity={isFuture ? 0.4 : 1}>
+          {labelText}
+        </text>
+      )}
+      {subLabel !== '' && (
+        <text x={labelX} y={cy + 13} textAnchor={labelAnchor}
+          fontSize={10} fontWeight={600}
+          fill={isNext ? `${chapterColour}99` : chapterColour} opacity={0.9}>
+          {subLabel}
+        </text>
+      )}
+
+      {/* Writz avatar floating above active node */}
       {isActive && (
-        <text
-          x={cx} y={cy + r + 16}
-          textAnchor="middle"
-          fontSize={11} fontWeight={800}
-          fill={chapterColour}
-          style={{ letterSpacing: '0.04em' }}
-        >
-          Level {level}
-        </text>
-      )}
-
-      {/* Node-type label (done and active only) */}
-      {!isLocked && (
-        <text
-          x={labelRight ? labelRight2 : labelLeft}
-          y={cy + 4}
-          textAnchor={labelRight ? 'start' : 'end'}
-          fontSize={11} fontWeight={isDone ? 600 : 700}
-          fill={isDone ? C.muted : isActive ? chapterColour : C.muted}
-        >
-          {meta.label}
-        </text>
-      )}
-
-      {/* Writz avatar above active node */}
-      {isAvatar && (
-        <foreignObject
-          x={cx - 42} y={cy - AVATAR_LIFT - 42}
-          width={84} height={84}
-        >
-          <div style={{ position: 'relative' }}>
-            {/* Glow disc behind avatar */}
+        <foreignObject x={cx - 44} y={cy - AVATAR_LIFT - 44} width={88} height={88}>
+          <div style={{ position: 'relative', width: 88, height: 88 }}>
+            {/* Radial glow disc */}
             <div style={{
-              position: 'absolute',
-              width: 84, height: 84,
-              borderRadius: '50%',
-              background: `radial-gradient(circle, ${chapterColour}40 0%, transparent 70%)`,
-              top: 0, left: 0,
+              position: 'absolute', inset: 0, borderRadius: '50%',
+              background: `radial-gradient(circle, ${chapterColour}50 0%, transparent 68%)`,
             }} />
             <motion.div
-              animate={{ y: [0, -7, 0] }}
-              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
               style={{ position: 'relative', zIndex: 1 }}
             >
-              <WritzAvatar variant={avatarVariant} size={80} animated={false} />
+              <WritzAvatar variant={avatarVariant} size={84} animated={false} />
             </motion.div>
           </div>
         </foreignObject>
@@ -675,7 +709,7 @@ const StatsSidebar: React.FC<StatsSidebarProps> = ({ progress, profile, earnedBa
   )
 }
 
-// ─── Learning path ────────────────────────────────────────────────────────────
+// ─── Learning path (1 node per level) ────────────────────────────────────────
 
 interface LearningPathProps {
   currentLevel: number
@@ -694,50 +728,21 @@ const LearningPath: React.FC<LearningPathProps> = ({ currentLevel, avatarVariant
         const chapterLocked = currentLevel < chapterMin
         const chapterCurrent = !chapterDone && !chapterLocked
 
-        // Flatten all nodes for this chapter into an array with state + geometry
-        type NodeEntry = {
-          level: number
-          nt: NodeType
-          ni: number
-          globalIdx: number
-          state: 'done' | 'active' | 'locked'
-          isAvatar: boolean
-          cx: number
-          cy: number
-        }
+        type LevelEntry = { level: number; tier: LevelTier; cx: number; cy: number }
+        const hasActive = chapterLevels.includes(currentLevel)
+        const topPad    = hasActive ? AVATAR_LIFT + 28 : 36
 
-        const nodes: NodeEntry[] = chapterLevels.flatMap((level, li) =>
-          NODE_TYPES.map((nt, ni): NodeEntry => {
-            const globalIdx  = li * 4 + ni
-            const levelDone  = level < currentLevel
-            const levelActive = level === currentLevel
+        const entries: LevelEntry[] = chapterLevels.map((level, li): LevelEntry => ({
+          level,
+          tier: levelTier(level, currentLevel),
+          cx: colX(li),
+          cy: topPad + li * NODE_STEP,
+        }))
 
-            const isActive = levelActive && nt === 'learn'
-            const isDone   = levelDone
-            const state: 'done' | 'active' | 'locked' = isDone ? 'done' : isActive ? 'active' : 'locked'
-
-            // Y: extra top padding when this chapter has an active node (room for avatar)
-            const hasActiveNode = chapterLevels.some(l => l === currentLevel)
-            const topPad = hasActiveNode ? AVATAR_LIFT + 20 : 40
-
-            return {
-              level, nt, ni, globalIdx,
-              state,
-              isAvatar: isActive,
-              cx: colX(globalIdx),
-              cy: topPad + globalIdx * NODE_STEP,
-            }
-          })
-        )
-
-        if (nodes.length === 0) return null
-
-        const hasActive  = chapterLevels.some(l => l === currentLevel)
-        const topPad     = hasActive ? AVATAR_LIFT + 20 : 40
-        const svgHeight  = topPad + nodes.length * NODE_STEP + 40
+        const svgHeight = topPad + entries.length * NODE_STEP + 24
 
         return (
-          <div key={chapter.num} style={{ marginBottom: 32 }}>
+          <div key={chapter.num} style={{ marginBottom: 28 }}>
             <ChapterBanner
               chapter={chapter}
               unlocked={!chapterLocked}
@@ -745,41 +750,39 @@ const LearningPath: React.FC<LearningPathProps> = ({ currentLevel, avatarVariant
               completed={chapterDone}
             />
 
-            {/* SVG canvas for this chapter's nodes + connectors */}
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflowX: 'visible' }}>
               <svg
                 width={PATH_W}
                 height={svgHeight}
                 style={{ display: 'block', margin: '0 auto', overflow: 'visible' }}
-                aria-label={`Chapter ${chapter.num} learning path`}
+                aria-label={`Chapter ${chapter.num} levels`}
               >
-                {/* Connectors (drawn first, behind nodes) */}
-                {nodes.map((node, i) => {
+                {/* Connectors behind nodes */}
+                {entries.map((entry, i) => {
                   if (i === 0) return null
-                  const prev = nodes[i - 1]
+                  const prev = entries[i - 1]
                   return (
                     <NodeConnector
                       key={`conn-${i}`}
-                      x1={prev.cx} y1={prev.cy} r1={nodeRadius(prev.state)}
-                      x2={node.cx} y2={node.cy} r2={nodeRadius(node.state)}
-                      done={prev.state === 'done'}
+                      x1={prev.cx} y1={prev.cy} r1={tierRadius(prev.tier)}
+                      x2={entry.cx} y2={entry.cy} r2={tierRadius(entry.tier)}
+                      tier={prev.tier}
                     />
                   )
                 })}
 
-                {/* Nodes */}
-                {nodes.map((node) => (
-                  <PathNode
-                    key={`${node.level}-${node.nt}`}
-                    level={node.level}
-                    nodeType={node.nt}
-                    state={node.state}
-                    isAvatar={node.isAvatar}
-                    avatarVariant={avatarVariant}
+                {/* Level nodes */}
+                {entries.map((entry) => (
+                  <LevelNode
+                    key={entry.level}
+                    level={entry.level}
+                    tier={entry.tier}
                     chapterColour={chapter.textColour}
-                    cx={node.cx}
-                    cy={node.cy}
-                    onClick={() => node.state !== 'locked' && onNodeClick(node.level, node.nt)}
+                    chapterEmoji={chapter.emoji}
+                    avatarVariant={avatarVariant}
+                    cx={entry.cx}
+                    cy={entry.cy}
+                    onClick={() => onNodeClick(entry.level, 'learn')}
                   />
                 ))}
               </svg>
