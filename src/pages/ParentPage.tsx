@@ -302,7 +302,6 @@ function PupilProgressPanel({ pupil, isPro }: { pupil: LinkedPupil; isPro: boole
           style={{
             backgroundColor: 'var(--color-background)',
             border: '1px solid var(--color-border)',
-            divideColor: 'var(--color-border)',
           }}
         >
           <div className="text-center py-3">

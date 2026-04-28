@@ -87,12 +87,20 @@ export default function TeacherPage() {
         className="px-4 py-3 flex items-center justify-between sticky top-0 z-10"
         style={{ backgroundColor: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}
       >
-        <span
-          className="font-bold text-base"
-          style={{ color: 'var(--color-text)' }}
-          data-tts="WriFe Teacher Dashboard"
+        <button
+          onClick={() => navigate('/')}
+          className="font-bold text-base hover:opacity-70 transition-opacity"
+          style={{ color: 'var(--color-text)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          data-tts="WriFe — go to home page"
+          aria-label="WriFe — go to home page"
         >
-          WriFe — Teacher Dashboard
+          WriFe
+        </button>
+        <span
+          className="text-base"
+          style={{ color: 'var(--color-text-muted)' }}
+        >
+          {' '}— Teacher Dashboard
         </span>
         <div className="flex items-center gap-3">
           <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>

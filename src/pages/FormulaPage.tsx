@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFormulaLevel } from '../hooks/useFormulaLevel'
 import { useFormulaStore } from '../stores/formulaStore'
@@ -105,7 +105,7 @@ export default function FormulaPage() {
     })()
   }, [user?.id, data?.level.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleDefinitionComplete = (wc: WordClass) => {
+  const handleDefinitionComplete = (_wc: WordClass) => {
     const remaining = definitionQueue.slice(1)
     setDefinitionQueue(remaining)
     setShowingDefinition(remaining.length > 0 ? remaining[0] : null)

@@ -284,9 +284,14 @@ export default function LoginPage() {
           ))}
         </div>
         <h1
-          className="text-5xl font-bold tracking-tight mb-2"
+          className="text-5xl font-bold tracking-tight mb-2 cursor-pointer hover:opacity-75 transition-opacity"
           style={{ color: 'var(--color-brand-dark)' }}
-          data-tts="WriFe"
+          data-tts="WriFe — go to home page"
+          onClick={() => navigate('/')}
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
+          role="link"
+          aria-label="WriFe — go to home page"
         >
           WriFe
         </h1>

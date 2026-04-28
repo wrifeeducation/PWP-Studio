@@ -829,7 +829,9 @@ interface TopBarProps {
   onLogout: () => void
 }
 
-const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWardrobe, onLogout }) => (
+const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWardrobe, onLogout }) => {
+  const navigate = useNavigate()
+  return (
   <div style={{
     position: 'sticky',
     top: 0,
@@ -863,17 +865,30 @@ const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWa
       <WritzAvatar variant={avatarId} size={34} />
     </button>
 
-    {/* Brand name — centred */}
+    {/* Brand name — centred, clickable home link */}
     <div style={{ flex: 1, textAlign: 'center' }}>
-      <span style={{
-        fontSize: 16,
-        fontWeight: 900,
-        color: '#fff',
-        letterSpacing: '0.02em',
-        textShadow: '0 1px 8px rgba(108,92,231,0.6)',
-      }}>
-        Writz Studio
-      </span>
+      <button
+        onClick={() => navigate('/')}
+        style={{
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          padding: 0,
+          fontSize: 16,
+          fontWeight: 900,
+          color: '#fff',
+          letterSpacing: '0.02em',
+          textShadow: '0 1px 8px rgba(108,92,231,0.6)',
+          opacity: 1,
+          transition: 'opacity 0.15s',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.75' }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
+        aria-label="WriFe — go to home page"
+        data-tts="WriFe — go to home page"
+      >
+        WriFe
+      </button>
       <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginLeft: 6 }}>
         · {name}
       </span>
@@ -922,7 +937,8 @@ const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWa
       </button>
     </div>
   </div>
-)
+  )
+}
 
 // ─── Main DashboardPage ───────────────────────────────────────────────────────
 

@@ -43,7 +43,7 @@ interface School {
 
 // ─── Shared UI primitives ────────────────────────────────────────────────────
 
-function Badge({ value, type }: { value: string; type?: 'tier' | 'role' | 'status' }) {
+function Badge({ value, type: _type }: { value: string; type?: 'tier' | 'role' | 'status' }) {
   const colours: Record<string, string> = {
     // tiers
     free:   'background:#e5e7eb;color:#374151',
