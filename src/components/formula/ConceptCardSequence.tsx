@@ -10,7 +10,7 @@
  * Examples from today's word bank are injected per word class.
  */
 
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ConceptCard } from './ConceptCard'
 import { getConceptCardsForFormula } from '../../lib/definitions'
@@ -37,6 +37,16 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
   const cards = getConceptCardsForFormula(formulaElements.map((el) => el.word_class as WordClass))
 
   const [cardIndex, setCardIndex] = useState(0) // 0-based
+  // Ref tracks the committed "next" index so rapid double-clicks can't
+  // queue two increments before React re-renders (WF-056 race condition fix).
+  // Reset to 0 whenever the card set changes (new formula level).
+  const committedIndexRef = useRef(0)
+  const prevCardsKeyRef = useRef(cards.map((c) => c.wordClass).join(','))
+  const cardsKey = cards.map((c) => c.wordClass).join(',')
+  if (cardsKey !== prevCardsKeyRef.current) {
+    prevCardsKeyRef.current = cardsKey
+    committedIndexRef.current = 0
+  }
 
   // Stage 1: no skip. Stage 2+: skip available
   const canSkip = scaffoldStage >= 2
@@ -46,11 +56,13 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
   const isReminderMode = scaffoldStage >= 2 && seenWordClasses.length > 0
 
   const handleNext = () => {
-    if (cardIndex < cards.length - 1) {
-      setCardIndex((i) => i + 1)
-    } else {
+    // Guard: if we're already at (or past) the last card, complete immediately
+    if (committedIndexRef.current >= cards.length - 1) {
       onComplete()
+      return
     }
+    committedIndexRef.current += 1
+    setCardIndex(committedIndexRef.current)
   }
 
   // ── Reminder chip mode (Stage 2+, previously seen word classes) ──────────────
@@ -98,6 +110,7 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
           <button
             onClick={() => {
               // Switch to full card mode so pupil can review any card
+              committedIndexRef.current = 0
               setCardIndex(0)
             }}
             className="px-4 py-2.5 rounded-xl text-sm font-medium"
@@ -119,6 +132,11 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
   }
 
   const currentCard = cards[cardIndex]
+  // Safety net: if cardIndex somehow exceeds bounds (e.g. stale render), complete
+  if (!currentCard) {
+    onComplete()
+    return null
+  }
   const wordBankExamples = (wordBanks[currentCard.wordClass] ?? []).slice(0, 4)
 
   return (
