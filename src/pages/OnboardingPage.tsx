@@ -81,7 +81,13 @@ export default function OnboardingPage() {
       if (updatedProfile) setProfile(updatedProfile as typeof profile)
       setStep(2)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred. Please try again.')
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : 'An error occurred. Please try again.'
+      setError(msg)
     } finally {
       setSaving(false)
     }
