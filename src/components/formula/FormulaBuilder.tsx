@@ -45,11 +45,9 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
     resetSession,
     setLabelsVisible,
     labelsVisible,
-    areAllSlotsFilled,
   } = useFormulaStore()
 
   const labelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const totalSlots = level.formula_elements.length
   // Track which word classes had hints used this session
   const [hintsUsed, setHintsUsed] = useState<WordClass[]>([])
 

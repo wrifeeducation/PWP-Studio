@@ -165,12 +165,18 @@ export interface School extends WithTimestamps {
 
 export interface Profile extends WithTimestamps {
   id: UUID; // Matches auth.users.id
-  school_id: UUID;
+  school_id: Nullable<UUID>; // nullable — parent accounts have no school
   role: Role;
   first_name: string;
   year_group: Nullable<number>; // 1-13
   class_id: Nullable<UUID>;
   avatar_colour: string;
+  is_active: boolean;
+  pin_code: Nullable<string>;
+  selected_avatar: string; // AvatarVariantId
+  coins: number;
+  stripe_customer_id: Nullable<string>;
+  membership_tier: 'free' | 'pro';
 }
 
 export interface Class extends WithTimestamps {
@@ -187,7 +193,35 @@ export interface ParentPupil {
   parent_id: UUID;
   pupil_id: UUID;
   approved: boolean;
+  child_display_name: Nullable<string>; // friendly label for parent dashboard
+  is_direct_signup: boolean; // true = parent-created child (no school)
   created_at: string;
+}
+
+/** Stripe subscription record — mirrors the subscriptions table */
+export interface Subscription {
+  id: string; // Stripe subscription ID
+  user_id: UUID;
+  status: 'active' | 'canceled' | 'past_due' | 'incomplete' | 'trialing' | 'unpaid';
+  price_id: Nullable<string>;
+  current_period_end: Nullable<string>;
+  cancel_at_period_end: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Tracks a pupil's mastery of the word class definition cloze sequence */
+export interface DefinitionMastery {
+  id: UUID;
+  pupil_id: UUID;
+  word_class: WordClass;
+  stage_reached: number; // 0 = not started, 1-4 = stages completed
+  unlocked_at: Nullable<string>;
+  mastered_at: Nullable<string>;
+  next_review_at: Nullable<string>;
+  review_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface FormulaLevel {
@@ -577,6 +611,16 @@ export interface Database {
         Row: TeacherNotification;
         Insert: Omit<TeacherNotification, 'id' | 'created_at'>;
         Update: DeepPartial<Omit<TeacherNotification, 'id' | 'created_at'>>;
+      };
+      subscriptions: {
+        Row: Subscription;
+        Insert: Omit<Subscription, 'created_at' | 'updated_at'>;
+        Update: DeepPartial<Omit<Subscription, 'created_at'>>;
+      };
+      definition_mastery: {
+        Row: DefinitionMastery;
+        Insert: Omit<DefinitionMastery, 'id' | 'created_at' | 'updated_at'>;
+        Update: DeepPartial<Omit<DefinitionMastery, 'id' | 'created_at'>>;
       };
     };
     Views: {

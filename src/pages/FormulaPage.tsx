@@ -41,6 +41,7 @@ import { CertificateModal } from '../components/ui/CertificateModal'
 import { awardCertificate } from '../lib/certificateEngine'
 import { sanitizeText } from '../lib/sanitize'
 import type { MasteryTracking, Badge, PupilProgress, WordClass } from '../types/index'
+import { DefinitionUnlock } from '../components/gamification/DefinitionUnlock'
 
 // ─── Screen states ────────────────────────────────────────────────────────────
 
@@ -72,6 +73,49 @@ export default function FormulaPage() {
 
   // WF-010: badge state
   const [newBadge, setNewBadge] = useState<Badge | null>(null)
+
+  // ── Definition Unlock ceremony ────────────────────────────────────────────
+  // Queue of word classes that need the cloze ceremony before the session starts
+  const [definitionQueue, setDefinitionQueue] = useState<WordClass[]>([])
+  const [showingDefinition, setShowingDefinition] = useState<WordClass | null>(null)
+
+  useEffect(() => {
+    if (!user?.id || !data?.level) return
+
+    // Collect the distinct word classes used in this level's formula elements
+    const levelWordClasses = [
+      ...new Set(data.level.formula_elements.map((el) => el.word_class)),
+    ]
+
+    // Check which ones the pupil hasn't unlocked yet (no mastery record)
+    ;(async () => {
+      const { data: masteryRows } = await supabase
+        .from('definition_mastery')
+        .select('word_class')
+        .eq('pupil_id', user.id)
+        .in('word_class', levelWordClasses)
+
+      const alreadyMastered = new Set((masteryRows ?? []).map((r: { word_class: string }) => r.word_class))
+      const newWordClasses = levelWordClasses.filter((wc) => !alreadyMastered.has(wc))
+
+      if (newWordClasses.length > 0) {
+        setDefinitionQueue(newWordClasses)
+        setShowingDefinition(newWordClasses[0])
+      }
+    })()
+  }, [user?.id, data?.level.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleDefinitionComplete = (wc: WordClass) => {
+    const remaining = definitionQueue.slice(1)
+    setDefinitionQueue(remaining)
+    setShowingDefinition(remaining.length > 0 ? remaining[0] : null)
+  }
+
+  const handleDefinitionDismiss = () => {
+    // Pupil dismissed without completing — skip the rest of the queue
+    setDefinitionQueue([])
+    setShowingDefinition(null)
+  }
 
   // WF-042: certificate state
   const [showCertificate, setShowCertificate] = useState(false)
@@ -686,6 +730,18 @@ export default function FormulaPage() {
           Saved offline — will sync when connected
         </motion.div>
       )}
+
+      {/* Definition Unlock ceremony — fires when a new word class is first encountered */}
+      <AnimatePresence>
+        {showingDefinition && (
+          <DefinitionUnlock
+            key={showingDefinition}
+            wordClass={showingDefinition}
+            onComplete={handleDefinitionComplete}
+            onDismiss={handleDefinitionDismiss}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Badge toast (WF-010) */}
       <BadgeToast badge={newBadge} onDismiss={() => setNewBadge(null)} />

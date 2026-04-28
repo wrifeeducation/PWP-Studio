@@ -253,10 +253,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const openAiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAiKey) {
+    const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
+    if (!anthropicKey) {
       return new Response(
-        JSON.stringify({ error: 'OpenAI API key not configured' }),
+        JSON.stringify({ error: 'Anthropic API key not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -279,42 +279,44 @@ Word Banks Used (words the pupil selected from): ${JSON.stringify(word_banks_use
 
 Assess each slot in the formula definition, calculate the overall score, and provide feedback.`;
 
-    const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAiKey}`,
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2000,
+        system: systemPrompt,
         messages: [
-          { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
-        temperature: 0.3,
-        max_tokens: 2000,
-        response_format: { type: 'json_object' },
       }),
     });
 
-    if (!openAiResponse.ok) {
-      const errorText = await openAiResponse.text();
-      console.error('OpenAI API error:', errorText);
+    if (!anthropicResponse.ok) {
+      const errorText = await anthropicResponse.text();
+      console.error('Anthropic API error:', errorText);
       return new Response(
-        JSON.stringify({ error: 'Assessment service unavailable', details: openAiResponse.status }),
+        JSON.stringify({ error: 'Assessment service unavailable', details: anthropicResponse.status }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const openAiData = await openAiResponse.json();
-    const content = openAiData.choices?.[0]?.message?.content;
+    const anthropicData = await anthropicResponse.json();
+    const rawContent = anthropicData.content?.[0]?.text;
 
-    if (!content) {
+    if (!rawContent) {
       return new Response(
         JSON.stringify({ error: 'Empty response from assessment service' }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Strip markdown code fences if present
+    const content = rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
 
     let result: AssessFormulaResponse;
     try {

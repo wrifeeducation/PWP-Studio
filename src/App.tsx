@@ -30,6 +30,7 @@ const TeacherPage = lazy(() => import('./pages/TeacherPage'))
 const TeacherReviewPage = lazy(() => import('./pages/TeacherReviewPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const ParentPage = lazy(() => import('./pages/ParentPage'))
+const PricingPage = lazy(() => import('./pages/PricingPage'))
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 // WF-056: Teacher onboarding
@@ -229,6 +230,9 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* WF-058: Pricing page — accessible to authenticated parents + public */}
+            <Route path="/pricing" element={<PricingPage />} />
 
             {/* WF-029: Pupil portfolio — pupils only */}
             <Route
