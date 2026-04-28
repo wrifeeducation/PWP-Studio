@@ -875,7 +875,7 @@ function MyClassesTab() {
   const [unassignedPupils, setUnassignedPupils] = useState<PupilRow[]>([])
   const [loadingPupils, setLoadingPupils] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [newClass, setNewClass] = useState({ name: '', year_group: '3', academic_year: '2025/26' })
+  const [newClass, setNewClass] = useState({ name: '', year_group: '3', academic_year: '2025-26' })
   const [saving, setSaving] = useState(false)
   const [addingPupil, setAddingPupil] = useState<string | null>(null)
   const [removingPupil, setRemovingPupil] = useState<string | null>(null)
@@ -916,14 +916,14 @@ function MyClassesTab() {
     const { data, error: err } = await supabase.from('classes').insert({
       name: newClass.name.trim(),
       year_group: parseInt(newClass.year_group),
-      academic_year: newClass.academic_year,
+      academic_year: newClass.academic_year.replace('/', '-'),
       school_id: profile.school_id,
       teacher_id: profile.id,
     }).select().single()
     setSaving(false)
     if (err) { setError(err.message); return }
     setClasses((prev) => [...prev, data as ClassRow].sort((a, b) => a.year_group - b.year_group))
-    setNewClass({ name: '', year_group: '3', academic_year: '2025/26' })
+    setNewClass({ name: '', year_group: '3', academic_year: '2025-26' })
     setShowCreateForm(false)
   }
 
