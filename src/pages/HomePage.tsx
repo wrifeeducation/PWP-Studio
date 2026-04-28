@@ -358,6 +358,133 @@ export default function HomePage() {
         ))}
       </div>
 
+      {/* ── SIGN IN / CREATE ACCOUNT ─────────────────────────────────────── */}
+      <div style={{ padding: '20px 20px 0', maxWidth: 600, margin: '0 auto' }}>
+        {isLoggedIn ? (
+          <button
+            onClick={() => navigate(dashboardRoute)}
+            style={{
+              width: '100%',
+              background: `linear-gradient(135deg, ${C.purple} 0%, #9B6CF7 100%)`,
+              border: 'none',
+              borderRadius: 16,
+              padding: '18px 20px',
+              cursor: 'pointer',
+              textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
+                Welcome back
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: C.white }}>
+                Continue your journey →
+              </div>
+            </div>
+            <span style={{ fontSize: 28 }}>🚀</span>
+          </button>
+        ) : (
+          <div>
+            <p style={{
+              fontSize: 10,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              color: C.muted,
+              margin: '0 0 10px',
+              textAlign: 'center',
+            }}>
+              Get started
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+
+              {/* Sign In card */}
+              <button
+                onClick={() => navigate('/login', { state: { authMode: 'login' } })}
+                style={{
+                  background: C.white,
+                  border: `2px solid ${C.purple}`,
+                  borderRadius: 14,
+                  padding: '16px 14px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                  width: '100%',
+                }}
+              >
+                <span style={{ fontSize: 22 }}>👋</span>
+                <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, lineHeight: 1.2 }}>
+                  Sign In
+                </div>
+                <div style={{ fontSize: 10, color: C.muted, lineHeight: 1.4 }}>
+                  Already have an account? Sign in to continue.
+                </div>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  fontSize: 10,
+                  fontWeight: 800,
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  background: C.purple,
+                  color: C.white,
+                  marginTop: 2,
+                  alignSelf: 'flex-start',
+                }}>
+                  Sign in →
+                </span>
+              </button>
+
+              {/* Create Account card */}
+              <button
+                onClick={() => navigate('/login', { state: { authMode: 'signup' } })}
+                style={{
+                  background: `linear-gradient(135deg, ${C.orange} 0%, #F5C500 100%)`,
+                  border: 'none',
+                  borderRadius: 14,
+                  padding: '16px 14px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                  width: '100%',
+                }}
+              >
+                <span style={{ fontSize: 22 }}>✨</span>
+                <div style={{ fontSize: 13, fontWeight: 800, color: C.white, lineHeight: 1.2 }}>
+                  Create Account
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
+                  New to WriFe? It's free to get started.
+                </div>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  fontSize: 10,
+                  fontWeight: 800,
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  background: C.white,
+                  color: C.orange,
+                  marginTop: 2,
+                  alignSelf: 'flex-start',
+                }}>
+                  Join free →
+                </span>
+              </button>
+
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* ── CTA CARDS ────────────────────────────────────────────────────── */}
       <div style={{ padding: '16px 20px', maxWidth: 600, margin: '0 auto' }}>
         <div style={{

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import { Role } from '../types/index'
@@ -18,8 +18,10 @@ interface FormErrors {
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const [loginMode, setLoginMode] = useState<LoginMode>('teacher')
-  const [authMode, setAuthMode] = useState<AuthMode>('login')
+  const location = useLocation()
+  const locationState = location.state as { authMode?: AuthMode; loginMode?: LoginMode } | null
+  const [loginMode, setLoginMode] = useState<LoginMode>(locationState?.loginMode ?? 'teacher')
+  const [authMode, setAuthMode] = useState<AuthMode>(locationState?.authMode ?? 'login')
 
   // Teacher fields
   const [email, setEmail] = useState('')
