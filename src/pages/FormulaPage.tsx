@@ -6,7 +6,7 @@
  * and level progression gate (WF-013).
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useQueryClient } from '@tanstack/react-query'
@@ -23,7 +23,10 @@ import {
   shouldAdvance,
   nextLevel,
   didUnlockParagraph,
+  checkParagraphMasteryUnlock,
 } from '../lib/progressionEngine'
+import { useMasteryState } from '../hooks/useMasteryState'
+import { ConceptCardSequence } from '../components/formula/ConceptCardSequence'
 import { supabase } from '../lib/supabase'
 import { enqueue, flush } from '../lib/offlineQueue'
 import { useNetworkStatus } from '../hooks/useNetworkStatus'
@@ -37,11 +40,11 @@ import { SessionExpiryBanner } from '../components/ui/SessionExpiryBanner'
 import { CertificateModal } from '../components/ui/CertificateModal'
 import { awardCertificate } from '../lib/certificateEngine'
 import { sanitizeText } from '../lib/sanitize'
-import type { MasteryTracking, Badge, PupilProgress } from '../types/index'
+import type { MasteryTracking, Badge, PupilProgress, WordClass } from '../types/index'
 
 // ─── Screen states ────────────────────────────────────────────────────────────
 
-type Screen = 'loading' | 'error' | 'practice' | 'feedback'
+type Screen = 'loading' | 'error' | 'concepts' | 'practice' | 'feedback'
 
 export default function FormulaPage() {
   const navigate = useNavigate()
@@ -50,10 +53,22 @@ export default function FormulaPage() {
   const { isLoading, isError, data, refetch } = useFormulaLevel()
   const { setAssessing, isAssessing, resetSession } = useFormulaStore()
 
-  const [screen, setScreen] = useState<Screen>('practice')
+  const [screen, setScreen] = useState<Screen>('concepts')
   const [assessmentResult, setAssessmentResult] = useState<RawAssessmentResult | null>(null)
   const [xpEarned, setXpEarned] = useState(0)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // Phase 2: mastery state for current level
+  const masteryState = useMasteryState(user?.id, data?.level.id)
+
+  // Track whether we've already notified the teacher about being stuck this level
+  const stuckNotifiedRef = useRef(false)
+
+  // Reset concept screen when level changes
+  useEffect(() => {
+    setScreen('concepts')
+    stuckNotifiedRef.current = false
+  }, [data?.level.id])
 
   // WF-010: badge state
   const [newBadge, setNewBadge] = useState<Badge | null>(null)
@@ -93,7 +108,7 @@ export default function FormulaPage() {
 
   // ─── submit handler ─────────────────────────────────────────────────────────
 
-  const handleSubmit = async (sentence: string, wordsUsed: string[]) => {
+  const handleSubmit = async (sentence: string, wordsUsed: string[], hintsUsed: WordClass[] = []) => {
     if (!user?.id || !data) return
     setSubmitError(null)
     setAssessing(true)
@@ -130,6 +145,39 @@ export default function FormulaPage() {
     }
 
     try {
+      // Phase 2: stuck detection — notify teacher if >12 sessions without gate pass
+      if (
+        masteryState.isStuck &&
+        !stuckNotifiedRef.current &&
+        profile?.class_id
+      ) {
+        stuckNotifiedRef.current = true
+        // Find the teacher for this class and send a notification
+        supabase
+          .from('classes')
+          .select('teacher_id')
+          .eq('id', profile.class_id)
+          .maybeSingle()
+          .then(({ data: classRow }) => {
+            if (classRow?.teacher_id) {
+              supabase.from('teacher_notifications').insert({
+                teacher_id: classRow.teacher_id,
+                pupil_id: user.id,
+                notification_type: 'stuck_pupil_alert',
+                title: `${profile.first_name} may need support on Level ${data.level.id}`,
+                body: `${profile.first_name} has completed ${masteryState.sessionsOnLevel} sessions on Level ${data.level.id} without reaching mastery. Consider a consolidation activity.`,
+                data: {
+                  level_id: data.level.id,
+                  sessions_completed: masteryState.sessionsOnLevel,
+                  scaffold_stage: masteryState.scaffoldStage,
+                },
+                action_required: false,
+              })
+            }
+          })
+          .catch(() => {/* silent — don't block session */})
+      }
+
       // WF-007: call assess-formula edge function + save session
       const { raw } = await assessFormula({
         pupilId: user.id,
@@ -138,6 +186,9 @@ export default function FormulaPage() {
         wordsUsed,
         yearGroup: profile?.year_group ?? 5,
         attemptNumber: 1,
+        scaffoldStage: masteryState.scaffoldStage,
+        hintsUsed: hintsUsed.map(String),
+        sessionNumberOnLevel: (masteryState.sessionsOnLevel ?? 0) + 1,
       })
 
       setAssessmentResult(raw)
@@ -160,6 +211,37 @@ export default function FormulaPage() {
       await supabase
         .from('mastery_tracking')
         .upsert(masteryPayload, { onConflict: 'pupil_id,level_id' })
+
+      // Phase 2: write mastery_event when gate first passes
+      const gateJustPassed = masteryPayload.gate_passed && !(existingMastery as MasteryTracking | null)?.gate_passed
+      if (gateJustPassed) {
+        await supabase.from('mastery_events').insert({
+          pupil_id: user.id,
+          event_type: 'level_mastered',
+          level_id: data.level.id,
+          scaffold_stage: masteryPayload.scaffold_stage,
+          triggered_by: 'system',
+          evidence: {
+            sessions_completed: masteryPayload.sessions_completed,
+            window_average: masteryPayload.current_window_average,
+          },
+        })
+      }
+
+      // Phase 2: also write mastery_event when scaffold stage advances
+      const prevStage = (existingMastery as MasteryTracking | null)?.scaffold_stage ?? 1
+      if (masteryPayload.scaffold_stage > prevStage) {
+        await supabase.from('mastery_events').insert({
+          pupil_id: user.id,
+          event_type: 'scaffold_stage_advanced',
+          level_id: data.level.id,
+          from_value: String(prevStage),
+          to_value: String(masteryPayload.scaffold_stage),
+          scaffold_stage: masteryPayload.scaffold_stage,
+          triggered_by: 'system',
+          evidence: { sessions_completed: masteryPayload.sessions_completed },
+        })
+      }
 
       // WF-009: XP + streak update
       const { data: progressRow } = await supabase
@@ -195,13 +277,17 @@ export default function FormulaPage() {
 
       if (shouldAdvance(masteryPayload)) {
         newLevelNum = nextLevel(data.level.id, masteryPayload)
-        const paragraphNowUnlocked = didUnlockParagraph(data.level.id, newLevelNum)
+        const newLevelsMastered = (progress?.levels_mastered_count ?? 0) + 1
+        const paragraphNowUnlocked =
+          didUnlockParagraph(data.level.id, newLevelNum) ||
+          checkParagraphMasteryUnlock(newLevelNum, true, newLevelsMastered)
         const writingUnlocked = newLevelNum >= 35 || (progress?.writing_studio_unlocked ?? false)
 
         progressionUpdates = {
           ...progressionUpdates,
           current_formula_level: newLevelNum,
           writing_studio_unlocked: writingUnlocked,
+          levels_mastered_count: newLevelsMastered,
         }
 
         didLevelUp = true
@@ -447,6 +533,7 @@ export default function FormulaPage() {
     resetSession()
     setAssessmentResult(null)
     setSubmitError(null)
+    // Skip concept cards on retry — go straight to practice
     setScreen('practice')
   }
 
@@ -674,6 +761,22 @@ export default function FormulaPage() {
           </motion.div>
         )}
 
+        {/* Phase 2: Concept cards shown before the first practice screen */}
+        {screen === 'concepts' && data && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+          >
+            <ConceptCardSequence
+              formulaElements={data.level.formula_elements}
+              wordBanks={data.level.word_banks as Record<string, string[]>}
+              scaffoldStage={masteryState.scaffoldStage}
+              onComplete={() => setScreen('practice')}
+            />
+          </motion.div>
+        )}
+
         {screen === 'practice' && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -693,6 +796,7 @@ export default function FormulaPage() {
                 todaysSubject={data.todaysSubject}
                 onSubmit={handleSubmit}
                 isSubmitting={isAssessing}
+                scaffoldStage={masteryState.scaffoldStage}
               />
             )}
           </motion.div>

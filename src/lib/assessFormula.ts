@@ -73,12 +73,24 @@ export interface AssessFormulaParams {
   wordsUsed: string[]
   yearGroup: number
   attemptNumber?: 1 | 2
+  /** Scaffold stage 1–4 (Phase 2) */
+  scaffoldStage?: number
+  /** Word classes the pupil used hints for (Phase 2) */
+  hintsUsed?: string[]
+  /** Session number on this level (Phase 2) */
+  sessionNumberOnLevel?: number
 }
 
 export const assessFormula = async (
   params: AssessFormulaParams
 ): Promise<{ raw: RawAssessmentResult; sessionId: string; xpEarned: number }> => {
-  const { pupilId, level, sentence, wordsUsed, yearGroup, attemptNumber = 1 } = params
+  const {
+    pupilId, level, sentence, wordsUsed, yearGroup,
+    attemptNumber = 1,
+    scaffoldStage = 1,
+    hintsUsed = [],
+    sessionNumberOnLevel,
+  } = params
 
   // Build input per Edge Function contract
   const input: AssessFormulaInput = {
@@ -108,7 +120,12 @@ export const assessFormula = async (
     throw new Error(error?.message ?? 'Assessment service unavailable')
   }
 
-  const xpEarned = calculateXP(level.id, data.overall_score)
+  // Phase 2: apply hint deduction at scaffold stage 3 (−5 pts per unique word class hinted)
+  const HINT_DEDUCTION = 5
+  const hintPenalty = scaffoldStage === 3 ? hintsUsed.length * HINT_DEDUCTION : 0
+  const adjustedScore = Math.max(0, data.overall_score - hintPenalty)
+
+  const xpEarned = calculateXP(level.id, adjustedScore)
 
   // Persist to formula_sessions
   const { data: sessionData, error: sessionError } = await supabase
@@ -117,18 +134,33 @@ export const assessFormula = async (
       pupil_id: pupilId,
       level_id: level.id,
       session_date: new Date().toISOString().split('T')[0],
-      formula_score: data.overall_score,
+      formula_score: adjustedScore,
       sentence_built: sentence,
-      scaffold_used: level.phase === 'A',
-      scaffold_type: { phase: level.phase },
+      scaffold_used: scaffoldStage <= 2,
+      scaffold_type: {
+        phase: level.phase,
+        scaffold_stage: scaffoldStage,
+        hints_used: hintsUsed,
+        hint_penalty: hintPenalty,
+        concept_cards_viewed: true,
+      },
       is_lens_lab: false,
       xp_earned: xpEarned,
       semantic_purpose_score: null,
       semantic_audience_score: null,
       semantic_effect_score: null,
+      session_number_on_level: sessionNumberOnLevel ?? null,
+      scaffold_stage: scaffoldStage,
+      context_sentence: null, // Phase 3: AI-generated context
+      subject_used: null,     // Phase 3: from subject rotation
+      distractor_words_used: null, // Phase 3
+      ai_mastery_check: null,      // Phase 7
     })
     .select('id')
     .single()
+
+  // Update raw result with adjusted score for upstream consumption
+  data.overall_score = adjustedScore
 
   if (sessionError || !sessionData) {
     throw new Error(sessionError?.message ?? 'Failed to save session')

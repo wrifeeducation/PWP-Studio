@@ -12,16 +12,18 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { FormulaLevelBadge } from '../components/dashboard/FormulaLevelBadge'
 import { StreakCounter } from '../components/dashboard/StreakCounter'
-import { NavCard } from '../components/dashboard/NavCard'
 import { XPShop } from '../components/dashboard/XPShop'
 import { TTSButton } from '../components/ui/TTSButton'
 import { SessionExpiryBanner } from '../components/ui/SessionExpiryBanner'
 import { PupilWelcomeModal, useShouldShowWelcome } from '../components/ui/PupilWelcomeModal'
 import { useSettingsStore } from '../stores/settingsStore'
-import type { PupilProgress, PupilBadge, Badge } from '../types/index'
+import type { PupilProgress, PupilBadge, Badge, MasteryTracking } from '../types/index'
+import { WORD_CLASS_COLOUR } from '../types/index'
+import { WordClass } from '../types/index'
+import { checkParagraphMasteryUnlock } from '../lib/progressionEngine'
 
-const PARAGRAPH_UNLOCK_LEVEL = 8
 const MASTERY_GATE_SESSIONS = 5
+const MAX_VISIBLE_LOCKED_LEVELS = 5
 
 // ─── Animated XP counter ─────────────────────────────────────────────────────
 
@@ -292,6 +294,258 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   )
 }
 
+// ─── Learning Path ────────────────────────────────────────────────────────────
+
+interface LearningPathProps {
+  currentLevel: number
+  levelsMastered: number
+  paragraphUnlocked: boolean
+  writingUnlocked: boolean
+  masteryData: { sessions_completed?: number; scaffold_stage?: number; gate_passed?: boolean } | null | undefined
+  pupilId: string
+  onStartPractice: () => void
+}
+
+/** Colour dot strip showing the word classes in a formula level */
+const FormulaPreviewDots: React.FC<{ levelId: number }> = ({ levelId }) => {
+  // Approximate word class sequence per phase — used for visual preview only
+  // Real data comes from formula_levels table but we don't load all 67 rows here
+  const phaseA = levelId <= 16
+  const phaseB = levelId > 16 && levelId <= 33
+  // Simple heuristic: more dots for higher levels
+  const dotClasses: WordClass[] = phaseA
+    ? [WordClass.DETERMINER, WordClass.NOUN, WordClass.VERB].slice(0, Math.min(levelId, 3) + 1)
+    : phaseB
+    ? [WordClass.DETERMINER, WordClass.ADJECTIVE, WordClass.NOUN, WordClass.VERB, WordClass.ADVERB].slice(0, 4)
+    : [WordClass.DETERMINER, WordClass.ADJECTIVE, WordClass.NOUN, WordClass.VERB, WordClass.ADVERB, WordClass.PREPOSITION].slice(0, 5)
+
+  return (
+    <div className="flex gap-1 mt-1" aria-hidden="true">
+      {dotClasses.map((wc, i) => (
+        <span
+          key={i}
+          className="w-2 h-2 rounded-full"
+          style={{ backgroundColor: WORD_CLASS_COLOUR[wc] }}
+          title={wc}
+        />
+      ))}
+    </div>
+  )
+}
+
+const SCAFFOLD_LABELS = ['', 'Learning', 'Practising', 'Consolidating', 'Mastering']
+
+const LearningPath: React.FC<LearningPathProps> = ({
+  currentLevel,
+  levelsMastered,
+  paragraphUnlocked,
+  writingUnlocked,
+  masteryData,
+  onStartPractice,
+}) => {
+  const navigate = useNavigate()
+
+  // Show 3 completed levels above current + current + 5 locked below
+  const completedStart = Math.max(1, currentLevel - 3)
+  const completedLevels = Array.from(
+    { length: currentLevel - completedStart },
+    (_, i) => completedStart + i
+  )
+  const lockedLevels = Array.from(
+    { length: MAX_VISIBLE_LOCKED_LEVELS },
+    (_, i) => currentLevel + 1 + i
+  ).filter((l) => l <= 67)
+
+  const scaffoldStage = masteryData?.scaffold_stage ?? 1
+  const sessionsCompleted = masteryData?.sessions_completed ?? 0
+  const gatePassed = masteryData?.gate_passed ?? false
+
+  // Paragraph Builder unlock banner: show inline between locked levels if criteria met
+  const showParagraphBanner = paragraphUnlocked
+
+  return (
+    <div className="space-y-1" data-testid="learning-path">
+      <h2
+        className="text-sm font-semibold uppercase tracking-wider mb-3"
+        style={{ color: 'var(--color-text-muted)' }}
+        data-tts="Your learning path"
+      >
+        Your Learning Path
+      </h2>
+
+      {/* Completed levels */}
+      {completedLevels.map((lvl) => (
+        <motion.div
+          key={lvl}
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.05 * (currentLevel - lvl) }}
+          className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
+          style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', opacity: 0.65 }}
+          data-testid={`path-level-${lvl}-completed`}
+        >
+          <span className="text-lg" aria-hidden="true">👑</span>
+          <div className="flex-1">
+            <span className="text-sm font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+              Level {lvl} — Mastered
+            </span>
+            <FormulaPreviewDots levelId={lvl} />
+          </div>
+          <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: '#D1FAE5', color: '#065F46' }}>
+            ✓
+          </span>
+        </motion.div>
+      ))}
+
+      {/* Paragraph Builder unlock banner */}
+      {showParagraphBanner && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.1 }}
+          className="rounded-xl px-4 py-3 text-sm font-semibold flex items-center gap-3 cursor-pointer"
+          style={{
+            background: 'linear-gradient(135deg, #ECFDF5, #D1FAE5)',
+            border: '2px solid #6EE7B7',
+            color: '#065F46',
+          }}
+          onClick={() => navigate('/paragraph')}
+          role="button"
+          tabIndex={0}
+          data-testid="paragraph-unlock-banner"
+          data-tts="Paragraph Builder unlocked — tap to start"
+        >
+          <span className="text-xl" aria-hidden="true">📝</span>
+          <div>
+            <p className="font-bold">Paragraph Builder unlocked!</p>
+            <p className="text-xs font-normal opacity-80">You can now extend your sentences into paragraphs</p>
+          </div>
+          <span className="ml-auto text-lg" aria-hidden="true">→</span>
+        </motion.div>
+      )}
+
+      {/* Current active level */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.1, type: 'spring', stiffness: 300, damping: 25 }}
+        className="rounded-xl overflow-hidden"
+        style={{
+          border: '2px solid var(--color-noun)',
+          backgroundColor: 'var(--color-surface)',
+          boxShadow: '0 0 0 3px rgba(59,130,246,0.15)',
+        }}
+        data-testid="path-current-level"
+      >
+        {/* Level header */}
+        <div
+          className="px-4 py-2 flex items-center justify-between"
+          style={{ backgroundColor: 'var(--color-noun)' }}
+        >
+          <span className="text-white font-bold text-sm" data-tts={`Level ${currentLevel} — active`}>
+            Level {currentLevel}
+          </span>
+          <span className="text-white text-xs font-medium opacity-90">
+            {SCAFFOLD_LABELS[scaffoldStage] ?? 'Practising'}
+          </span>
+        </div>
+
+        {/* Session progress */}
+        <div className="px-4 py-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <FormulaPreviewDots levelId={currentLevel} />
+            <span className="text-xs ml-auto" style={{ color: 'var(--color-text-muted)' }}>
+              {sessionsCompleted}/{MASTERY_GATE_SESSIONS} sessions
+            </span>
+          </div>
+          <div
+            className="h-2 rounded-full overflow-hidden"
+            style={{ backgroundColor: 'var(--color-border)' }}
+          >
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min((sessionsCompleted / MASTERY_GATE_SESSIONS) * 100, 100)}%` }}
+              transition={{ duration: 0.7, ease: 'easeOut' }}
+              className="h-full rounded-full"
+              style={{ backgroundColor: gatePassed ? '#10B981' : 'var(--color-noun)' }}
+            />
+          </div>
+          <button
+            onClick={onStartPractice}
+            className="w-full py-2.5 rounded-lg text-sm font-bold text-white transition-all"
+            style={{ backgroundColor: 'var(--color-noun)' }}
+            data-testid="start-practice-button"
+            data-tts="Start today's practice"
+          >
+            {gatePassed ? '✓ Mastered — keep going →' : "Start today's practice →"}
+          </button>
+        </div>
+      </motion.div>
+
+      {/* Writing Studio unlock banner */}
+      {writingUnlocked && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="rounded-xl px-4 py-3 text-sm font-semibold flex items-center gap-3 cursor-pointer"
+          style={{
+            background: 'linear-gradient(135deg, #FEF3C7, #FDE68A)',
+            border: '2px solid #FCD34D',
+            color: '#78350F',
+          }}
+          onClick={() => navigate('/writing')}
+          role="button"
+          tabIndex={0}
+          data-testid="writing-unlock-banner"
+          data-tts="Writing Studio unlocked — tap to start"
+        >
+          <span className="text-xl" aria-hidden="true">✍️</span>
+          <div>
+            <p className="font-bold">Writing Studio unlocked!</p>
+            <p className="text-xs font-normal opacity-80">Your teacher has assigned a writing task</p>
+          </div>
+          <span className="ml-auto text-lg" aria-hidden="true">→</span>
+        </motion.div>
+      )}
+
+      {/* Locked levels ahead */}
+      {lockedLevels.map((lvl, i) => (
+        <motion.div
+          key={lvl}
+          initial={{ opacity: 0, x: 8 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.06 * (i + 1) }}
+          className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            opacity: Math.max(0.25, 0.7 - i * 0.12),
+          }}
+          data-testid={`path-level-${lvl}-locked`}
+        >
+          <span className="text-lg" aria-hidden="true">🔒</span>
+          <div className="flex-1">
+            <span className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>
+              Level {lvl}
+            </span>
+            <FormulaPreviewDots levelId={lvl} />
+          </div>
+        </motion.div>
+      ))}
+
+      {currentLevel < 67 && (
+        <p
+          className="text-xs text-center pt-2"
+          style={{ color: 'var(--color-text-muted)' }}
+          data-tts={`${67 - currentLevel} levels remaining`}
+        >
+          {67 - currentLevel} more levels to go
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -322,18 +576,18 @@ export default function DashboardPage() {
     staleTime: 1000 * 30,
   })
 
-  // React Query for mastery sessions count
-  const { data: masteryData } = useQuery({
+  // React Query for mastery data on current level
+  const { data: masteryData } = useQuery<MasteryTracking | null>({
     queryKey: ['mastery_tracking', user?.id, progress?.current_formula_level],
     queryFn: async () => {
       if (!user?.id || !progress) return null
       const { data } = await supabase
         .from('mastery_tracking')
-        .select('sessions_completed')
+        .select('*')
         .eq('pupil_id', user.id)
         .eq('level_id', progress.current_formula_level)
         .maybeSingle()
-      return data
+      return data as MasteryTracking | null
     },
     enabled: !!user?.id && !!progress,
     staleTime: 1000 * 60,
@@ -351,7 +605,12 @@ export default function DashboardPage() {
   const longestStreak = progress?.longest_streak ?? 0
   const shieldActive = progress?.streak_shield_active ?? false
 
-  const isParagraphLocked = level < PARAGRAPH_UNLOCK_LEVEL
+  // Phase 2: mastery-based paragraph unlock (§4.2 criteria A+B+C)
+  const isParagraphUnlocked = checkParagraphMasteryUnlock(
+    level,
+    masteryData?.gate_passed ?? false,
+    progress?.levels_mastered_count ?? 0
+  )
   const isWritingStudioLocked = !progress?.writing_studio_unlocked
 
   const firstName = profile?.first_name ?? 'Pupil'
@@ -592,72 +851,56 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Three-layer navigation cards */}
-        <section aria-label="Learning layers" data-testid="nav-cards">
-          <h2
-            className="text-sm font-semibold mb-3 uppercase tracking-wider"
-            style={{ color: 'var(--color-text-muted)' }}
-            data-tts="Your learning layers"
+        {/* Phase 2: Learning Path (Duolingo-style node map) */}
+        {user?.id && (
+          <LearningPath
+            currentLevel={level}
+            levelsMastered={progress?.levels_mastered_count ?? 0}
+            paragraphUnlocked={isParagraphUnlocked}
+            writingUnlocked={!isWritingStudioLocked}
+            masteryData={masteryData}
+            pupilId={user.id}
+            onStartPractice={() => navigate('/practice')}
+          />
+        )}
+
+        {/* Quick links for unlocked layers (compact row) */}
+        <div className="flex gap-2" data-testid="quick-links">
+          {isParagraphUnlocked && (
+            <button
+              onClick={() => navigate('/paragraph')}
+              className="flex-1 py-2 rounded-xl text-xs font-semibold text-white"
+              style={{ backgroundColor: 'var(--color-adjective)' }}
+              data-testid="quick-paragraph"
+              data-tts="Go to Paragraph Builder"
+            >
+              📝 Paragraph Builder
+            </button>
+          )}
+          {!isWritingStudioLocked && (
+            <button
+              onClick={() => navigate('/writing')}
+              className="flex-1 py-2 rounded-xl text-xs font-semibold text-white"
+              style={{ backgroundColor: 'var(--color-verb)' }}
+              data-testid="quick-writing"
+              data-tts="Go to Writing Studio"
+            >
+              ✍️ Writing Studio
+            </button>
+          )}
+          <button
+            onClick={() => navigate('/portfolio')}
+            className="flex-1 py-2 rounded-xl text-xs font-semibold"
+            style={{
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-muted)',
+            }}
+            data-testid="quick-portfolio"
+            data-tts="Go to My Portfolio"
           >
-            Your Learning Layers
-          </h2>
-
-          <div className="space-y-3 dashboard-grid">
-            {/* Layer 1: Formula Practice — always unlocked */}
-            <NavCard
-              title="Formula Practice"
-              description={`Level ${level} — Build sentences with colour-coded word tiles`}
-              isLocked={false}
-              accentColor="var(--color-noun)"
-              icon="🧩"
-              route="/practice"
-              delay={0.1}
-            />
-
-            {/* Layer 2: Paragraph Builder — locked until L8 */}
-            <NavCard
-              title="Paragraph Builder"
-              description="Extend your formula into a full Lead–Support–Close paragraph"
-              isLocked={isParagraphLocked}
-              lockReason={
-                isParagraphLocked
-                  ? `Unlocks at Level ${PARAGRAPH_UNLOCK_LEVEL} — you're on Level ${level}`
-                  : undefined
-              }
-              accentColor="var(--color-adjective)"
-              icon="📝"
-              route="/paragraph"
-              delay={0.15}
-            />
-
-            {/* Layer 3: Writing Studio — locked */}
-            <NavCard
-              title="Writing Studio"
-              description="Write extended stories, essays, and arguments"
-              isLocked={isWritingStudioLocked}
-              lockReason={
-                isWritingStudioLocked
-                  ? 'Unlocked when your teacher assigns a Writing Studio task'
-                  : undefined
-              }
-              accentColor="var(--color-verb)"
-              icon="✍️"
-              route="/writing"
-              delay={0.2}
-            />
-
-            {/* WF-029: Portfolio — always accessible */}
-            <NavCard
-              title="My Portfolio"
-              description="View your published writing, badges, and progress"
-              isLocked={false}
-              accentColor="var(--color-adverb)"
-              icon="📚"
-              route="/portfolio"
-              delay={0.25}
-            />
-          </div>
-        </section>
+            📚 Portfolio
+          </button>
+        </div>
 
         {/* Progress summary footer */}
         {progress && (

@@ -138,6 +138,60 @@ export const computeMasteryUpdate = (
   }
 }
 
+// ─── scaffold stage advancement ───────────────────────────────────────────────
+
+/**
+ * Stage thresholds per the adaptive progression plan (§3.1):
+ *   Stage 1 → 2: No gate — all pupils complete 3 sessions at Stage 1
+ *   Stage 2 → 3: ≥75% on 2 of the last 3 sessions
+ *   Stage 3 → 4: ≥85% on 2 consecutive sessions
+ *
+ * Returns the new scaffold stage (1–4). Never regresses.
+ */
+export const computeNextScaffoldStage = (
+  currentStage: number,
+  allScores: number[]
+): number => {
+  if (currentStage >= 4) return 4
+
+  if (currentStage === 1) {
+    // Auto-advance after 3 sessions
+    return allScores.length >= 3 ? 2 : 1
+  }
+
+  if (currentStage === 2) {
+    // ≥75% on 2 of last 3
+    const last3 = allScores.slice(-3)
+    const passing = last3.filter((s) => s >= 75).length
+    return passing >= 2 ? 3 : 2
+  }
+
+  if (currentStage === 3) {
+    // ≥85% on 2 consecutive
+    if (allScores.length < 2) return 3
+    const last2 = allScores.slice(-2)
+    return last2.every((s) => s >= 85) ? 4 : 3
+  }
+
+  return currentStage
+}
+
+/**
+ * Accelerated stage jump: if pupil scores ≥90% on 3 consecutive sessions
+ * at Stage 2 or 3, skip ahead one additional stage.
+ */
+export const checkFastStageJump = (
+  newStage: number,
+  allScores: number[]
+): number => {
+  if (newStage < 2 || newStage > 3) return newStage
+  const last3 = allScores.slice(-3)
+  if (last3.length === 3 && last3.every((s) => s >= 90)) {
+    return Math.min(newStage + 1, 4)
+  }
+  return newStage
+}
+
 /** Convenience: upsert mastery after a session — returns computed update */
 export const buildMasteryUpsert = (
   pupilId: string,
@@ -146,13 +200,32 @@ export const buildMasteryUpsert = (
   newScore: number
 ): Omit<MasteryTracking, 'id' | 'created_at' | 'updated_at'> => {
   const update = computeMasteryUpdate(existing, newScore)
+
+  // Compute updated scaffold stage
+  const allScores = [
+    ...([1, 2, 3, 4, 5, 6, 7] as const)
+      .map((n) => (existing as Record<string, unknown> | null)?.[`session_${n}_score`] as number | null | undefined)
+      .filter((v): v is number => v != null),
+    newScore,
+  ]
+  const prevStage = existing?.scaffold_stage ?? 1
+  let nextStage = computeNextScaffoldStage(prevStage, allScores)
+  nextStage = checkFastStageJump(nextStage, allScores)
+
+  // Record when each stage was first reached
+  const scaffoldAdvancedAt: Record<string, string> = {
+    ...(existing?.scaffold_advanced_at as Record<string, string> | null ?? {}),
+  }
+  if (nextStage > prevStage) {
+    scaffoldAdvancedAt[String(nextStage)] = new Date().toISOString()
+  }
+
   return {
     pupil_id: pupilId as import('../types/index').UUID,
     level_id: levelId,
     ...update,
-    // Phase 1: scaffold defaults (preserve existing if present)
-    scaffold_stage: existing?.scaffold_stage ?? 1,
-    scaffold_advanced_at: existing?.scaffold_advanced_at ?? null,
+    scaffold_stage: nextStage,
+    scaffold_advanced_at: scaffoldAdvancedAt,
     weak_word_class: existing?.weak_word_class ?? null,
     ai_mastery_check: existing?.ai_mastery_check ?? null,
   }

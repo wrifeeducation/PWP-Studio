@@ -4,7 +4,7 @@
  * Kept under 200 lines — feedback is in FormulaFeedback.tsx.
  */
 
-import React, { useCallback, useEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   DndContext,
   type DragEndEvent,
@@ -24,8 +24,10 @@ import { TTSButton } from '../ui/TTSButton'
 interface FormulaBuilderProps {
   level: FormulaLevel
   todaysSubject: string | null
-  onSubmit: (sentence: string, wordsUsed: string[]) => void
+  onSubmit: (sentence: string, wordsUsed: string[], hintsUsed: WordClass[]) => void
   isSubmitting: boolean
+  /** Scaffold stage 1–4, determines label/hint availability */
+  scaffoldStage?: number
 }
 
 export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
@@ -33,6 +35,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
   todaysSubject,
   onSubmit,
   isSubmitting,
+  scaffoldStage = 1,
 }) => {
   const {
     slotSelections,
@@ -47,6 +50,8 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
 
   const labelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const totalSlots = level.formula_elements.length
+  // Track which word classes had hints used this session
+  const [hintsUsed, setHintsUsed] = useState<WordClass[]>([])
 
   // Phase B: hide labels after 3 seconds
   useEffect(() => {
@@ -66,6 +71,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
   // Reset when level changes
   useEffect(() => {
     resetSession()
+    setHintsUsed([])
   }, [level.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // dnd-kit sensors (mouse + touch)
@@ -133,6 +139,12 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
 
   const displayPhase = labelsVisible ? Phase.A : level.phase
 
+  const handleHintUsed = useCallback((wordClass: WordClass) => {
+    setHintsUsed((prev) =>
+      prev.includes(wordClass) ? prev : [...prev, wordClass]
+    )
+  }, [])
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <div className="space-y-6" data-testid="formula-builder">
@@ -176,6 +188,8 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
               selectedWord={slotSelections[el.position] ?? null}
               instruction={el.instruction}
               example={el.example}
+              scaffoldStage={scaffoldStage}
+              wordBankExamples={(level.word_banks[el.word_class as WordClass] ?? []).slice(0, 4)}
               onClear={() => {
                 const wordId = Object.keys(slotSelections)
                   .map((k) => ({
@@ -184,13 +198,13 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
                   }))
                   .find((e) => e.pos === el.position)
                 if (wordId) {
-                  // Find the id in usedWordIds that corresponds
                   const matchId = Array.from(usedWordIds).find((id) =>
                     id.startsWith(`${el.word_class}-${slotSelections[el.position]}-`)
                   )
                   clearSlot(el.position, matchId ?? '')
                 }
               }}
+              onHintUsed={handleHintUsed}
               dataTestId={`formula-slot-${el.position}`}
             />
           ))}
@@ -269,7 +283,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
           <button
             onClick={() => {
               if (allFilled && !isSubmitting) {
-                onSubmit(buildSentence(), getUsedWords())
+                onSubmit(buildSentence(), getUsedWords(), hintsUsed)
               }
             }}
             disabled={!allFilled || isSubmitting}

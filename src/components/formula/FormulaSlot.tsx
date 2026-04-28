@@ -1,16 +1,24 @@
 /**
- * WF-005/006: Formula Slot — drop target for WordClassTile.
- * Uses dnd-kit useDroppable. Shows label in Phase A, hides in B/C/D.
+ * WF-005/006 + Phase 2: Formula Slot — drop target for WordClassTile.
+ * Uses dnd-kit useDroppable. Label visibility and hint availability
+ * are now driven by scaffoldStage (1–4) as well as Phase.
+ *
+ * Scaffold stage behaviour (§10.4):
+ *   Stage 1: labels visible, hints auto-shown, no cost
+ *   Stage 2: labels hidden, hints on demand, no cost
+ *   Stage 3: blank slot, hints on demand, −5pts per hint used
+ *   Stage 4: blank slot, no hints
  */
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useDroppable } from '@dnd-kit/core'
+import { AnimatePresence, motion } from 'framer-motion'
 import { WordClass, Phase } from '../../types/index'
+import { getHintForSlot } from '../../lib/definitions'
 
 // ─── types ───────────────────────────────────────────────────────────────────
 
 export interface FormulaSlotProps {
-  /** Unique slot id — must match what DndContext expects (e.g. "slot-0") */
   id: string
   position: number
   wordClass: WordClass
@@ -19,8 +27,14 @@ export interface FormulaSlotProps {
   selectedWord: string | null
   instruction: string
   example: string
+  /** Scaffold stage 1–4 (default 1 if omitted) */
+  scaffoldStage?: number
+  /** Words from today's word bank for this word class — used in hint */
+  wordBankExamples?: string[]
   /** Called when user clicks to remove a placed word */
   onClear?: () => void
+  /** Called when hint is shown (for tracking) */
+  onHintUsed?: (wordClass: WordClass) => void
   dataTestId?: string
 }
 
@@ -48,6 +62,73 @@ const LABEL_MAP: Record<WordClass, string> = {
   [WordClass.CONJUNCTION]: 'Conjunction',
 }
 
+// ─── hint tooltip ─────────────────────────────────────────────────────────────
+
+interface HintTooltipProps {
+  wordClass: WordClass
+  wordBankExamples?: string[]
+  color: string
+  onClose: () => void
+}
+
+const HintTooltip: React.FC<HintTooltipProps> = ({ wordClass, wordBankExamples, color, onClose }) => {
+  const hint = getHintForSlot(wordClass, wordBankExamples)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 6, scale: 0.97 }}
+      transition={{ duration: 0.15 }}
+      className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-56 rounded-xl shadow-lg p-3 text-left"
+      style={{
+        backgroundColor: 'var(--color-surface)',
+        border: `2px solid ${color}`,
+      }}
+      role="tooltip"
+      data-testid={`hint-tooltip-${wordClass}`}
+    >
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs font-bold uppercase tracking-wider" style={{ color }}>
+          {hint.label}
+        </span>
+        <button
+          onClick={onClose}
+          className="text-xs px-1 rounded"
+          style={{ color: 'var(--color-text-muted)' }}
+          aria-label="Close hint"
+        >
+          ✕
+        </button>
+      </div>
+      <p className="text-xs leading-snug mb-2" style={{ color: 'var(--color-text)' }}>
+        {hint.definition}
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {hint.examples.slice(0, 3).map((ex) => (
+          <span
+            key={ex}
+            className="text-xs px-2 py-0.5 rounded-full font-mono text-white"
+            style={{ backgroundColor: color }}
+          >
+            {ex}
+          </span>
+        ))}
+      </div>
+      {/* Small triangle pointer */}
+      <div
+        className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+        style={{
+          borderLeft: '6px solid transparent',
+          borderRight: '6px solid transparent',
+          borderTop: `6px solid ${color}`,
+        }}
+        aria-hidden="true"
+      />
+    </motion.div>
+  )
+}
+
 // ─── component ────────────────────────────────────────────────────────────────
 
 export const FormulaSlot: React.FC<FormulaSlotProps> = ({
@@ -56,14 +137,47 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
   phase,
   selectedWord,
   instruction,
+  scaffoldStage = 1,
+  wordBankExamples,
   onClear,
+  onHintUsed,
   dataTestId,
 }) => {
   const { isOver, setNodeRef } = useDroppable({ id })
+  const [hintVisible, setHintVisible] = useState(false)
+  const [autoHintShown, setAutoHintShown] = useState(false)
 
   const color = VAR_MAP[wordClass]
   const label = LABEL_MAP[wordClass]
-  const showLabel = phase === Phase.A
+
+  // Show label in slot: Stage 1 always shows labels; Stage 2+ respects Phase
+  const showLabel = scaffoldStage === 1 || phase === Phase.A
+
+  // Hint availability: Stage 1–3 yes, Stage 4 no
+  const hintsAvailable = scaffoldStage <= 3
+
+  // Hint costs −5 points at Stage 3 (communicated via onHintUsed callback)
+  const hintHasCost = scaffoldStage === 3
+
+  // Stage 1: auto-show hint on first empty slot render
+  useEffect(() => {
+    if (scaffoldStage === 1 && !autoHintShown && !selectedWord) {
+      const timer = setTimeout(() => {
+        setHintVisible(true)
+        setAutoHintShown(true)
+      }, 800) // brief delay so the card animation settles first
+      return () => clearTimeout(timer)
+    }
+  }, [scaffoldStage, autoHintShown, selectedWord])
+
+  const handleHintClick = () => {
+    if (!hintsAvailable) return
+    const opening = !hintVisible
+    setHintVisible(opening)
+    if (opening && onHintUsed) {
+      onHintUsed(wordClass)
+    }
+  }
 
   const isEmpty = selectedWord === null
 
@@ -79,59 +193,89 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
       }
 
   return (
-    <div
-      ref={setNodeRef}
-      data-testid={dataTestId ?? `formula-slot-${id}`}
-      data-tts={`${label} slot${selectedWord ? ': ' + selectedWord : ' — empty'}`}
-      className="flex flex-col items-center justify-center rounded-xl transition-all duration-150 min-w-[80px] min-h-[64px] px-3 py-2 relative"
-      style={containerStyle}
-      aria-label={`${label} slot${selectedWord ? ' — ' + selectedWord : ' — empty'}`}
-      role="region"
-    >
-      {/* Phase A label */}
-      {showLabel && (
-        <span
-          className="text-[9px] uppercase tracking-widest font-semibold leading-none mb-1"
-          style={{ color: isEmpty ? '#6B7280' : 'rgba(255,255,255,0.8)' }}
-          aria-hidden="true"
-        >
-          {label}
-        </span>
-      )}
-
-      {isEmpty ? (
-        /* Empty state */
-        <div className="flex flex-col items-center gap-0.5">
-          {!showLabel && (
-            /* Colour dot hint for Phase B/C/D */
-            <span
-              className="w-3 h-3 rounded-full inline-block mb-1"
-              style={{ backgroundColor: color }}
-              aria-hidden="true"
-            />
-          )}
-          <span className="text-xl text-gray-400 leading-none" aria-hidden="true">
-            +
+    <div className="relative flex flex-col items-center">
+      <div
+        ref={setNodeRef}
+        data-testid={dataTestId ?? `formula-slot-${id}`}
+        data-tts={`${label} slot${selectedWord ? ': ' + selectedWord : ' — empty'}`}
+        className="flex flex-col items-center justify-center rounded-xl transition-all duration-150 min-w-[80px] min-h-[64px] px-3 py-2 relative"
+        style={containerStyle}
+        aria-label={`${label} slot${selectedWord ? ' — ' + selectedWord : ' — empty'}`}
+        role="region"
+      >
+        {/* Phase A / Stage 1 label */}
+        {showLabel && (
+          <span
+            className="text-[9px] uppercase tracking-widest font-semibold leading-none mb-1"
+            style={{ color: isEmpty ? '#6B7280' : 'rgba(255,255,255,0.8)' }}
+            aria-hidden="true"
+          >
+            {label}
           </span>
-          {showLabel && (
-            <span className="text-[10px] text-gray-400 mt-0.5" aria-hidden="true">
-              {instruction}
+        )}
+
+        {isEmpty ? (
+          <div className="flex flex-col items-center gap-0.5">
+            {!showLabel && (
+              <span
+                className="w-3 h-3 rounded-full inline-block mb-1"
+                style={{ backgroundColor: color }}
+                aria-hidden="true"
+              />
+            )}
+            <span className="text-xl text-gray-400 leading-none" aria-hidden="true">
+              +
             </span>
-          )}
-        </div>
-      ) : (
-        /* Filled state */
+            {showLabel && (
+              <span className="text-[10px] text-gray-400 mt-0.5" aria-hidden="true">
+                {instruction}
+              </span>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={onClear}
+            className="text-white font-mono font-bold text-sm leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            data-testid={`slot-word-${id}`}
+            data-tts={selectedWord}
+            aria-label={`${selectedWord} — tap to remove`}
+            title="Tap to remove"
+          >
+            {selectedWord}
+          </button>
+        )}
+      </div>
+
+      {/* Hint button — sits below the slot, min 44×44px tap target */}
+      {hintsAvailable && (
         <button
-          onClick={onClear}
-          className="text-white font-mono font-bold text-sm leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-          data-testid={`slot-word-${id}`}
-          data-tts={selectedWord}
-          aria-label={`${selectedWord} — tap to remove`}
-          title="Tap to remove"
+          onClick={handleHintClick}
+          className="mt-1 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all focus:outline-none focus-visible:ring-2"
+          style={{
+            backgroundColor: hintVisible ? color : 'var(--color-border)',
+            color: hintVisible ? 'white' : 'var(--color-text-muted)',
+            minWidth: '44px',
+            minHeight: '28px',
+          }}
+          data-testid={`hint-button-${id}`}
+          aria-label={`${hintHasCost ? 'Hint (−5 pts): ' : 'Hint: '}${label} definition`}
+          title={hintHasCost ? 'Show hint (−5 pts)' : 'Show hint'}
         >
-          {selectedWord}
+          {hintHasCost ? '?−5' : '?'}
         </button>
       )}
+
+      {/* Hint tooltip */}
+      <AnimatePresence>
+        {hintVisible && (
+          <HintTooltip
+            wordClass={wordClass}
+            wordBankExamples={wordBankExamples}
+            color={color}
+            onClose={() => setHintVisible(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

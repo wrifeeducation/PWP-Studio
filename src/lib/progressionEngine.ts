@@ -8,8 +8,11 @@ import type { MasteryTracking } from '../types/index'
 // ─── constants ────────────────────────────────────────────────────────────────
 
 const MAX_LEVEL = 67
-const PARAGRAPH_UNLOCK_LEVEL = 8
+// Phase 1: structural gate at L4 (mastery criteria are the real lock — see §4.2)
+const PARAGRAPH_UNLOCK_LEVEL = 4
 const WRITING_STUDIO_UNLOCK_LEVEL = 35
+// Minimum levels mastered before Paragraph Builder can unlock (Criterion C)
+const PARAGRAPH_MIN_LEVELS_MASTERED = 2
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -36,26 +39,46 @@ export const nextLevel = (
 }
 
 /**
- * Returns true if the paragraph builder is unlocked at this level.
+ * Returns true if the structural paragraph gate is open (level ≥ L4).
+ * The full mastery-based unlock also requires gate_passed + levels_mastered_count ≥ 2.
+ * Use checkParagraphMasteryUnlock() for the complete check.
  */
 export const isParagraphUnlocked = (level: number): boolean => {
   return level >= PARAGRAPH_UNLOCK_LEVEL
 }
 
 /**
- * Returns true if Writing Studio should be unlocked.
- * Requires either teacher assignment OR reaching the unlock level.
+ * Full mastery-based Paragraph Builder unlock check (§4.2):
+ *   A) Structural richness: level ≥ 4 (paragraph_active = true in DB)
+ *   B) Formula mastery: gate_passed on current level
+ *   C) Pattern variety: ≥ 2 levels mastered in total
  */
-export const isWritingStudioUnlocked = (
-  level: number,
-  teacherAssigned: boolean
+export const checkParagraphMasteryUnlock = (
+  currentLevel: number,
+  gatePassed: boolean,
+  levelsMasteredCount: number
 ): boolean => {
-  return teacherAssigned || level >= WRITING_STUDIO_UNLOCK_LEVEL
+  return (
+    currentLevel >= PARAGRAPH_UNLOCK_LEVEL &&
+    gatePassed &&
+    levelsMasteredCount >= PARAGRAPH_MIN_LEVELS_MASTERED
+  )
 }
 
 /**
- * Returns true if transitioning from `oldLevel` to `newLevel` crosses
- * the paragraph unlock boundary (L7 → L8).
+ * Returns true if Writing Studio should be unlocked.
+ * Requires either teacher confirmation OR reaching the structural unlock level.
+ */
+export const isWritingStudioUnlocked = (
+  level: number,
+  teacherConfirmed: boolean
+): boolean => {
+  return teacherConfirmed || level >= WRITING_STUDIO_UNLOCK_LEVEL
+}
+
+/**
+ * Returns true if transitioning from oldLevel to newLevel crosses
+ * the paragraph structural gate (L3 → L4).
  */
 export const didUnlockParagraph = (oldLevel: number, newLevel: number): boolean => {
   return oldLevel < PARAGRAPH_UNLOCK_LEVEL && newLevel >= PARAGRAPH_UNLOCK_LEVEL
