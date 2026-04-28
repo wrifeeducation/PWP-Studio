@@ -691,7 +691,7 @@ const StatsSidebar: React.FC<StatsSidebarProps> = ({ progress, profile, earnedBa
             label: 'Streak',
             value: progress.current_streak > 0 ? `${progress.current_streak}d` : '–',
             icon: <span style={{ fontSize: 20 }}>🔥</span>,
-            colour: '#E74C3C',
+            colour: progress.current_streak > 0 ? '#E74C3C' : C.muted,
           },
           {
             label: 'Coins',
@@ -890,7 +890,7 @@ const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWa
         boxShadow: '0 1px 6px rgba(0,0,0,0.15)',
       }}>
         <span style={{ fontSize: 15 }}>🔥</span>
-        <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{streak}</span>
+        <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{streak > 0 ? streak : '–'}</span>
       </div>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
