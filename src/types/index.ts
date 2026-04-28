@@ -102,6 +102,28 @@ export enum InterventionTrigger {
   WRITING = 'writing',
 }
 
+export enum TeacherNotificationType {
+  MASTERY_GATE_PASSED = 'mastery_gate_passed',
+  PARAGRAPH_BUILDER_UNLOCKED = 'paragraph_builder_unlocked',
+  WRITING_STUDIO_READY = 'writing_studio_ready',
+  CONSOLIDATION_ALERT = 'consolidation_alert',
+  STUCK_PUPIL_ALERT = 'stuck_pupil_alert',
+  GENRE_MASTERED = 'genre_mastered',
+  SCAFFOLD_STAGE_ADVANCED = 'scaffold_stage_advanced',
+}
+
+export enum MasteryEventType {
+  LEVEL_MASTERED = 'level_mastered',
+  PARAGRAPH_UNLOCKED = 'paragraph_unlocked',
+  GENRE_MASTERED = 'genre_mastered',
+  GENRE_STARTED = 'genre_started',
+  WRITING_STUDIO_SUGGESTED = 'writing_studio_suggested',
+  WRITING_STUDIO_CONFIRMED = 'writing_studio_confirmed',
+  SCAFFOLD_STAGE_ADVANCED = 'scaffold_stage_advanced',
+  CONSOLIDATION_TRIGGERED = 'consolidation_triggered',
+  TEACHER_OVERRIDE = 'teacher_override',
+}
+
 export enum SchoolPhase {
   PRIMARY = 'primary',
   SECONDARY = 'secondary',
@@ -247,6 +269,13 @@ export interface PupilProgress extends WithTimestamps {
   total_xp: number;
   /** WF-035: Set when pupil buys Double XP Day from the XP Shop */
   double_xp_until: Nullable<string>; // ISO timestamp
+  // Phase 1: adaptive progression columns
+  paragraph_genres_mastered: Genre[];
+  paragraph_genres_started: Genre[];
+  writing_studio_suggested_at: Nullable<string>; // ISO timestamp
+  writing_studio_confirmed_at: Nullable<string>; // ISO timestamp
+  levels_mastered_count: number;
+  phases_completed: Phase[];
 }
 
 export interface PupilBadge extends WithTimestamps {
@@ -274,6 +303,13 @@ export interface FormulaSession extends WithTimestamps {
   scaffold_type: Nullable<Record<string, unknown>>;
   is_lens_lab: boolean;
   xp_earned: number;
+  // Phase 1: scaffold metadata columns
+  session_number_on_level: Nullable<number>;
+  scaffold_stage: Nullable<number>; // 1-4 (Acquisition→Practice→Consolidation→Transfer)
+  context_sentence: Nullable<string>;
+  subject_used: Nullable<string>;
+  distractor_words_used: Nullable<string[]>;
+  ai_mastery_check: Nullable<Record<string, unknown>>;
 }
 
 export interface ParagraphSession extends WithTimestamps {
@@ -315,6 +351,11 @@ export interface MasteryTracking extends WithTimestamps {
   gate_passed_at: Nullable<string>;
   fast_track_eligible: boolean;
   consolidation_required: boolean;
+  // Phase 1: adaptive scaffold columns
+  scaffold_stage: number; // 1-4 (Acquisition=1, Practice=2, Consolidation=3, Transfer=4)
+  scaffold_advanced_at: Nullable<Record<string, string>>; // stage -> ISO timestamp
+  weak_word_class: Nullable<string>;
+  ai_mastery_check: Nullable<Record<string, unknown>>;
 }
 
 export interface WritingPiece extends WithTimestamps {
@@ -392,6 +433,37 @@ export interface InterventionLog extends WithTimestamps {
   /** WF-032: Set when mastery_tracking.consolidation_required = true triggered this intervention */
   consolidation_required: boolean;
   resolved_at: Nullable<string>;
+}
+
+export interface MasteryEvent {
+  id: UUID;
+  pupil_id: UUID;
+  event_type: MasteryEventType;
+  level_id: Nullable<number>;
+  genre: Nullable<Genre>;
+  scaffold_stage: Nullable<number>;
+  from_value: Nullable<string>;
+  to_value: Nullable<string>;
+  triggered_by: 'system' | 'teacher' | 'ai';
+  teacher_id: Nullable<UUID>;
+  teacher_note: Nullable<string>;
+  evidence: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface TeacherNotification {
+  id: UUID;
+  teacher_id: UUID;
+  pupil_id: Nullable<UUID>;
+  notification_type: TeacherNotificationType;
+  title: string;
+  body: Nullable<string>;
+  data: Record<string, unknown>;
+  action_required: boolean;
+  actioned_at: Nullable<string>;
+  read_at: Nullable<string>;
+  dismissed_at: Nullable<string>;
+  created_at: string;
 }
 
 // ============================================================================
@@ -495,6 +567,16 @@ export interface Database {
         Row: InterventionLog;
         Insert: Omit<InterventionLog, 'id' | 'created_at' | 'updated_at'>;
         Update: DeepPartial<Omit<InterventionLog, 'id' | 'created_at'>>;
+      };
+      mastery_events: {
+        Row: MasteryEvent;
+        Insert: Omit<MasteryEvent, 'id' | 'created_at'>;
+        Update: DeepPartial<Omit<MasteryEvent, 'id' | 'created_at'>>;
+      };
+      teacher_notifications: {
+        Row: TeacherNotification;
+        Insert: Omit<TeacherNotification, 'id' | 'created_at'>;
+        Update: DeepPartial<Omit<TeacherNotification, 'id' | 'created_at'>>;
       };
     };
     Views: {
@@ -937,7 +1019,7 @@ export const isAssessmentBand = (value: unknown): value is AssessmentBand => {
 export const FORMULA_LEVELS = {
   MIN: 1,
   MAX: 67,
-  PARAGRAPH_UNLOCK: 8,
+  PARAGRAPH_UNLOCK: 4, // Phase 1: mastery-gated, structural richness check from L4
   WRITING_UNLOCK: 35, // Approximate
 } as const;
 
