@@ -996,10 +996,8 @@ export default function DashboardPage() {
   }
 
   // ── node click ──────────────────────────────────────────────────────────────
-  const handleNodeClick = (level: number, node: NodeType) => {
-    // In the full implementation this would navigate to the formula practice page
-    // For now, just a placeholder
-    console.log('Navigate to level', level, 'node', node)
+  const handleNodeClick = (_level: number, _node: NodeType) => {
+    navigate('/practice')
   }
 
   // ── derived data ────────────────────────────────────────────────────────────
