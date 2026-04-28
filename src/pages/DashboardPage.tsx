@@ -15,10 +15,10 @@
  *   • Separate XP (learning) and Coins (cosmetics) currencies
  */
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { WritzAvatar, type AvatarVariantId } from '../components/WritzAvatar'
@@ -77,10 +77,6 @@ const C = {
 /** Total number of node steps before a given level within its chapter */
 const NODE_TYPES = ['learn', 'build', 'practice', 'master'] as const
 type NodeType = typeof NODE_TYPES[number]
-
-function nodeKey(level: number, nodeType: NodeType) {
-  return `${level}-${nodeType}`
-}
 
 /** Pixel offset for meander: alternates left / right on mobile */
 function meandX(idx: number): number {
@@ -376,7 +372,7 @@ interface BadgesProps {
   currentLevel: number
 }
 
-const BadgesSection: React.FC<BadgesProps> = ({ earnedBadgeIds, currentLevel }) => {
+const BadgesSection: React.FC<BadgesProps> = ({ earnedBadgeIds, currentLevel: _currentLevel }) => {
   const groups: { key: BadgeGroup; label: string; subLabel: string; emoji: string }[] = [
     { key: 'prior',   label: 'What you\'ve learned',  subLabel: 'Badges you\'ve earned',         emoji: '✅' },
     { key: 'current', label: 'What you\'re learning', subLabel: 'Earn these right now',          emoji: '🎯' },
@@ -578,7 +574,7 @@ const LearningPath: React.FC<LearningPathProps> = ({ currentLevel, onNodeClick }
 
   return (
     <div style={{ position: 'relative', padding: '24px 0 80px' }}>
-      {CHAPTERS.map((chapter, ci) => {
+      {CHAPTERS.map((chapter) => {
         const chapterLevels = getLevelsForChapter(chapter)
         const chapterMax = chapter.levelRange[1]
         const chapterMin = chapter.levelRange[0]
@@ -675,14 +671,13 @@ const LearningPath: React.FC<LearningPathProps> = ({ currentLevel, onNodeClick }
 interface TopBarProps {
   name: string
   avatarId: AvatarVariantId
-  xp: number
   streak: number
   coins: number
   onOpenWardrobe: () => void
   onLogout: () => void
 }
 
-const TopBar: React.FC<TopBarProps> = ({ name, avatarId, xp, streak, coins, onOpenWardrobe, onLogout }) => (
+const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWardrobe, onLogout }) => (
   <div style={{
     position: 'sticky',
     top: 0,
@@ -755,16 +750,19 @@ export default function DashboardPage() {
   const navigate = useNavigate()
   const { user, profile } = useAuthStore()
   const [wardrobeOpen, setWardrobeOpen] = useState(false)
+  // Profile is typed without the new selected_avatar column; cast through any
+  const profileAny = profile as (typeof profile & { selected_avatar?: string }) | null
   const [selectedAvatar, setSelectedAvatar] = useState<AvatarVariantId>(
-    (profile?.selected_avatar as AvatarVariantId) ?? 'wizard'
+    (profileAny?.selected_avatar as AvatarVariantId) ?? 'wizard'
   )
 
   // Sync avatar from profile when it loads
   useEffect(() => {
-    if (profile?.selected_avatar) {
-      setSelectedAvatar(profile.selected_avatar as AvatarVariantId)
+    if (profileAny?.selected_avatar) {
+      setSelectedAvatar(profileAny.selected_avatar as AvatarVariantId)
     }
-  }, [profile?.selected_avatar])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileAny?.selected_avatar])
 
   const pupilId = user?.id ?? ''
 
@@ -874,7 +872,6 @@ export default function DashboardPage() {
       <TopBar
         name={name}
         avatarId={avatarId}
-        xp={totalXp}
         streak={streak}
         coins={coins}
         onOpenWardrobe={() => setWardrobeOpen(true)}
