@@ -124,7 +124,8 @@ const DEFAULT_THRESHOLDS = NC_YEAR_GROUP_BANDS[4]
 
 /** Get the NC band for a pupil based on their current level and year group */
 export function getNcBand(level: number, yearGroup?: number | null): NCBand {
-  const thresholds = (yearGroup && NC_YEAR_GROUP_BANDS[yearGroup]) ?? DEFAULT_THRESHOLDS
+  const thresholds =
+    yearGroup != null ? (NC_YEAR_GROUP_BANDS[yearGroup] ?? DEFAULT_THRESHOLDS) : DEFAULT_THRESHOLDS
   if (level <= thresholds.below[1]) return 'below'
   if (level <= thresholds.working[1]) return 'working'
   if (level <= thresholds.meeting[1]) return 'meeting'
