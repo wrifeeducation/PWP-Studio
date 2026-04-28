@@ -195,8 +195,7 @@ const LevelNode: React.FC<LevelNodeProps> = ({
     isDone   ? '✓' :
     isActive ? chapterEmoji :
     isNext   ? chapterEmoji :
-    tier === 'upcoming' ? chapterEmoji :
-    '·'
+    chapterEmoji
 
   const labelRight = cx <= 150
   const labelX = labelRight ? cx + r + 8 : cx - r - 8
@@ -206,8 +205,7 @@ const LevelNode: React.FC<LevelNodeProps> = ({
     isDone   ? `L${level}` :
     isActive ? `Level ${level}` :
     isNext   ? `Level ${level}` :
-    tier === 'upcoming' ? `L${level}` :
-    ''
+    `L${level}`
 
   const labelColour =
     isDone   ? C.muted :
