@@ -3,13 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 
-const ADMIN_EMAILS = [
-  'mankrah@kafed.org.uk',
-  'wrife.education@gmail.com',
-  'miyk99@gmail.com',
-  'admin@wrife-test.com',
-]
-
 export default function AdminLoginPage() {
   const navigate = useNavigate()
   const { session, profile, isLoading } = useAuthStore()
@@ -52,11 +45,6 @@ export default function AdminLoginPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
-
-    if (!ADMIN_EMAILS.includes(email.trim().toLowerCase())) {
-      setError('This email is not authorised for admin access.')
-      return
-    }
 
     setLoading(true)
     const { error: signInError } = await supabase.auth.signInWithPassword({
