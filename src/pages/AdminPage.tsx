@@ -1423,9 +1423,15 @@ function AdminsTab() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const result = await adminAction('list_admins', {})
-    if (result?.admins) setAdmins(result.admins)
-    setLoading(false)
+    try {
+      const result = await adminAction('list_admins', {})
+      if (result?.admins) setAdmins(result.admins)
+    } catch (e) {
+      // Edge Function may not be redeployed yet — show empty state gracefully
+      console.error('list_admins failed:', e)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -1440,34 +1446,44 @@ function AdminsTab() {
     if (!form.email.trim()) return
     setSubmitting(true)
     setMsg(null)
-    const result = await adminAction('create_admin', {
-      email: form.email.trim(),
-      firstName: form.firstName.trim() || undefined,
-      password: form.password.trim() || undefined,
-    })
-    if (result?.error) {
-      setMsg({ type: 'err', text: result.error })
-    } else if (result?.upgraded) {
-      setMsg({ type: 'ok', text: `Existing user upgraded to admin.` })
-      setForm({ email: '', firstName: '', password: '' })
-      load()
-    } else if (result?.created) {
-      const pwd = result.tempPassword ? ` Temporary password: ${result.tempPassword}` : ''
-      setMsg({ type: 'ok', text: `Admin created.${pwd} Ask them to change their password after first login.` })
-      setForm({ email: '', firstName: '', password: '' })
-      load()
+    try {
+      const result = await adminAction('create_admin', {
+        email: form.email.trim(),
+        firstName: form.firstName.trim() || undefined,
+        password: form.password.trim() || undefined,
+      })
+      if (result?.upgraded) {
+        setMsg({ type: 'ok', text: 'Existing user upgraded to admin.' })
+        setForm({ email: '', firstName: '', password: '' })
+        load()
+      } else if (result?.created) {
+        const pwd = result.tempPassword
+          ? ` Temporary password: ${result.tempPassword}`
+          : ''
+        setMsg({
+          type: 'ok',
+          text: `Admin created.${pwd} Ask them to change their password after first login.`,
+        })
+        setForm({ email: '', firstName: '', password: '' })
+        load()
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Something went wrong — please try again.'
+      setMsg({ type: 'err', text: msg })
+    } finally {
+      setSubmitting(false)
     }
-    setSubmitting(false)
   }
 
   const handleRevoke = async (adminId: string, adminEmail: string) => {
     if (!window.confirm(`Remove admin access for ${adminEmail}? They will be downgraded to Teacher.`)) return
-    const result = await adminAction('revoke_admin', { userId: adminId, callerUserId: currentUserId })
-    if (result?.error) {
-      setMsg({ type: 'err', text: result.error })
-    } else {
+    try {
+      await adminAction('revoke_admin', { userId: adminId, callerUserId: currentUserId })
       setMsg({ type: 'ok', text: `Admin access revoked for ${adminEmail}.` })
       load()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Something went wrong.'
+      setMsg({ type: 'err', text: msg })
     }
   }
 
