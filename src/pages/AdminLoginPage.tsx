@@ -37,22 +37,8 @@ export default function AdminLoginPage() {
       return
     }
 
-    // Verify role in profiles
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { setError('Sign-in failed. Please try again.'); return }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .single()
-
-    if (!profile || profile.role !== 'admin') {
-      await supabase.auth.signOut()
-      setError('Your account does not have admin privileges.')
-      return
-    }
-
+    // ADMIN_EMAILS check above is the security gate.
+    // ProtectedRoute on /admin enforces Role.ADMIN as the second layer.
     navigate('/admin')
   }
 
