@@ -7,6 +7,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import type { FormulaLevel } from '../../types/index'
+import { MIN_SESSIONS_TO_ADVANCE } from '../../lib/progressionEngine'
 
 // ─── Chapter colour lookup (mirrors chapters.ts palette) ─────────────────────
 
@@ -50,20 +51,23 @@ const ScoreRing: React.FC<{ score: number; colour: string }> = ({ score, colour 
   )
 }
 
-// ─── Mastery progress bar ─────────────────────────────────────────────────────
+// ─── Level progress bar ───────────────────────────────────────────────────────
 
-const MasteryBar: React.FC<{
+const LevelProgressBar: React.FC<{
   sessionsCompleted: number
-  gateThreshold: number
+  sessionsToAdvance: number
   colour: string
-}> = ({ sessionsCompleted, gateThreshold, colour }) => {
-  const pct = Math.min(100, Math.round((sessionsCompleted / gateThreshold) * 100))
+}> = ({ sessionsCompleted, sessionsToAdvance, colour }) => {
+  const pct = Math.min(100, Math.round((sessionsCompleted / sessionsToAdvance) * 100))
+  const done = sessionsCompleted >= sessionsToAdvance
+  const remaining = Math.max(0, sessionsToAdvance - sessionsCompleted)
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#2D3436' }}>Level mastery</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#2D3436' }}>Level progress</span>
         <span style={{ fontSize: 12, fontWeight: 700, color: colour }}>
-          {sessionsCompleted}/{gateThreshold} sessions
+          {Math.min(sessionsCompleted, sessionsToAdvance)}/{sessionsToAdvance} sessions
         </span>
       </div>
       <div style={{
@@ -77,9 +81,9 @@ const MasteryBar: React.FC<{
         />
       </div>
       <p style={{ fontSize: 11, color: '#8E9BAE', marginTop: 5 }}>
-        {pct >= 100
-          ? '🎉 Gate passed — ready to advance!'
-          : `Keep practising to unlock the next level`}
+        {done
+          ? '🚀 Level complete — moving to the next level!'
+          : `${remaining} more session${remaining === 1 ? '' : 's'} and you'll move on automatically`}
       </p>
     </div>
   )
@@ -118,8 +122,6 @@ export const WhatsNext: React.FC<WhatsNextProps> = ({
   onDashboard,
 }) => {
   const colour = CHAPTER_COLOUR_FOR_LEVEL(level.id)
-  // Mastery gate threshold: 3 sessions with avg >= 80 to advance
-  const GATE_THRESHOLD = 3
 
   const scoreLabel =
     score >= 90 ? '🌟 Outstanding!' :
@@ -245,9 +247,9 @@ export const WhatsNext: React.FC<WhatsNextProps> = ({
         padding: '16px 18px',
         marginBottom: 24,
       }}>
-        <MasteryBar
+        <LevelProgressBar
           sessionsCompleted={sessionsCompleted}
-          gateThreshold={GATE_THRESHOLD}
+          sessionsToAdvance={MIN_SESSIONS_TO_ADVANCE}
           colour={colour}
         />
       </div>

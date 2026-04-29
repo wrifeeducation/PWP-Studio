@@ -8,19 +8,27 @@ import type { MasteryTracking } from '../types/index'
 // ─── constants ────────────────────────────────────────────────────────────────
 
 const MAX_LEVEL = 67
-// Phase 1: structural gate at L4 (mastery criteria are the real lock — see §4.2)
+// Phase 1: structural gate at L4
 const PARAGRAPH_UNLOCK_LEVEL = 4
 const WRITING_STUDIO_UNLOCK_LEVEL = 35
-// Minimum levels mastered before Paragraph Builder can unlock (Criterion C)
-const PARAGRAPH_MIN_LEVELS_MASTERED = 2
+
+/**
+ * Progressive Depth model (Phase A):
+ * Pupils auto-advance after completing this many sessions at a level,
+ * regardless of score. No score gate — forward momentum is always maintained.
+ * Mastery scores are tracked silently for teacher insight only.
+ */
+export const MIN_SESSIONS_TO_ADVANCE = 3
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 /**
- * Returns true if the mastery gate has been passed (trigger advancement).
+ * Progressive Depth model: advance after MIN_SESSIONS_TO_ADVANCE sessions,
+ * regardless of score. No gate — pupils always move forward after enough practice.
+ * The consolidation_required flag is surfaced to teachers but never blocks progression.
  */
-export const shouldAdvance = (mastery: Pick<MasteryTracking, 'gate_passed' | 'consolidation_required'>): boolean => {
-  return mastery.gate_passed && !mastery.consolidation_required
+export const shouldAdvance = (mastery: Pick<MasteryTracking, 'sessions_completed'>): boolean => {
+  return (mastery.sessions_completed ?? 0) >= MIN_SESSIONS_TO_ADVANCE
 }
 
 /**
@@ -48,21 +56,16 @@ export const isParagraphUnlocked = (level: number): boolean => {
 }
 
 /**
- * Full mastery-based Paragraph Builder unlock check (§4.2):
- *   A) Structural richness: level ≥ 4 (paragraph_active = true in DB)
- *   B) Formula mastery: gate_passed on current level
- *   C) Pattern variety: ≥ 2 levels mastered in total
+ * Paragraph Builder unlock check:
+ * Unlocks automatically when a pupil reaches L4+ — no score gate required.
+ * The structural level progression ensures readiness by the time they arrive here.
  */
 export const checkParagraphMasteryUnlock = (
   currentLevel: number,
-  gatePassed: boolean,
-  levelsMasteredCount: number
+  _gatePassed: boolean,
+  _levelsMasteredCount: number
 ): boolean => {
-  return (
-    currentLevel >= PARAGRAPH_UNLOCK_LEVEL &&
-    gatePassed &&
-    levelsMasteredCount >= PARAGRAPH_MIN_LEVELS_MASTERED
-  )
+  return currentLevel >= PARAGRAPH_UNLOCK_LEVEL
 }
 
 /**
