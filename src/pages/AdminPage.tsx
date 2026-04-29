@@ -747,6 +747,16 @@ function PupilsTab() {
     } finally { setSaving(false) }
   }
 
+  const changeTier = async (userId: string, tier: string) => {
+    setSaving(true); setError('')
+    try {
+      await adminAction('change_tier', { userId, tier })
+      await load(); setSelected(null)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to update tier')
+    } finally { setSaving(false) }
+  }
+
   const resetPin = async (userId: string, pin: string) => {
     if (!pin || pin.length < 4) { setError('PIN must be at least 4 digits'); return }
     setSaving(true); setError('')
@@ -823,6 +833,18 @@ function PupilsTab() {
               PIN: <strong>{(selected as Profile & { pin_code?: string }).pin_code ?? '—'}</strong> · Year: {selected.year_group ?? '—'}
             </p>
 
+            <Field label="Membership Tier">
+              <Select
+                value={selected.membership_tier}
+                onChange={v => setSelected(s => s ? { ...s, membership_tier: v } : s)}
+                options={[
+                  { label: 'Free (3 sessions/day)', value: 'free' },
+                  { label: 'Pro (unlimited)', value: 'pro' },
+                  { label: 'School (via school plan)', value: 'school' },
+                ]}
+              />
+            </Field>
+
             <Field label="Reset PIN">
               <Input value={newPin} onChange={setNewPin} placeholder="Enter new 4–6 digit PIN" type="text" />
             </Field>
@@ -830,7 +852,10 @@ function PupilsTab() {
             {error && <p className="text-xs text-red-600">{error}</p>}
 
             <div className="flex flex-wrap gap-2 mt-2">
-              <PrimaryBtn onClick={() => resetPin(selected.id, newPin)} disabled={saving || !newPin}>
+              <PrimaryBtn onClick={() => changeTier(selected.id, selected.membership_tier)} disabled={saving}>
+                {saving ? 'Saving…' : 'Save Tier'}
+              </PrimaryBtn>
+              <PrimaryBtn onClick={() => resetPin(selected.id, newPin)} disabled={saving || !newPin} variant="ghost">
                 {saving ? 'Saving…' : 'Set PIN'}
               </PrimaryBtn>
               <PrimaryBtn
@@ -1182,6 +1207,201 @@ function TeachersTab() {
   )
 }
 
+// ─── Access Tab (universal tier upgrade) ─────────────────────────────────────
+
+interface AnyUser {
+  id: string
+  first_name: string
+  role: string
+  membership_tier: string
+  is_active: boolean
+  year_group?: number | null
+  pin_code?: string | null
+  created_at: string
+}
+
+function AccessTab() {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<AnyUser[]>([])
+  const [searching, setSearching] = useState(false)
+  const [saving, setSaving] = useState<string | null>(null) // userId being saved
+  const [pendingTiers, setPendingTiers] = useState<Record<string, string>>({})
+  const [messages, setMessages] = useState<Record<string, string>>({})
+  const [searchDone, setSearchDone] = useState(false)
+
+  const search = async () => {
+    if (!query.trim()) return
+    setSearching(true); setSearchDone(false)
+    try {
+      // Search across all profile roles by first_name or pin_code
+      const q = query.trim().toLowerCase()
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, first_name, role, membership_tier, is_active, year_group, pin_code, created_at')
+        .or(`first_name.ilike.%${q}%,pin_code.eq.${q}`)
+        .order('created_at', { ascending: false })
+        .limit(30)
+      setResults((data as AnyUser[]) ?? [])
+    } finally {
+      setSearching(false)
+      setSearchDone(true)
+    }
+  }
+
+  const upgradeTier = async (userId: string) => {
+    const tier = pendingTiers[userId]
+    if (!tier) return
+    setSaving(userId)
+    try {
+      await adminAction('change_tier', { userId, tier })
+      setMessages(m => ({ ...m, [userId]: `✅ Updated to ${tier}` }))
+      // Refresh local result
+      setResults(r => r.map(u => u.id === userId ? { ...u, membership_tier: tier } : u))
+      setTimeout(() => setMessages(m => { const n = { ...m }; delete n[userId]; return n }), 3000)
+    } catch (e: unknown) {
+      setMessages(m => ({ ...m, [userId]: `❌ ${e instanceof Error ? e.message : 'Failed'}` }))
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  const TIER_COLOUR: Record<string, string> = {
+    free:   '#6B7280',
+    pro:    '#065f46',
+    school: '#1e40af',
+  }
+
+  return (
+    <div className="max-w-2xl">
+      <div className="mb-4">
+        <p className="text-sm mb-3" style={{ color: 'var(--color-text-muted)' }}>
+          Search for any user by name or PIN, then upgrade their access tier in one click.
+          Use this to grant Pro or School access to early testers, pilot schools, or anyone
+          who needs access before Stripe checkout is live.
+        </p>
+        <div className="flex gap-2">
+          <Input
+            value={query}
+            onChange={setQuery}
+            placeholder="Name, first name, or PIN…"
+          />
+          <PrimaryBtn onClick={search} disabled={searching || !query.trim()}>
+            {searching ? 'Searching…' : 'Search'}
+          </PrimaryBtn>
+        </div>
+      </div>
+
+      {searchDone && results.length === 0 && (
+        <p className="text-sm py-4" style={{ color: 'var(--color-text-muted)' }}>No users found for "{query}".</p>
+      )}
+
+      {results.length > 0 && (
+        <div className="flex flex-col gap-3">
+          {results.map(u => {
+            const pendingTier = pendingTiers[u.id] ?? u.membership_tier
+            const isDirty = pendingTier !== u.membership_tier
+            const isSaving = saving === u.id
+            const msg = messages[u.id]
+
+            return (
+              <div
+                key={u.id}
+                className="rounded-xl p-4"
+                style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)' }}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  {/* Identity */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <span className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>
+                        {u.first_name ?? '—'}
+                      </span>
+                      <Badge value={u.role} type="role" />
+                      {u.pin_code && (
+                        <span className="font-mono text-xs font-bold px-2 py-0.5 rounded"
+                          style={{ background: '#EFF6FF', color: '#1D4ED8' }}>
+                          PIN {u.pin_code}
+                        </span>
+                      )}
+                      {u.year_group && (
+                        <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                          Yr {u.year_group}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-xs font-bold" style={{ color: TIER_COLOUR[u.membership_tier] ?? '#6B7280' }}>
+                        Current: {u.membership_tier}
+                      </span>
+                      {!u.is_active && (
+                        <span className="text-xs font-medium text-red-500 ml-1">· inactive</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tier picker + save */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div style={{ minWidth: 160 }}>
+                      <Select
+                        value={pendingTier}
+                        onChange={v => setPendingTiers(t => ({ ...t, [u.id]: v }))}
+                        options={[
+                          { label: '🔒 Free', value: 'free' },
+                          { label: '⭐ Pro', value: 'pro' },
+                          { label: '🏫 School', value: 'school' },
+                        ]}
+                      />
+                    </div>
+                    <PrimaryBtn
+                      size="sm"
+                      disabled={!isDirty || isSaving}
+                      onClick={() => upgradeTier(u.id)}
+                    >
+                      {isSaving ? '…' : 'Save'}
+                    </PrimaryBtn>
+                  </div>
+                </div>
+
+                {msg && (
+                  <p className="text-xs mt-2 font-medium" style={{ color: msg.startsWith('✅') ? '#065f46' : '#991b1b' }}>
+                    {msg}
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Quick bulk actions */}
+      {results.length > 1 && (
+        <div className="mt-4 p-3 rounded-lg flex flex-wrap items-center gap-2"
+          style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+            Bulk set all {results.length} results to:
+          </span>
+          {(['free', 'pro', 'school'] as const).map(tier => (
+            <button
+              key={tier}
+              onClick={() => setPendingTiers(Object.fromEntries(results.map(u => [u.id, tier])))}
+              className="text-xs font-semibold px-2 py-1 rounded-full capitalize"
+              style={{
+                background: tier === 'pro' ? '#d1fae5' : tier === 'school' ? '#dbeafe' : '#e5e7eb',
+                color: tier === 'pro' ? '#065f46' : tier === 'school' ? '#1e40af' : '#374151',
+              }}
+            >
+              {tier}
+            </button>
+          ))}
+          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            — then click Save on each row
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Analytics Tab ────────────────────────────────────────────────────────────
 function AnalyticsTab() {
   const [stats, setStats] = useState({
@@ -1315,6 +1535,7 @@ function PasswordsTab() {
 
 // ─── Main AdminPage ───────────────────────────────────────────────────────────
 const TABS = [
+  { id: 'access',    label: '⭐ Access' },
   { id: 'analytics', label: '📊 Analytics' },
   { id: 'schools',   label: '🏫 Schools' },
   { id: 'teachers',  label: '👩‍🏫 Teachers' },
@@ -1328,7 +1549,7 @@ type TabId = typeof TABS[number]['id']
 export default function AdminPage() {
   const navigate = useNavigate()
   const [userEmail, setUserEmail] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<TabId>('analytics')
+  const [activeTab, setActiveTab] = useState<TabId>('access')
   const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
@@ -1410,6 +1631,7 @@ export default function AdminPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
         >
+          {activeTab === 'access'    && <AccessTab />}
           {activeTab === 'analytics' && <AnalyticsTab />}
           {activeTab === 'schools'   && <SchoolsTab />}
           {activeTab === 'teachers'  && <TeachersTab />}
