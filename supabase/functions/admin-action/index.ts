@@ -307,6 +307,59 @@ Deno.serve(async (req: Request) => {
       return ok({ created: true, userId: invited?.user?.id ?? null })
     }
 
+    if (action === 'create_pupil') {
+      // Create a pupil account without email — PIN-based auth only.
+      // Routes: admin, teacher, or parent (all call this endpoint).
+      // Generates a unique 4-digit PIN, creates auth user with synthetic email
+      // pupil-{pin}@wrife.school, stores PIN in profiles.pin_code.
+      const { firstName, yearGroup, schoolId, classId } = payload
+      if (!firstName) return err('firstName is required')
+
+      // Generate a unique 4-digit PIN
+      let pin = ''
+      let attempts = 0
+      while (attempts < 20) {
+        const candidate = String(Math.floor(1000 + Math.random() * 9000))
+        const syntheticEmail = `pupil-${candidate}@wrife.school`
+        const { data: existing } = await admin.auth.admin.listUsers()
+        const taken = existing?.users?.some(u => u.email === syntheticEmail)
+        if (!taken) { pin = candidate; break }
+        attempts++
+      }
+      if (!pin) return err('Could not generate a unique PIN — please try again')
+
+      const syntheticEmail = `pupil-${pin}@wrife.school`
+
+      // Create auth user with PIN as password
+      const { data: newUser, error: createError } = await admin.auth.admin.createUser({
+        email: syntheticEmail,
+        password: pin,
+        email_confirm: true,
+        user_metadata: {
+          first_name: firstName,
+          role: 'pupil',
+          school_id: schoolId || null,
+        },
+      })
+      if (createError) return err(createError.message)
+
+      if (newUser?.user) {
+        await admin.from('profiles').upsert({
+          id: newUser.user.id,
+          role: 'pupil',
+          first_name: firstName.trim(),
+          year_group: yearGroup || null,
+          school_id: schoolId || null,
+          class_id: classId || null,
+          pin_code: pin,
+          membership_tier: 'free',
+          is_active: true,
+        }, { onConflict: 'id', ignoreDuplicates: true })
+      }
+
+      return ok({ created: true, userId: newUser?.user?.id ?? null, pin, syntheticEmail })
+    }
+
     return err(`Unknown action: ${action}`)
 
   } catch (e: unknown) {

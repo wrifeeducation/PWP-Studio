@@ -715,7 +715,8 @@ function PupilsTab() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
-  const [newForm, setNewForm] = useState({ email: '', fullName: '', yearGroup: '' })
+  const [newForm, setNewForm] = useState({ firstName: '', yearGroup: '', schoolId: '' })
+  const [createdPin, setCreatedPin] = useState<string | null>(null)
   const [newPin, setNewPin] = useState('')
 
   const load = useCallback(async () => {
@@ -732,8 +733,8 @@ function PupilsTab() {
   useEffect(() => { load() }, [load])
 
   const filtered = pupils.filter(p =>
-    !search || (p.email ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (p.first_name ?? '').toLowerCase().includes(search.toLowerCase())
+    !search || (p.first_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    String(p.year_group ?? '').includes(search)
   )
 
   const toggleActive = async (userId: string, activate: boolean) => {
@@ -759,18 +760,16 @@ function PupilsTab() {
   }
 
   const createPupil = async () => {
-    if (!newForm.email.trim()) { setError('Email is required'); return }
+    if (!newForm.firstName.trim()) { setError('First name is required'); return }
     setSaving(true); setError('')
     try {
-      await adminAction('create_user', {
-        email: newForm.email.trim(),
-        fullName: newForm.fullName.trim() || null,
-        role: 'pupil',
+      const result = await adminAction('create_pupil', {
+        firstName: newForm.firstName.trim(),
         yearGroup: newForm.yearGroup || null,
-        membershipTier: 'free',
+        schoolId: newForm.schoolId || null,
       })
-      setShowCreate(false)
-      setNewForm({ email: '', fullName: '', yearGroup: '' })
+      setCreatedPin(result.pin)
+      setNewForm({ firstName: '', yearGroup: '', schoolId: '' })
       await load()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to create pupil')
@@ -790,7 +789,7 @@ function PupilsTab() {
         <table className="w-full text-sm">
           <thead>
             <tr style={{ backgroundColor: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}>
-              {['Name', 'Email', 'Year', 'Status', 'Joined', ''].map(h => (
+              {['Name', 'PIN', 'Year', 'Status', 'Joined', ''].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{h}</th>
               ))}
             </tr>
@@ -799,7 +798,9 @@ function PupilsTab() {
             {filtered.map((p, i) => (
               <tr key={p.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                 <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>{p.first_name ?? '—'}</td>
-                <td className="px-4 py-3" style={{ color: 'var(--color-text-muted)' }}>{p.email}</td>
+                <td className="px-4 py-3 font-mono font-bold" style={{ color: 'var(--color-brand-primary)', letterSpacing: '0.12em' }}>
+                  {(p as Profile & { pin_code?: string }).pin_code ?? '—'}
+                </td>
                 <td className="px-4 py-3" style={{ color: 'var(--color-text-muted)' }}>{p.year_group ?? '—'}</td>
                 <td className="px-4 py-3"><Badge value={p.is_active ? 'active' : 'inactive'} type="status" /></td>
                 <td className="px-4 py-3" style={{ color: 'var(--color-text-muted)' }}>{new Date(p.created_at).toLocaleDateString('en-GB')}</td>
@@ -816,9 +817,11 @@ function PupilsTab() {
       </div>
 
       {selected && (
-        <Modal title={`Manage: ${selected.first_name ?? selected.email}`} onClose={() => setSelected(null)}>
+        <Modal title={`Manage: ${selected.first_name ?? 'Pupil'}`} onClose={() => setSelected(null)}>
           <div className="flex flex-col gap-3">
-            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{selected.email} · Year: {selected.year_group ?? '—'}</p>
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              PIN: <strong>{(selected as Profile & { pin_code?: string }).pin_code ?? '—'}</strong> · Year: {selected.year_group ?? '—'}
+            </p>
 
             <Field label="Reset PIN">
               <Input value={newPin} onChange={setNewPin} placeholder="Enter new 4–6 digit PIN" type="text" />
@@ -842,14 +845,14 @@ function PupilsTab() {
         </Modal>
       )}
 
-      {showCreate && (
+      {showCreate && !createdPin && (
         <Modal title="Create Pupil Account" onClose={() => setShowCreate(false)}>
           <div className="flex flex-col gap-3">
-            <Field label="Email *">
-              <Input value={newForm.email} onChange={v => setNewForm(f => ({ ...f, email: v }))} placeholder="pupil@school.co.uk" type="email" />
-            </Field>
-            <Field label="Full Name">
-              <Input value={newForm.fullName} onChange={v => setNewForm(f => ({ ...f, fullName: v }))} placeholder="Alex Johnson" />
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              No email needed. A unique PIN will be generated automatically — share it with the pupil to log in.
+            </p>
+            <Field label="First Name *">
+              <Input value={newForm.firstName} onChange={v => setNewForm(f => ({ ...f, firstName: v }))} placeholder="Alex" />
             </Field>
             <Field label="Year Group">
               <Select
@@ -864,8 +867,33 @@ function PupilsTab() {
             {error && <p className="text-xs text-red-600">{error}</p>}
             <div className="flex gap-2 justify-end mt-2">
               <PrimaryBtn variant="ghost" onClick={() => setShowCreate(false)}>Cancel</PrimaryBtn>
-              <PrimaryBtn onClick={createPupil} disabled={saving}>{saving ? 'Creating…' : 'Create & Send Invite'}</PrimaryBtn>
+              <PrimaryBtn onClick={createPupil} disabled={saving}>{saving ? 'Creating…' : 'Create Pupil'}</PrimaryBtn>
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {createdPin && (
+        <Modal title="✅ Pupil Created" onClose={() => { setCreatedPin(null); setShowCreate(false) }}>
+          <div className="flex flex-col gap-4 items-center text-center py-2">
+            <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+              Share this PIN with the pupil. They use it to log in — no email required.
+            </p>
+            <div style={{
+              fontSize: 48,
+              fontWeight: 800,
+              fontFamily: 'monospace',
+              letterSpacing: '0.2em',
+              color: 'var(--color-brand-primary)',
+              background: 'var(--color-surface)',
+              border: '2px solid var(--color-border)',
+              borderRadius: 16,
+              padding: '16px 32px',
+            }}>
+              {createdPin}
+            </div>
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Login: pupil-{createdPin}@wrife.school · Password: {createdPin}</p>
+            <PrimaryBtn onClick={() => { setCreatedPin(null); setShowCreate(false) }}>Done</PrimaryBtn>
           </div>
         </Modal>
       )}
