@@ -1402,6 +1402,212 @@ function AccessTab() {
   )
 }
 
+// ─── Admins Tab ───────────────────────────────────────────────────────────────
+
+interface AdminRow {
+  id: string
+  email: string
+  first_name: string
+  is_active: boolean
+  created_at: string
+  isSuperAdmin: boolean
+}
+
+function AdminsTab() {
+  const [admins, setAdmins] = useState<AdminRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [form, setForm] = useState({ email: '', firstName: '', password: '' })
+  const [submitting, setSubmitting] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const result = await adminAction('list_admins', {})
+    if (result?.admins) setAdmins(result.admins)
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    load()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUserId(session?.user?.id ?? null)
+    })
+  }, [load])
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!form.email.trim()) return
+    setSubmitting(true)
+    setMsg(null)
+    const result = await adminAction('create_admin', {
+      email: form.email.trim(),
+      firstName: form.firstName.trim() || undefined,
+      password: form.password.trim() || undefined,
+    })
+    if (result?.error) {
+      setMsg({ type: 'err', text: result.error })
+    } else if (result?.upgraded) {
+      setMsg({ type: 'ok', text: `Existing user upgraded to admin.` })
+      setForm({ email: '', firstName: '', password: '' })
+      load()
+    } else if (result?.created) {
+      const pwd = result.tempPassword ? ` Temporary password: ${result.tempPassword}` : ''
+      setMsg({ type: 'ok', text: `Admin created.${pwd} Ask them to change their password after first login.` })
+      setForm({ email: '', firstName: '', password: '' })
+      load()
+    }
+    setSubmitting(false)
+  }
+
+  const handleRevoke = async (adminId: string, adminEmail: string) => {
+    if (!window.confirm(`Remove admin access for ${adminEmail}? They will be downgraded to Teacher.`)) return
+    const result = await adminAction('revoke_admin', { userId: adminId, callerUserId: currentUserId })
+    if (result?.error) {
+      setMsg({ type: 'err', text: result.error })
+    } else {
+      setMsg({ type: 'ok', text: `Admin access revoked for ${adminEmail}.` })
+      load()
+    }
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Warning */}
+      <div className="rounded-xl px-5 py-4 flex gap-3" style={{ background: '#FEF3C7', border: '1px solid #F59E0B' }}>
+        <span className="text-xl">⚠️</span>
+        <div>
+          <p className="font-bold text-sm" style={{ color: '#92400E' }}>Platform admin access</p>
+          <p className="text-sm mt-0.5" style={{ color: '#92400E' }}>
+            Admins have full access to all schools, users, and settings. Only grant this to trusted team members.
+          </p>
+        </div>
+      </div>
+
+      {/* Create form */}
+      <div className="rounded-xl p-6 space-y-4" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+        <h2 className="font-bold text-base" style={{ color: 'var(--color-text)' }}>Add new admin</h2>
+        {msg && (
+          <div
+            className="rounded-lg px-4 py-2.5 text-sm font-medium"
+            style={{
+              background: msg.type === 'ok' ? '#D1FAE5' : '#FEE2E2',
+              color: msg.type === 'ok' ? '#065F46' : '#991B1B',
+            }}
+          >
+            {msg.text}
+          </div>
+        )}
+        <form onSubmit={handleCreate} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--color-text-muted)' }}>
+              Email address *
+            </label>
+            <input
+              type="email"
+              required
+              value={form.email}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              placeholder="new-admin@example.com"
+              className="w-full px-3 py-2 rounded-lg text-sm border focus:outline-none focus:ring-2"
+              style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--color-text-muted)' }}>
+              First name (optional)
+            </label>
+            <input
+              type="text"
+              value={form.firstName}
+              onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+              placeholder="e.g. Sarah"
+              className="w-full px-3 py-2 rounded-lg text-sm border focus:outline-none"
+              style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--color-text-muted)' }}>
+              Password (leave blank to auto-generate)
+            </label>
+            <input
+              type="text"
+              value={form.password}
+              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+              placeholder="Min 8 chars"
+              className="w-full px-3 py-2 rounded-lg text-sm border focus:outline-none"
+              style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <PrimaryBtn type="submit" loading={submitting} disabled={submitting}>
+              Create admin account
+            </PrimaryBtn>
+          </div>
+        </form>
+      </div>
+
+      {/* Existing admins table */}
+      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+        <div className="px-5 py-3 flex items-center justify-between" style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}>
+          <h2 className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>
+            Current admins ({admins.length})
+          </h2>
+          <PrimaryBtn size="sm" variant="ghost" onClick={load}>Refresh</PrimaryBtn>
+        </div>
+        {loading ? (
+          <p className="text-sm p-5" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
+        ) : admins.length === 0 ? (
+          <p className="text-sm p-5" style={{ color: 'var(--color-text-muted)' }}>No admins found.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead style={{ background: '#F9FAFB' }}>
+              <tr>
+                {['Name', 'Email', 'Type', 'Status', 'Actions'].map((h) => (
+                  <th key={h} className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {admins.map((a) => (
+                <tr key={a.id} style={{ borderTop: '1px solid var(--color-border)' }}>
+                  <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>{a.first_name || '—'}</td>
+                  <td className="px-4 py-3" style={{ color: 'var(--color-text-muted)' }}>{a.email}</td>
+                  <td className="px-4 py-3">
+                    {a.isSuperAdmin
+                      ? <Badge value="super-admin" />
+                      : <Badge value="admin" />}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge value={a.is_active ? 'active' : 'inactive'} />
+                  </td>
+                  <td className="px-4 py-3">
+                    {a.isSuperAdmin || a.id === currentUserId ? (
+                      <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                        {a.id === currentUserId ? 'You' : 'Protected'}
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleRevoke(a.id, a.email)}
+                        className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
+                        style={{ background: '#FEE2E2', color: '#991B1B' }}
+                      >
+                        Revoke access
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Analytics Tab ────────────────────────────────────────────────────────────
 function AnalyticsTab() {
   const [stats, setStats] = useState({
@@ -1542,6 +1748,7 @@ const TABS = [
   { id: 'parents',   label: '👨‍👩‍👧 Parents' },
   { id: 'pupils',    label: '🎒 Pupils' },
   { id: 'passwords', label: '🔑 Passwords' },
+  { id: 'admins',    label: '👑 Admins' },
 ] as const
 
 type TabId = typeof TABS[number]['id']
@@ -1553,18 +1760,36 @@ export default function AdminPage() {
   const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       const email = session?.user?.email ?? null
       setUserEmail(email)
-      setAuthChecked(true)
-      if (!email || !ADMIN_EMAILS.includes(email)) {
+
+      if (!email || !session?.user?.id) {
         navigate('/', { replace: true })
+        setAuthChecked(true)
+        return
       }
+
+      // Allow access: hardcoded super-admin emails OR profile role = 'admin'
+      if (!ADMIN_EMAILS.includes(email)) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+        if (profile?.role !== 'admin') {
+          navigate('/', { replace: true })
+          setAuthChecked(true)
+          return
+        }
+      }
+
+      setAuthChecked(true)
     })
   }, [navigate])
 
   if (!authChecked) return null
-  if (!userEmail || !ADMIN_EMAILS.includes(userEmail)) return null
+  if (!userEmail) return null
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -1638,6 +1863,7 @@ export default function AdminPage() {
           {activeTab === 'parents'   && <ParentsTab />}
           {activeTab === 'pupils'    && <PupilsTab />}
           {activeTab === 'passwords' && <PasswordsTab />}
+          {activeTab === 'admins'    && <AdminsTab />}
         </motion.div>
       </main>
     </div>

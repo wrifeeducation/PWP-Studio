@@ -18,6 +18,9 @@
  *   find_user_email       — look up a user id/profile by email (auth.users join)
  *   assign_teacher_to_school — move an independent teacher into a school
  *   create_user           — create a new user account (any role)
+ *   list_admins           — list all platform admin accounts
+ *   create_admin          — create a new admin (or upgrade existing user)
+ *   revoke_admin          — downgrade an admin back to teacher role
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -61,18 +64,29 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    if (!ADMIN_EMAILS.includes(user.email ?? '')) {
-      return new Response(JSON.stringify({ error: 'Forbidden — not an admin account' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
     // ── Service role client ───────────────────────────────────────────────────
     const admin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // ── Admin access check: hardcoded super-admins OR profile role = 'admin' ──
+    // This lets dynamically-created admins call the Edge Function too.
+    let isAuthorizedAdmin = ADMIN_EMAILS.includes(user.email ?? '')
+    if (!isAuthorizedAdmin) {
+      const { data: callerProfile } = await admin
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      isAuthorizedAdmin = callerProfile?.role === 'admin'
+    }
+    if (!isAuthorizedAdmin) {
+      return new Response(JSON.stringify({ error: 'Forbidden — not an admin account' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     const body = await req.json()
     const { action, ...payload } = body
@@ -373,6 +387,103 @@ Deno.serve(async (req: Request) => {
       }
 
       return ok({ created: true, userId: newUser?.user?.id ?? null, pin, syntheticEmail })
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ADMIN MANAGEMENT ACTIONS
+    // ─────────────────────────────────────────────────────────────────────────
+
+    if (action === 'list_admins') {
+      // Return all profiles with role='admin', enriched with auth email
+      const { data: profiles, error: profileError } = await admin
+        .from('profiles')
+        .select('id, first_name, role, is_active, created_at')
+        .eq('role', 'admin')
+        .order('created_at', { ascending: true })
+      if (profileError) return err(profileError.message)
+
+      const { data: authData } = await admin.auth.admin.listUsers()
+      const emailMap = new Map((authData?.users ?? []).map((u) => [u.id, u.email ?? '(unknown)']))
+
+      const admins = (profiles ?? []).map((p) => ({
+        ...p,
+        email: emailMap.get(p.id) ?? '(unknown)',
+        isSuperAdmin: ADMIN_EMAILS.includes(emailMap.get(p.id) ?? ''),
+      }))
+      return ok({ admins })
+    }
+
+    if (action === 'create_admin') {
+      // Create a new platform admin account with email + password.
+      // If the email already belongs to an existing user, upgrade their role.
+      const { email, firstName, password } = payload
+      if (!email) return err('email is required')
+
+      const { data: allUsers } = await admin.auth.admin.listUsers()
+      const existing = allUsers?.users.find(
+        (u) => u.email?.toLowerCase() === email.toLowerCase()
+      )
+
+      if (existing) {
+        // Upgrade existing user to admin role
+        const { error: updateError } = await admin
+          .from('profiles')
+          .update({ role: 'admin' })
+          .eq('id', existing.id)
+        if (updateError) return err(updateError.message)
+        return ok({ created: false, upgraded: true, userId: existing.id })
+      }
+
+      // New user — create with a password so they can log in immediately
+      const name = firstName?.trim() || email.split('@')[0]
+      const tempPassword =
+        password ||
+        `Wr!${Math.random().toString(36).slice(-6)}${Math.floor(10 + Math.random() * 90)}`
+
+      const { data: newUser, error: createError } = await admin.auth.admin.createUser({
+        email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: { first_name: name, role: 'admin' },
+      })
+      if (createError) return err(createError.message)
+
+      await admin.from('profiles').upsert(
+        {
+          id: newUser.user.id,
+          role: 'admin',
+          first_name: name,
+          membership_tier: 'pro',
+          is_active: true,
+        },
+        { onConflict: 'id', ignoreDuplicates: true }
+      )
+
+      return ok({ created: true, userId: newUser.user.id, tempPassword })
+    }
+
+    if (action === 'revoke_admin') {
+      // Downgrade an admin to the 'teacher' role.
+      // Guards: cannot revoke yourself, cannot revoke super-admin (hardcoded email).
+      const { userId, callerUserId } = payload
+      if (!userId) return err('userId is required')
+      if (userId === callerUserId) return err('You cannot revoke your own admin access')
+
+      // Protect hardcoded super-admins
+      const { data: authUser } = await admin.auth.admin.getUserById(userId)
+      if (
+        authUser?.user?.email &&
+        ADMIN_EMAILS.includes(authUser.user.email)
+      ) {
+        return err('Super-admin accounts cannot be revoked via this panel')
+      }
+
+      const { error } = await admin
+        .from('profiles')
+        .update({ role: 'teacher' })
+        .eq('id', userId)
+      if (error) return err(error.message)
+      return ok({ revoked: true })
     }
 
     return err(`Unknown action: ${action}`)
