@@ -16,6 +16,8 @@ import { ParagraphFeedback } from '../components/paragraph/ParagraphFeedback'
 import { Genre, Phase } from '../types/index'
 import paragraphStartersJson from '../../content/paragraph-starters.json'
 import { sanitizeText } from '../lib/sanitize'
+import { useFreemium } from '../hooks/useFreemium'
+import { UpgradePrompt } from '../components/ui/UpgradePrompt'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -85,6 +87,18 @@ export default function ParagraphPage() {
   const location = useLocation()
   const queryClient = useQueryClient()
   const { user, profile } = useAuthStore()
+  const freemium = useFreemium()
+
+  // Freemium gate — Paragraph Builder is pro-only
+  if (!freemium.loading && freemium.isFree) {
+    return (
+      <UpgradePrompt
+        variant="pro"
+        feature="Paragraph Builder"
+        onBack={() => navigate('/dashboard')}
+      />
+    )
+  }
 
   // Props passed from FormulaPage via router state
   const state = location.state as {

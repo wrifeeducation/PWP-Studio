@@ -36,21 +36,27 @@ import { BadgeToast } from '../components/ui/BadgeToast'
 import { LevelUpModal } from '../components/ui/LevelUpModal'
 import { OfflineBanner } from '../components/ui/OfflineBanner'
 import { LensLab } from '../components/formula/LensLab'
+import { WhatsNext } from '../components/formula/WhatsNext'
 import { SessionExpiryBanner } from '../components/ui/SessionExpiryBanner'
 import { CertificateModal } from '../components/ui/CertificateModal'
 import { awardCertificate } from '../lib/certificateEngine'
 import { sanitizeText } from '../lib/sanitize'
 import type { MasteryTracking, Badge, PupilProgress, WordClass } from '../types/index'
 import { DefinitionUnlock } from '../components/gamification/DefinitionUnlock'
+import { useFreemium } from '../hooks/useFreemium'
+import { UpgradePrompt } from '../components/ui/UpgradePrompt'
 
 // ─── Screen states ────────────────────────────────────────────────────────────
 
-type Screen = 'loading' | 'error' | 'concepts' | 'practice' | 'feedback'
+type Screen = 'loading' | 'error' | 'concepts' | 'practice' | 'feedback' | 'whats-next'
 
 export default function FormulaPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user, profile } = useAuthStore()
+
+  // ── Freemium gate ─────────────────────────────────────────────────────────
+  const freemium = useFreemium()
   const { isLoading, isError, data, refetch } = useFormulaLevel()
   const { setAssessing, isAssessing, resetSession } = useFormulaStore()
 
@@ -58,6 +64,8 @@ export default function FormulaPage() {
   const [assessmentResult, setAssessmentResult] = useState<RawAssessmentResult | null>(null)
   const [xpEarned, setXpEarned] = useState(0)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  // Track sessions completed on this level (for WhatsNext mastery bar)
+  const [sessionsCompletedThisLevel, setSessionsCompletedThisLevel] = useState(0)
 
   // Phase 2: mastery state for current level
   const masteryState = useMasteryState(user?.id, data?.level.id)
@@ -239,6 +247,7 @@ export default function FormulaPage() {
       })
 
       setAssessmentResult(raw)
+      setSessionsCompletedThisLevel((masteryState.sessionsOnLevel ?? 0) + 1)
 
       // WF-008: fetch existing mastery row then upsert
       const { data: existingMastery } = await supabase
@@ -607,27 +616,36 @@ export default function FormulaPage() {
     }
   }
 
-  // ─── continue from feedback (no level-up) ───────────────────────────────────
+  // ─── continue from feedback → WhatsNext screen ──────────────────────────────
 
   const handleFeedbackContinue = () => {
     if (showLevelUp) return // Let LevelUpModal handle navigation
-    // Navigate to paragraph if paragraph_active on current level
-    if (data?.level.paragraph_active) {
-      navigate('/paragraph', {
-        state: {
-          leadSentence: data.level.formula_elements
-            .map((el) => useFormulaStore.getState().slotSelections[el.position] ?? '')
-            .filter(Boolean)
-            .join(' '),
-          levelId: data.level.id,
-          formulaScore: assessmentResult?.overall_score ?? 0,
-          phase: data.level.phase,
-          genreRotation: data.level.paragraph_genre_rotation ?? [],
-        },
-      })
-    } else {
-      navigate('/dashboard')
-    }
+    setScreen('whats-next')
+  }
+
+  // ─── WhatsNext CTA handlers ──────────────────────────────────────────────────
+
+  const handleWhatsNextParagraph = () => {
+    if (!data) return
+    navigate('/paragraph', {
+      state: {
+        leadSentence: data.level.formula_elements
+          .map((el) => useFormulaStore.getState().slotSelections[el.position] ?? '')
+          .filter(Boolean)
+          .join(' '),
+        levelId: data.level.id,
+        formulaScore: assessmentResult?.overall_score ?? 0,
+        phase: data.level.phase,
+        genreRotation: data.level.paragraph_genre_rotation ?? [],
+      },
+    })
+  }
+
+  const handleWhatsNextRetry = () => {
+    resetSession()
+    setAssessmentResult(null)
+    setSubmitError(null)
+    setScreen('practice')
   }
 
   // ─── loading state ──────────────────────────────────────────────────────────
@@ -685,6 +703,21 @@ export default function FormulaPage() {
           </button>
         </div>
       </div>
+    )
+  }
+
+  // ─── freemium gate ──────────────────────────────────────────────────────────
+  // Show upgrade prompt if free user has used all their daily sessions.
+  // We still allow the page to render while freemium data is loading.
+
+  if (!freemium.loading && freemium.isAtLimit) {
+    return (
+      <UpgradePrompt
+        variant="limit"
+        playsUsed={freemium.playsToday}
+        playsTotal={3}
+        onBack={() => navigate('/dashboard')}
+      />
     )
   }
 
@@ -795,12 +828,30 @@ export default function FormulaPage() {
           </span>
         </div>
 
-        <div
-          className="text-xs font-semibold px-2 py-1 rounded"
-          style={{ backgroundColor: '#EFF6FF', color: 'var(--color-noun)' }}
-          data-tts={`Level ${data.level.id}`}
-        >
-          L{data.level.id}
+        <div className="flex items-center gap-2">
+          {/* Free tier: plays remaining badge */}
+          {freemium.isFree && !freemium.loading && (
+            <div
+              className="text-xs font-semibold px-2 py-1 rounded"
+              style={{
+                backgroundColor: freemium.playsRemaining <= 1 ? '#FEE2E2' : '#ECFDF5',
+                color: freemium.playsRemaining <= 1 ? '#991B1B' : '#065F46',
+              }}
+              title="Free daily sessions remaining"
+              data-tts={`${freemium.playsRemaining} sessions left today`}
+              data-testid="freemium-counter"
+            >
+              {freemium.playsRemaining}/{3} left
+            </div>
+          )}
+
+          <div
+            className="text-xs font-semibold px-2 py-1 rounded"
+            style={{ backgroundColor: '#EFF6FF', color: 'var(--color-noun)' }}
+            data-tts={`Level ${data.level.id}`}
+          >
+            L{data.level.id}
+          </div>
         </div>
       </header>
 
@@ -872,6 +923,27 @@ export default function FormulaPage() {
             }
             onRetry={handleRetry}
             onContinue={handleFeedbackContinue}
+          />
+        )}
+
+        {screen === 'whats-next' && assessmentResult && (
+          <WhatsNext
+            level={data.level}
+            score={assessmentResult.overall_score}
+            xpEarned={xpEarned}
+            sessionsCompleted={sessionsCompletedThisLevel}
+            paragraphActive={data.level.paragraph_active ?? false}
+            writingUnlocked={false}
+            leadSentence={
+              data.level.formula_elements
+                .map((el) => useFormulaStore.getState().slotSelections[el.position] ?? '')
+                .filter(Boolean)
+                .join(' ')
+            }
+            formulaScore={assessmentResult.overall_score}
+            onParagraph={handleWhatsNextParagraph}
+            onRetry={handleWhatsNextRetry}
+            onDashboard={() => navigate('/dashboard')}
           />
         )}
       </main>

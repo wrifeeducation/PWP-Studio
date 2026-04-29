@@ -140,6 +140,10 @@ Deno.serve(async (req: Request) => {
       const { schoolId, email, firstName } = payload
       if (!schoolId || !email) return err('schoolId and email are required')
 
+      // Quota check — school_admins count as teachers for quota purposes
+      const quotaErr = await checkQuota(admin, schoolId, 'teacher')
+      if (quotaErr) return quotaErr
+
       const siteUrl = Deno.env.get('SITE_URL') ?? 'https://pwp-studio.wrife.co.uk'
 
       // Check if user already exists
@@ -187,6 +191,11 @@ Deno.serve(async (req: Request) => {
     if (action === 'assign_teacher_to_school') {
       const { userId, schoolId } = payload
       if (!userId || !schoolId) return err('userId and schoolId are required')
+
+      // Quota check — teachers
+      const quotaErr = await checkQuota(admin, schoolId, 'teacher')
+      if (quotaErr) return quotaErr
+
       const { error } = await admin
         .from('profiles')
         .update({ school_id: schoolId, membership_tier: 'school' })
@@ -315,6 +324,12 @@ Deno.serve(async (req: Request) => {
       const { firstName, yearGroup, schoolId, classId } = payload
       if (!firstName) return err('firstName is required')
 
+      // Quota check — pupils (only when assigned to a school)
+      if (schoolId) {
+        const quotaErr = await checkQuota(admin, schoolId, 'pupil')
+        if (quotaErr) return quotaErr
+      }
+
       // Generate a unique 4-digit PIN
       let pin = ''
       let attempts = 0
@@ -370,6 +385,78 @@ Deno.serve(async (req: Request) => {
     })
   }
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUOTA HELPER
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Checks whether a school has capacity for one more teacher or pupil.
+ * Returns a 403 Response if the quota is hit, or null if there is space.
+ */
+async function checkQuota(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any,
+  schoolId: string,
+  role: 'teacher' | 'pupil'
+): Promise<Response | null> {
+  // Fetch school quota limits
+  const { data: school, error: schoolErr } = await admin
+    .from('schools')
+    .select('max_teachers, max_pupils, status')
+    .eq('id', schoolId)
+    .single()
+
+  if (schoolErr || !school) {
+    return new Response(JSON.stringify({ error: 'School not found' }), {
+      status: 404,
+      headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' },
+    })
+  }
+
+  // Block any additions to suspended or expired schools
+  if (school.status === 'suspended' || school.status === 'expired') {
+    return new Response(JSON.stringify({
+      error: `School account is ${school.status}. Contact support to restore access.`,
+      code: 'SCHOOL_INACTIVE',
+    }), {
+      status: 403,
+      headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' },
+    })
+  }
+
+  // Count active users of this role in the school
+  const roleFilter = role === 'teacher'
+    ? ['teacher', 'school_admin']  // admins count against teacher quota
+    : ['pupil']
+
+  const { count, error: countErr } = await admin
+    .from('profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('school_id', schoolId)
+    .in('role', roleFilter)
+    .eq('is_active', true)
+
+  if (countErr) return null // non-fatal — allow the action if count fails
+
+  const limit = role === 'teacher' ? school.max_teachers : school.max_pupils
+  const current = count ?? 0
+
+  if (current >= limit) {
+    const label = role === 'teacher' ? 'teacher' : 'pupil'
+    return new Response(JSON.stringify({
+      error: `School ${label} quota reached (${current}/${limit}). Increase the limit in school settings before adding more ${label}s.`,
+      code: 'QUOTA_EXCEEDED',
+      current,
+      limit,
+    }), {
+      status: 403,
+      headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' },
+    })
+  }
+
+  return null // quota OK
+}
 
 function ok(data: Record<string, unknown>) {
   return new Response(JSON.stringify(data), {

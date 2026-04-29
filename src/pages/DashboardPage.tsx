@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { useFreemium } from '../hooks/useFreemium'
 import { WritzAvatar, type AvatarVariantId } from '../components/WritzAvatar'
 import {
   CHAPTERS,
@@ -610,9 +611,10 @@ interface StatsSidebarProps {
   profile: { first_name?: string; selected_avatar?: string } | null
   earnedBadgeIds: string[]
   onOpenWardrobe: () => void
+  isPro?: boolean
 }
 
-const StatsSidebar: React.FC<StatsSidebarProps> = ({ progress, profile, earnedBadgeIds, onOpenWardrobe }) => {
+const StatsSidebar: React.FC<StatsSidebarProps> = ({ progress, profile, earnedBadgeIds, onOpenWardrobe, isPro = true }) => {
   const avatarId = (profile?.selected_avatar ?? 'wizard') as AvatarVariantId
   const name = profile?.first_name ?? 'Pupil'
   const currentChapter = getChapterForLevel(progress.current_formula_level)
@@ -669,67 +671,194 @@ const StatsSidebar: React.FC<StatsSidebarProps> = ({ progress, profile, earnedBa
       </div>
 
       {/* Stats row */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 10,
-      }}>
-        {[
-          {
-            label: 'Level',
-            value: `L${progress.current_formula_level}`,
-            icon: <span style={{ fontSize: 20 }}>📈</span>,
-            colour: C.brand,
-          },
-          {
-            label: 'XP',
-            value: progress.total_xp.toLocaleString(),
-            icon: <span style={{ fontSize: 20 }}>⭐</span>,
-            colour: '#F39C12',
-          },
-          {
-            label: 'Streak',
-            value: progress.current_streak > 0 ? `${progress.current_streak}d` : '–',
-            icon: <span style={{ fontSize: 20 }}>🔥</span>,
-            colour: progress.current_streak > 0 ? '#E74C3C' : C.muted,
-          },
-          {
-            label: 'Coins',
-            value: progress.coins.toLocaleString(),
-            icon: <CoinIcon size={22} />,
-            colour: C.orange,
-          },
-        ].map((s) => (
-          <div
-            key={s.label}
-            style={{
-              background: C.surface,
-              border: `1px solid ${C.border}`,
-              borderRadius: 12,
-              padding: '12px 10px',
-              textAlign: 'center',
-            }}
-            data-tts={`${s.label}: ${s.value}`}
-          >
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 2 }}>{s.icon}</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: s.colour }}>{s.value}</div>
-            <div style={{ fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
+      {isPro ? (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 10,
+        }}>
+          {[
+            {
+              label: 'Level',
+              value: `L${progress.current_formula_level}`,
+              icon: <span style={{ fontSize: 20 }}>📈</span>,
+              colour: C.brand,
+            },
+            {
+              label: 'XP',
+              value: progress.total_xp.toLocaleString(),
+              icon: <span style={{ fontSize: 20 }}>⭐</span>,
+              colour: '#F39C12',
+            },
+            {
+              label: 'Streak',
+              value: progress.current_streak > 0 ? `${progress.current_streak}d` : '–',
+              icon: <span style={{ fontSize: 20 }}>🔥</span>,
+              colour: progress.current_streak > 0 ? '#E74C3C' : C.muted,
+            },
+            {
+              label: 'Coins',
+              value: progress.coins.toLocaleString(),
+              icon: <CoinIcon size={22} />,
+              colour: C.orange,
+            },
+          ].map((s) => (
+            <div
+              key={s.label}
+              style={{
+                background: C.surface,
+                border: `1px solid ${C.border}`,
+                borderRadius: 12,
+                padding: '12px 10px',
+                textAlign: 'center',
+              }}
+              data-tts={`${s.label}: ${s.value}`}
+            >
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 2 }}>{s.icon}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: s.colour }}>{s.value}</div>
+              <div style={{ fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* Free tier: single level stat + locked rewards prompt */
+        <>
+          <div style={{
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 12,
+            padding: '12px 10px',
+            textAlign: 'center',
+          }} data-tts={`Level L${progress.current_formula_level}`}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 2 }}><span style={{ fontSize: 20 }}>📈</span></div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.brand }}>L{progress.current_formula_level}</div>
+            <div style={{ fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Level</div>
           </div>
-        ))}
+          <div style={{
+            background: C.surface,
+            border: `1px dashed ${C.border}`,
+            borderRadius: 14,
+            padding: 16,
+            textAlign: 'center',
+          }} data-testid="rewards-locked-panel">
+            <div style={{ fontSize: 26, marginBottom: 6 }}>🔒</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>Rewards locked</div>
+            <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>
+              Upgrade to Pro to earn XP, streaks, coins and badges.
+            </div>
+            <a
+              href="/pricing"
+              style={{
+                display: 'inline-block',
+                background: C.brand,
+                color: '#fff',
+                borderRadius: 8,
+                padding: '7px 16px',
+                fontSize: 12,
+                fontWeight: 700,
+                textDecoration: 'none',
+              }}
+              data-tts="Upgrade to Pro"
+            >
+              Upgrade to Pro →
+            </a>
+          </div>
+        </>
+      )}
+
+      {/* Badges panel — Pro only */}
+      {isPro && (
+        <div style={{
+          background: C.surface,
+          border: `1px solid ${C.border}`,
+          borderRadius: 16,
+          padding: 16,
+          overflow: 'hidden',
+        }}>
+          <h3 style={{ fontSize: 13, fontWeight: 800, color: C.text, margin: '0 0 14px' }}>Your Badges</h3>
+          <BadgesSection earnedBadgeIds={earnedBadgeIds} currentLevel={progress.current_formula_level} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Continue Practice card ───────────────────────────────────────────────────
+
+interface ContinueCardProps {
+  currentLevel: number
+  onContinue: () => void
+}
+
+const ContinueCard: React.FC<ContinueCardProps> = ({ currentLevel, onContinue }) => {
+  const chapter = getChapterForLevel(currentLevel)
+  return (
+    <motion.button
+      onClick={onContinue}
+      whileTap={{ scale: 0.97 }}
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      data-testid="continue-practice-card"
+      data-tts={`Continue Level ${currentLevel} practice`}
+      style={{
+        width: '100%',
+        background: `linear-gradient(135deg, ${chapter.textColour}ee, ${chapter.textColour}bb)`,
+        border: `2px solid ${chapter.textColour}55`,
+        borderRadius: 18,
+        padding: '16px 20px',
+        marginBottom: 20,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        cursor: 'pointer',
+        textAlign: 'left',
+        boxShadow: `0 4px 20px ${chapter.textColour}33`,
+      }}
+    >
+      {/* Level badge */}
+      <div style={{
+        width: 54,
+        height: 54,
+        borderRadius: '50%',
+        background: 'rgba(255,255,255,0.25)',
+        border: '2.5px solid rgba(255,255,255,0.6)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}>
+        <span style={{ fontSize: 18, lineHeight: 1 }}>{chapter.emoji}</span>
+        <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', lineHeight: 1 }}>L{currentLevel}</span>
       </div>
 
-      {/* Badges panel */}
-      <div style={{
-        background: C.surface,
-        border: `1px solid ${C.border}`,
-        borderRadius: 16,
-        padding: 16,
-        overflow: 'hidden',
-      }}>
-        <h3 style={{ fontSize: 13, fontWeight: 800, color: C.text, margin: '0 0 14px' }}>Your Badges</h3>
-        <BadgesSection earnedBadgeIds={earnedBadgeIds} currentLevel={progress.current_formula_level} />
+      {/* Text */}
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', marginBottom: 2 }}>
+          Continue Practice
+        </div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.82)', fontWeight: 600 }}>
+          Level {currentLevel} · {chapter.title}
+        </div>
       </div>
-    </div>
+
+      {/* Arrow */}
+      <div style={{
+        width: 36,
+        height: 36,
+        borderRadius: '50%',
+        background: 'rgba(255,255,255,0.25)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 18,
+        color: '#fff',
+        flexShrink: 0,
+      }} aria-hidden="true">
+        ▶
+      </div>
+    </motion.button>
   )
 }
 
@@ -827,9 +956,10 @@ interface TopBarProps {
   coins: number
   onOpenWardrobe: () => void
   onLogout: () => void
+  isPro?: boolean
 }
 
-const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWardrobe, onLogout }) => {
+const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWardrobe, onLogout, isPro = true }) => {
   const navigate = useNavigate()
   return (
   <div style={{
@@ -894,30 +1024,51 @@ const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWa
       </span>
     </div>
 
-    {/* Quick stats */}
+    {/* Quick stats — Pro only */}
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        background: 'rgba(255,255,255,0.18)',
-        border: '1px solid rgba(255,255,255,0.25)',
-        borderRadius: 20,
-        padding: '5px 12px',
-        boxShadow: '0 1px 6px rgba(0,0,0,0.15)',
-      }}>
-        <span style={{ fontSize: 15 }}>🔥</span>
-        <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{streak > 0 ? streak : '–'}</span>
-      </div>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        background: 'rgba(255,255,255,0.18)',
-        border: '1px solid rgba(255,255,255,0.25)',
-        borderRadius: 20,
-        padding: '5px 12px',
-        boxShadow: '0 1px 6px rgba(0,0,0,0.15)',
-      }}>
-        <CoinIcon size={15} />
-        <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{coins}</span>
-      </div>
+      {isPro && (
+        <>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            background: 'rgba(255,255,255,0.18)',
+            border: '1px solid rgba(255,255,255,0.25)',
+            borderRadius: 20,
+            padding: '5px 12px',
+            boxShadow: '0 1px 6px rgba(0,0,0,0.15)',
+          }}>
+            <span style={{ fontSize: 15 }}>🔥</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{streak > 0 ? streak : '–'}</span>
+          </div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            background: 'rgba(255,255,255,0.18)',
+            border: '1px solid rgba(255,255,255,0.25)',
+            borderRadius: 20,
+            padding: '5px 12px',
+            boxShadow: '0 1px 6px rgba(0,0,0,0.15)',
+          }}>
+            <CoinIcon size={15} />
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{coins}</span>
+          </div>
+        </>
+      )}
+      {!isPro && (
+        <a
+          href="/pricing"
+          style={{
+            fontSize: 11, fontWeight: 700, color: '#fff',
+            background: 'rgba(255,255,255,0.2)',
+            border: '1px solid rgba(255,255,255,0.4)',
+            borderRadius: 16,
+            padding: '4px 10px',
+            textDecoration: 'none',
+            whiteSpace: 'nowrap',
+          }}
+          data-tts="Upgrade to unlock rewards"
+        >
+          ⭐ Upgrade
+        </a>
+      )}
       <button
         onClick={onLogout}
         data-testid="logout-btn"
@@ -945,6 +1096,7 @@ const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWa
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { user, profile } = useAuthStore()
+  const { isPro: isProUser } = useFreemium()
   const [wardrobeOpen, setWardrobeOpen] = useState(false)
   // Profile is typed without the new selected_avatar column; cast through any
   const profileAny = profile as (typeof profile & { selected_avatar?: string }) | null
@@ -1071,6 +1223,7 @@ export default function DashboardPage() {
         coins={coins}
         onOpenWardrobe={() => setWardrobeOpen(true)}
         onLogout={handleLogout}
+        isPro={isProUser}
       />
 
       {/* Main content */}
@@ -1156,6 +1309,10 @@ export default function DashboardPage() {
               Keep going — every step makes you a better writer!
             </motion.p>
           </div>
+          <ContinueCard
+            currentLevel={currentLevel}
+            onContinue={() => navigate('/practice')}
+          />
           <LearningPath
             currentLevel={currentLevel}
             avatarVariant={avatarId}
@@ -1184,6 +1341,7 @@ export default function DashboardPage() {
             profile={profile as { first_name?: string; selected_avatar?: string } | null}
             earnedBadgeIds={demoEarnedIds}
             onOpenWardrobe={() => setWardrobeOpen(true)}
+            isPro={isProUser}
           />
         </motion.div>
       </div>

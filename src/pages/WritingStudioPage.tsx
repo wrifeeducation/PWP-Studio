@@ -20,6 +20,8 @@ import { calcWritingXP } from '../lib/xpEngine'
 import { Genre, WritingDimension } from '../types/index'
 import { sanitizeText } from '../lib/sanitize'
 import { SessionExpiryBanner } from '../components/ui/SessionExpiryBanner'
+import { useFreemium } from '../hooks/useFreemium'
+import { UpgradePrompt } from '../components/ui/UpgradePrompt'
 import writingTasks from '../../content/writing-tasks.json'
 
 // ─── Local task type (from JSON) ──────────────────────────────────────────────
@@ -62,6 +64,18 @@ function pickTask(genre: Genre, yearGroup: number): LocalWritingTask | null {
 export default function WritingStudioPage() {
   const navigate = useNavigate()
   const { profile } = useAuthStore()
+  const freemium = useFreemium()
+
+  // Freemium gate — Writing Studio is pro-only
+  if (!freemium.loading && freemium.isFree) {
+    return (
+      <UpgradePrompt
+        variant="pro"
+        feature="Writing Studio"
+        onBack={() => navigate('/dashboard')}
+      />
+    )
+  }
 
   // Guard: check studio unlocked
   const [studioChecked, setStudioChecked] = useState(false)
