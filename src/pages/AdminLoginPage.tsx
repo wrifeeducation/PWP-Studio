@@ -12,28 +12,42 @@ const ADMIN_EMAILS = [
 
 export default function AdminLoginPage() {
   const navigate = useNavigate()
-  const { profile, isLoading, isInitialised } = useAuthStore()
+  const { session, profile, isLoading } = useAuthStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [awaitingProfile, setAwaitingProfile] = useState(false)
+  const [awaitingAuth, setAwaitingAuth] = useState(false)
 
-  // Once sign-in succeeds, wait for authStore to populate the profile
+  // After sign-in: wait for onAuthStateChange to populate session + profile, then navigate.
   useEffect(() => {
-    if (!awaitingProfile) return
-    if (isLoading || !isInitialised) return
+    if (!awaitingAuth) return
 
+    // Step 1: wait for session to appear in the store (onAuthStateChange hasn't fired yet)
+    if (!session) return
+
+    // Step 2: wait for profile fetch to complete
+    if (isLoading) return
+
+    // Step 3: profile loaded — check role
     if (profile?.role === 'admin') {
       navigate('/admin', { replace: true })
-    } else if (profile) {
-      // Signed in but not an admin — sign them back out
+      return
+    }
+
+    if (profile) {
+      // Authenticated but not an admin
       supabase.auth.signOut()
       setError('Your account does not have admin privileges.')
-      setAwaitingProfile(false)
-      setLoading(false)
+    } else {
+      // Profile fetch failed
+      supabase.auth.signOut()
+      setError('Could not load account profile. Please try again.')
     }
-  }, [awaitingProfile, isLoading, isInitialised, profile, navigate])
+
+    setAwaitingAuth(false)
+    setLoading(false)
+  }, [awaitingAuth, session, profile, isLoading, navigate])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -56,8 +70,8 @@ export default function AdminLoginPage() {
       return
     }
 
-    // Auth succeeded — wait for authStore to load the profile via onAuthStateChange
-    setAwaitingProfile(true)
+    // Auth succeeded — useEffect watches session + profile and navigates when ready
+    setAwaitingAuth(true)
   }
 
   return (
