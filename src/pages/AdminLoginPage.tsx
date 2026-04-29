@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuthStore } from '../stores/authStore'
 
 const ADMIN_EMAILS = [
   'mankrah@kafed.org.uk',
@@ -11,10 +12,28 @@ const ADMIN_EMAILS = [
 
 export default function AdminLoginPage() {
   const navigate = useNavigate()
+  const { profile, isLoading, isInitialised } = useAuthStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [awaitingProfile, setAwaitingProfile] = useState(false)
+
+  // Once sign-in succeeds, wait for authStore to populate the profile
+  useEffect(() => {
+    if (!awaitingProfile) return
+    if (isLoading || !isInitialised) return
+
+    if (profile?.role === 'admin') {
+      navigate('/admin', { replace: true })
+    } else if (profile) {
+      // Signed in but not an admin — sign them back out
+      supabase.auth.signOut()
+      setError('Your account does not have admin privileges.')
+      setAwaitingProfile(false)
+      setLoading(false)
+    }
+  }, [awaitingProfile, isLoading, isInitialised, profile, navigate])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -30,16 +49,15 @@ export default function AdminLoginPage() {
       email: email.trim(),
       password,
     })
-    setLoading(false)
 
     if (signInError) {
+      setLoading(false)
       setError('Invalid email or password.')
       return
     }
 
-    // ADMIN_EMAILS check above is the security gate.
-    // ProtectedRoute on /admin enforces Role.ADMIN as the second layer.
-    navigate('/admin')
+    // Auth succeeded — wait for authStore to load the profile via onAuthStateChange
+    setAwaitingProfile(true)
   }
 
   return (

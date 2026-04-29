@@ -51,6 +51,7 @@ export const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) 
 
   // Wrong role → redirect to own dashboard
   if (allowedRoles && role && !allowedRoles.includes(role)) {
+    if (role === 'admin')        return <Navigate to="/admin" replace />
     if (role === 'pupil')        return <Navigate to="/dashboard" replace />
     if (role === 'teacher')      return <Navigate to="/teacher" replace />
     if (role === 'school_admin') return <Navigate to="/admin" replace />
