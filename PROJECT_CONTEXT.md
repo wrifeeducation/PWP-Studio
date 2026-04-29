@@ -1,31 +1,82 @@
 # WriFe PWP Studio
-*Last updated: 2026-04-29 · Session 15*
+*Last updated: 2026-04-29 · Session 17*
 
 ## Current state
-The app is live at https://pwp-studio.wrife.co.uk. Sign-in works for existing users (miyk99@gmail.com confirmed signing in today). Three auth bugs have been fixed in this session and are pending a `git push` to deploy: missing `emailRedirectTo` in signUp calls (the primary new-user signup blocker), raw Supabase error messages shown on duplicate signup, and stale RLS documentation. The production DB is healthy — all users have profiles, `handle_new_user` trigger fires on signup, and RLS policies are clean.
+The app is live at https://pwp-studio.wrife.co.uk. Admin dashboard has been expanded with a Teachers tab and a fully rebuilt Schools tab. Schools schema now supports quotas, plan tiers, and status. Three new Edge Function actions deployed. All DB changes applied directly to production.
 
-## Next steps
-1. **Run `git push`** — the 3 changed files are staged and committed locally; push to GitHub to trigger Vercel redeploy (see deploy commands above)
-2. **Test new teacher sign-up end-to-end** — sign up with a fresh email, check confirmation email arrives and links to `/auth/confirm`, verify redirect to `/teacher` after confirming
-3. **Verify Supabase Site URL** — in Supabase Dashboard → Auth → URL Configuration, confirm Site URL is `https://pwp-studio.wrife.co.uk` and `/auth/confirm` is in the Redirect URL allowlist
+## Pending git push
+Run from the wrifeapp folder in terminal:
+```
+rm -f .git/HEAD.lock .git/index.lock && git add src/pages/AdminPage.tsx src/pages/ParentPage.tsx supabase/functions/admin-action/index.ts supabase/functions/create-child-profile/index.ts supabase/functions/invite-teacher/index.ts supabase/migrations/20260429000002_fix_view_rls_and_parent_policy.sql supabase/migrations/20260429000003_schools_quota_and_status.sql database/rls-policies.sql database/schema.sql && git commit -m "feat: teachers tab, expanded schools tab, quota management, RLS fixes, new edge functions" && git push
+```
 
-## Key decisions
-- **RLS recursion fix:** `is_school_admin()` SECURITY DEFINER function + own-row policies (`id = auth.uid()`) + classes-join for teacher visibility — eliminates all profiles→profiles recursion
-- **emailRedirectTo fix:** Both teacher and parent `signUp` calls now pass `emailRedirectTo: ${window.location.origin}/auth/confirm` so confirmation links always match the live domain
-- **Admin email allowlist:** `['mankrah@kafed.org.uk', 'wrife.education@gmail.com', 'miyk99@gmail.com', 'admin@wrife-test.com']` in `admin-action` Edge Function
-- **Paragraph Builder gate:** Unlocks at L4 mastery (not L8) per adaptive progression plan
-- **Pupil login:** PIN-only (synthetic `pupil-${pin}@wrife.school` email) — works for seeded test data; class code + username flow not yet implemented
+## Key decisions — Session 17
+- **Teachers tab:** Lists all teachers with filter (All / Independent / School-attached). Amber warning banner when independent teachers exist. Actions: invite, assign to school, change tier, reset password, deactivate. "Independent" teachers (school_id = null) are teachers who self-signed-up and aren't linked to any school — they operate on free tier until assigned.
+- **Schools tab rebuild:** Card layout replaces flat table. Each card shows: usage bars (teachers/pupils vs quota), plan tier, status badge, contact email. Actions: Set Quota (tier + max_teachers/max_pupils), Invite School Admin (sends Supabase invite → creates school_admin profile + sets schools.admin_user_id), Suspend/Activate.
+- **Schools schema:** Added contact_email, subscription_tier, max_teachers, max_pupils, status, admin_user_id, notes to schools table.
+- **admin-action new actions:** invite_school_admin, assign_teacher_to_school, set_school_quota, toggle_school_status, change_tier, toggle_active, create_user (all now included).
+
+## School sign-up best practice (recommendation)
+The industry-leading approach for EdTech school access management (used by Seesaw, Century Tech, Lexia, Myon):
+
+**Tier structure (recommended for WriFe):**
+| Tier | Teachers | Pupils | Price signal |
+|------|----------|--------|-------------|
+| Trial | 2 | 30 | Free, 30-day |
+| Starter | 5 | 150 | £299/year |
+| Professional | 20 | 600 | £799/year |
+| Enterprise | Unlimited | Unlimited | Custom |
+
+**Recommended school onboarding flow:**
+1. School contacts WriFe (email/form) → WriFe admin creates school in Admin Dashboard → sets tier + quota → clicks "Invite School Admin"
+2. School admin receives email → clicks link → sets password → lands on `/admin/school` dashboard
+3. School admin invites teachers (via Invite Teacher button) → teachers accept invite → set password
+4. School admin creates classes and assigns pupils (PIN-based, no email required)
+5. WriFe admin monitors usage from Admin → Schools tab (usage bars show teachers/pupils vs quota)
+
+**Self-service school signup (future):** A `/school/signup` page where a school admin enters school name + URN + email → creates a trial account automatically → WriFe admin approves (or auto-approves for trial) → invitation email sent. This requires a school_applications table and an approval workflow — not yet built.
+
+**Access enforcement (to build next):**
+- When `profiles` table INSERT fires for role=teacher and school_id is set, check `SELECT count(*) FROM profiles WHERE school_id = X AND role = 'teacher'` against `schools.max_teachers` → block if at limit (enforce in Edge Function, not RLS, to give a good error message)
+- Same for pupils vs `max_pupils`
+- schools.status = 'suspended' → profiles.is_active = false for all users in that school (batch update via admin-action)
+
+## Key decisions — carried forward
+- **RLS recursion fix:** is_school_admin() SECURITY DEFINER + own-row policies
+- **View RLS (Session 16):** All 3 views now security_invoker = true
+- **Parent read policy (Session 16):** profiles_parent_read added
+- **emailRedirectTo fix (Session 15):** Both signUp calls include correct redirectTo
+- **invite-teacher (Session 16):** Deployed, fixed redirectTo
+- **create-child-profile (Session 16):** Deployed, 6-digit home-pupil PIN scheme
+- **Admin email allowlist:** ['mankrah@kafed.org.uk', 'wrife.education@gmail.com', 'miyk99@gmail.com', 'admin@wrife-test.com']
+- **Paragraph Builder gate:** Unlocks at L4 mastery
+
+## Test accounts
+| Role | Email | Password/PIN | Notes |
+|------|-------|-------------|-------|
+| School Admin | miyk99@gmail.com | existing | Test Primary School |
+| Teacher | teacher@pwptest.com | WriFe2026! | Test Primary School |
+| Pupil | pupil-7777@wrife.school | PIN 7777 | Year 5 Oaks class |
+| Parent | parent@pwptest.com | WriFe2026! | Linked to Jamie (pupil) |
 
 ## Files & locations
-- `src/pages/LoginPage.tsx` — signUp calls now include `emailRedirectTo`; friendly error messages for duplicate/rate-limit cases
-- `database/rls-policies.sql` — updated to match production (non-recursive policies, `is_school_admin()` helper)
-- `supabase/migrations/20260429000001_fix_profiles_rls.sql` — codifies the Session 14 RLS fix for reproducible DB setup
-- `src/App.tsx` — AuthInitialiser with `setLoading(true)` race-condition fix (deployed)
-- `supabase/functions/admin-action/index.ts` — handles create_school, delete_user, update_role, reset_password, find_user_email
+- `src/pages/AdminPage.tsx` — Teachers tab + expanded Schools tab (pending git push)
+- `src/pages/ParentPage.tsx` — create-child-profile wired up
+- `src/pages/LoginPage.tsx` — emailRedirectTo; friendly error messages
+- `database/rls-policies.sql` — profiles_parent_read added; all policies match production
+- `database/schema.sql` — views updated to security_invoker + teacher scope
+- `supabase/migrations/20260429000001_fix_profiles_rls.sql` — Session 14 RLS fix
+- `supabase/migrations/20260429000002_fix_view_rls_and_parent_policy.sql` — APPLIED
+- `supabase/migrations/20260429000003_schools_quota_and_status.sql` — APPLIED
+- `supabase/functions/admin-action/index.ts` — all admin actions (DEPLOYED v3)
+- `supabase/functions/invite-teacher/index.ts` — DEPLOYED
+- `supabase/functions/create-child-profile/index.ts` — DEPLOYED
 
-## Open questions
-- Is Supabase Dashboard → Auth → URL Configuration set to `https://pwp-studio.wrife.co.uk`? (required for confirmation emails to work)
-- Pupil login uses PIN-only synthetic email — does this scale once real pupils are added? (class code + username not yet built)
+## Open questions / next build items
+- **Quota enforcement:** Check teacher/pupil count against max on create (Edge Function logic)
+- **School self-service signup page** (`/school/apply`) — trial account + approval workflow
+- **Class code + username pupil login** — currently PIN-only, no class code validation
+- **Next major feature:** Consider which of these is highest priority for the next session
 
 ---
 
@@ -33,8 +84,10 @@ The app is live at https://pwp-studio.wrife.co.uk. Sign-in works for existing us
 
 | # | Date | Summary |
 |---|------|---------|
-| 15 | 2026-04-29 | Auth review: found emailRedirectTo missing from signUp (primary signup bug); improved error messages; updated rls-policies.sql + added migration to codify Session 14 RLS fix |
-| 14 | 2026-04-29 | Fixed recursive RLS on `profiles` — dropped recursive school_admin policies, created `is_school_admin()` SECURITY DEFINER function, recreated policies |
-| 13 | 2026-04-29 | Fixed App.tsx auth race condition (`setLoading(true)` before profile fetch); diagnosed real root cause as recursive RLS 500s |
-| 12 | 2026-04-28 | Built AdminPage, admin-action Edge Function, AuthConfirmPage, UpdatePasswordPage, forgot-password flow; fixed ProtectedRoute blank screen |
+| 17 | 2026-04-29 | Teachers tab built; Schools tab rebuilt with usage bars + quota + invite admin; schools schema expanded; admin-action v3 deployed |
+| 16 | 2026-04-29 | Audit-driven fixes: view RLS, profiles_parent_read, invite-teacher deployed, create-child-profile built + deployed, ParentPage wired |
+| 15 | 2026-04-29 | Auth review: emailRedirectTo fix, improved error messages, migration for RLS codification |
+| 14 | 2026-04-29 | Fixed recursive RLS on profiles — is_school_admin() SECURITY DEFINER function |
+| 13 | 2026-04-29 | Fixed App.tsx auth race condition; diagnosed recursive RLS root cause |
+| 12 | 2026-04-28 | Built AdminPage, admin-action Edge Function, AuthConfirmPage, UpdatePasswordPage, forgot-password flow |
 | 11 | 2026-04-27 | Built DefinitionUnlock component, ParentDashboard, Stripe Edge Functions, parent role + Stripe DB migration |

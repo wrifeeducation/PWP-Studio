@@ -233,8 +233,6 @@ function SchoolsTab() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const [error, setError] = useState('')
-
   const load = useCallback(async () => {
     setLoading(true)
     // Load schools + count teachers and pupils per school
