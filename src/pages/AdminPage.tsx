@@ -35,10 +35,19 @@ interface Profile {
 interface School {
   id: string
   name: string
+  urn: string
+  phase: string
   contact_email: string | null
+  subscription_tier: string
+  max_teachers: number
+  max_pupils: number
+  status: string
+  admin_user_id: string | null
+  notes: string | null
   created_at: string
-  pupil_count?: number
+  // computed locally after load
   teacher_count?: number
+  pupil_count?: number
 }
 
 // ─── Shared UI primitives ────────────────────────────────────────────────────
@@ -190,19 +199,57 @@ async function adminAction(action: string, payload: Record<string, unknown>) {
   return res.data
 }
 
+// ─── Usage bar helper ─────────────────────────────────────────────────────────
+function UsageBar({ used, max, label }: { used: number; max: number; label: string }) {
+  const pct = Math.min(100, Math.round((used / Math.max(max, 1)) * 100))
+  const colour = pct >= 90 ? '#dc2626' : pct >= 70 ? '#f59e0b' : '#10b981'
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="flex justify-between text-xs" style={{ color: 'var(--color-text-muted)' }}>
+        <span>{label}</span>
+        <span>{used}/{max}</span>
+      </div>
+      <div className="h-1.5 rounded-full w-full" style={{ backgroundColor: 'var(--color-border)' }}>
+        <div className="h-1.5 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: colour }} />
+      </div>
+    </div>
+  )
+}
+
 // ─── Schools Tab ─────────────────────────────────────────────────────────────
 function SchoolsTab() {
   const [schools, setSchools] = useState<School[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ name: '', contactEmail: '' })
+  const [selected, setSelected] = useState<School | null>(null)
+  const [showQuota, setShowQuota] = useState(false)
+  const [showInviteAdmin, setShowInviteAdmin] = useState(false)
+  const [form, setForm] = useState({
+    name: '', contactEmail: '', urn: '', phase: 'primary',
+    subscriptionTier: 'trial', maxTeachers: '5', maxPupils: '150',
+  })
+  const [quotaForm, setQuotaForm] = useState({ maxTeachers: '', maxPupils: '', subscriptionTier: '' })
+  const [inviteForm, setInviteForm] = useState({ email: '', firstName: '' })
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('schools').select('*').order('name')
-    setSchools((data as School[]) ?? [])
+    // Load schools + count teachers and pupils per school
+    const { data: schoolData } = await supabase.from('schools').select('*').order('name')
+    const { data: teacherCounts } = await supabase
+      .from('profiles').select('school_id').eq('role', 'teacher')
+    const { data: pupilCounts } = await supabase
+      .from('profiles').select('school_id').eq('role', 'pupil')
+
+    const schoolList = (schoolData as School[] ?? []).map(s => ({
+      ...s,
+      teacher_count: (teacherCounts ?? []).filter(p => p.school_id === s.id).length,
+      pupil_count:   (pupilCounts   ?? []).filter(p => p.school_id === s.id).length,
+    }))
+    setSchools(schoolList)
     setLoading(false)
   }, [])
 
@@ -212,13 +259,75 @@ function SchoolsTab() {
     if (!form.name.trim()) { setError('School name is required'); return }
     setSaving(true); setError('')
     try {
-      await adminAction('create_school', { schoolName: form.name.trim(), contactEmail: form.contactEmail.trim() || null })
+      await adminAction('create_school', {
+        name: form.name.trim(),
+        contactEmail: form.contactEmail.trim() || null,
+        urn: form.urn.trim() || null,
+        phase: form.phase,
+        subscriptionTier: form.subscriptionTier,
+        maxTeachers: Number(form.maxTeachers) || 5,
+        maxPupils: Number(form.maxPupils) || 150,
+      })
       setShowCreate(false)
-      setForm({ name: '', contactEmail: '' })
+      setForm({ name: '', contactEmail: '', urn: '', phase: 'primary', subscriptionTier: 'trial', maxTeachers: '5', maxPupils: '150' })
       await load()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to create school')
     } finally { setSaving(false) }
+  }
+
+  const setQuota = async () => {
+    if (!selected) return
+    setSaving(true); setError('')
+    try {
+      await adminAction('set_school_quota', {
+        schoolId: selected.id,
+        maxTeachers: quotaForm.maxTeachers ? Number(quotaForm.maxTeachers) : undefined,
+        maxPupils: quotaForm.maxPupils ? Number(quotaForm.maxPupils) : undefined,
+        subscriptionTier: quotaForm.subscriptionTier || undefined,
+      })
+      setShowQuota(false)
+      setSelected(null)
+      await load()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to update quota')
+    } finally { setSaving(false) }
+  }
+
+  const toggleStatus = async (school: School) => {
+    const next = school.status === 'active' ? 'suspended' : 'active'
+    setSaving(true)
+    try {
+      await adminAction('toggle_school_status', { schoolId: school.id, status: next })
+      await load()
+    } catch { /* swallow */ } finally { setSaving(false) }
+  }
+
+  const inviteAdmin = async () => {
+    if (!selected || !inviteForm.email.trim()) { setError('Email is required'); return }
+    setSaving(true); setError('')
+    try {
+      await adminAction('invite_school_admin', {
+        schoolId: selected.id,
+        email: inviteForm.email.trim(),
+        firstName: inviteForm.firstName.trim() || null,
+      })
+      setShowInviteAdmin(false)
+      setSelected(null)
+      await load()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to invite admin')
+    } finally { setSaving(false) }
+  }
+
+  const TIER_LABELS: Record<string, string> = {
+    trial: 'Trial', starter: 'Starter', professional: 'Professional', enterprise: 'Enterprise',
+  }
+  const STATUS_COLOURS: Record<string, string> = {
+    active: '#d1fae5', trial: '#dbeafe', suspended: '#fee2e2', expired: '#e5e7eb',
+  }
+  const STATUS_TEXT: Record<string, string> = {
+    active: '#065f46', trial: '#1e40af', suspended: '#991b1b', expired: '#374151',
   }
 
   if (loading) return <p className="text-sm py-8 text-center" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
@@ -226,47 +335,183 @@ function SchoolsTab() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>{schools.length} school{schools.length !== 1 ? 's' : ''}</p>
-        <PrimaryBtn onClick={() => setShowCreate(true)} size="sm">+ New School</PrimaryBtn>
+        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+          {schools.length} school{schools.length !== 1 ? 's' : ''} ·{' '}
+          {schools.filter(s => s.status === 'active').length} active
+        </p>
+        <PrimaryBtn onClick={() => { setShowCreate(true); setError('') }} size="sm">+ New School</PrimaryBtn>
       </div>
 
-      <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid var(--color-border)' }}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr style={{ backgroundColor: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}>
-              {['School Name', 'Contact Email', 'Created'].map(h => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {schools.map((s, i) => (
-              <tr key={s.id} style={{ borderBottom: i < schools.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>{s.name}</td>
-                <td className="px-4 py-3" style={{ color: 'var(--color-text-muted)' }}>{s.contact_email ?? '—'}</td>
-                <td className="px-4 py-3" style={{ color: 'var(--color-text-muted)' }}>{new Date(s.created_at).toLocaleDateString('en-GB')}</td>
-              </tr>
-            ))}
-            {schools.length === 0 && (
-              <tr><td colSpan={3} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>No schools yet</td></tr>
-            )}
-          </tbody>
-        </table>
+      <div className="flex flex-col gap-4">
+        {schools.map(s => (
+          <div
+            key={s.id}
+            className="rounded-xl p-4"
+            style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)' }}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+              {/* Left: name + meta */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>{s.name}</span>
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
+                    style={{ background: STATUS_COLOURS[s.status] ?? '#e5e7eb', color: STATUS_TEXT[s.status] ?? '#374151' }}
+                  >
+                    {s.status}
+                  </span>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: '#dbeafe', color: '#1e40af' }}>
+                    {TIER_LABELS[s.subscription_tier] ?? s.subscription_tier}
+                  </span>
+                </div>
+                <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>
+                  {s.contact_email ?? 'No contact email'} · {s.phase ?? 'unknown phase'} · URN: {s.urn}
+                </p>
+                {/* Usage bars */}
+                <div className="grid grid-cols-2 gap-3 mb-3 max-w-sm">
+                  <UsageBar used={s.teacher_count ?? 0} max={s.max_teachers} label="Teachers" />
+                  <UsageBar used={s.pupil_count ?? 0} max={s.max_pupils} label="Pupils" />
+                </div>
+              </div>
+
+              {/* Right: actions */}
+              <div className="flex flex-wrap gap-1.5 items-start shrink-0">
+                <PrimaryBtn size="sm" variant="ghost" onClick={() => {
+                  setSelected(s)
+                  setQuotaForm({ maxTeachers: String(s.max_teachers), maxPupils: String(s.max_pupils), subscriptionTier: s.subscription_tier })
+                  setShowQuota(true)
+                  setError('')
+                }}>Set Quota</PrimaryBtn>
+                <PrimaryBtn size="sm" variant="ghost" onClick={() => {
+                  setSelected(s)
+                  setInviteForm({ email: s.contact_email ?? '', firstName: '' })
+                  setShowInviteAdmin(true)
+                  setError('')
+                }}>Invite Admin</PrimaryBtn>
+                <PrimaryBtn
+                  size="sm"
+                  variant={s.status === 'active' ? 'danger' : 'primary'}
+                  disabled={saving}
+                  onClick={() => toggleStatus(s)}
+                >
+                  {s.status === 'active' ? 'Suspend' : 'Activate'}
+                </PrimaryBtn>
+              </div>
+            </div>
+          </div>
+        ))}
+        {schools.length === 0 && (
+          <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>No schools yet. Create one to get started.</p>
+        )}
       </div>
 
+      {/* Create School Modal */}
       {showCreate && (
         <Modal title="Create School" onClose={() => setShowCreate(false)}>
           <div className="flex flex-col gap-3">
             <Field label="School Name *">
-              <Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. Oakfield Primary School" />
+              <Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Oakfield Primary School" />
             </Field>
             <Field label="Contact Email">
               <Input value={form.contactEmail} onChange={v => setForm(f => ({ ...f, contactEmail: v }))} placeholder="admin@school.co.uk" type="email" />
             </Field>
+            <Field label="URN (optional — UK school reference number)">
+              <Input value={form.urn} onChange={v => setForm(f => ({ ...f, urn: v }))} placeholder="e.g. 123456" />
+            </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Phase">
+                <Select
+                  value={form.phase}
+                  onChange={v => setForm(f => ({ ...f, phase: v }))}
+                  options={[
+                    { label: 'Primary', value: 'primary' },
+                    { label: 'Secondary', value: 'secondary' },
+                    { label: 'All-through', value: 'all-through' },
+                    { label: 'Special', value: 'special' },
+                  ]}
+                />
+              </Field>
+              <Field label="Plan">
+                <Select
+                  value={form.subscriptionTier}
+                  onChange={v => setForm(f => ({ ...f, subscriptionTier: v }))}
+                  options={[
+                    { label: 'Trial (free)', value: 'trial' },
+                    { label: 'Starter', value: 'starter' },
+                    { label: 'Professional', value: 'professional' },
+                    { label: 'Enterprise', value: 'enterprise' },
+                  ]}
+                />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Max Teachers">
+                <Input value={form.maxTeachers} onChange={v => setForm(f => ({ ...f, maxTeachers: v }))} placeholder="5" type="number" />
+              </Field>
+              <Field label="Max Pupils">
+                <Input value={form.maxPupils} onChange={v => setForm(f => ({ ...f, maxPupils: v }))} placeholder="150" type="number" />
+              </Field>
+            </div>
             {error && <p className="text-xs text-red-600">{error}</p>}
             <div className="flex gap-2 justify-end mt-2">
               <PrimaryBtn variant="ghost" onClick={() => setShowCreate(false)}>Cancel</PrimaryBtn>
               <PrimaryBtn onClick={createSchool} disabled={saving}>{saving ? 'Creating…' : 'Create School'}</PrimaryBtn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Set Quota Modal */}
+      {showQuota && selected && (
+        <Modal title={`Set Quota — ${selected.name}`} onClose={() => { setShowQuota(false); setSelected(null) }}>
+          <div className="flex flex-col gap-3">
+            <Field label="Plan Tier">
+              <Select
+                value={quotaForm.subscriptionTier}
+                onChange={v => setQuotaForm(f => ({ ...f, subscriptionTier: v }))}
+                options={[
+                  { label: 'Trial', value: 'trial' },
+                  { label: 'Starter', value: 'starter' },
+                  { label: 'Professional', value: 'professional' },
+                  { label: 'Enterprise', value: 'enterprise' },
+                ]}
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Max Teachers">
+                <Input value={quotaForm.maxTeachers} onChange={v => setQuotaForm(f => ({ ...f, maxTeachers: v }))} type="number" placeholder="5" />
+              </Field>
+              <Field label="Max Pupils">
+                <Input value={quotaForm.maxPupils} onChange={v => setQuotaForm(f => ({ ...f, maxPupils: v }))} type="number" placeholder="150" />
+              </Field>
+            </div>
+            {error && <p className="text-xs text-red-600">{error}</p>}
+            <div className="flex gap-2 justify-end mt-2">
+              <PrimaryBtn variant="ghost" onClick={() => { setShowQuota(false); setSelected(null) }}>Cancel</PrimaryBtn>
+              <PrimaryBtn onClick={setQuota} disabled={saving}>{saving ? 'Saving…' : 'Save Quota'}</PrimaryBtn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Invite School Admin Modal */}
+      {showInviteAdmin && selected && (
+        <Modal title={`Invite School Admin — ${selected.name}`} onClose={() => { setShowInviteAdmin(false); setSelected(null) }}>
+          <div className="flex flex-col gap-3">
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              The invited person will receive an email to set up their account as the school admin for {selected.name}.
+              If they already have an account, their role will be updated.
+            </p>
+            <Field label="Email *">
+              <Input value={inviteForm.email} onChange={v => setInviteForm(f => ({ ...f, email: v }))} placeholder="headteacher@school.co.uk" type="email" />
+            </Field>
+            <Field label="First Name (optional)">
+              <Input value={inviteForm.firstName} onChange={v => setInviteForm(f => ({ ...f, firstName: v }))} placeholder="Sarah" />
+            </Field>
+            {error && <p className="text-xs text-red-600">{error}</p>}
+            <div className="flex gap-2 justify-end mt-2">
+              <PrimaryBtn variant="ghost" onClick={() => { setShowInviteAdmin(false); setSelected(null) }}>Cancel</PrimaryBtn>
+              <PrimaryBtn onClick={inviteAdmin} disabled={saving}>{saving ? 'Sending…' : 'Send Invite'}</PrimaryBtn>
             </div>
           </div>
         </Modal>
@@ -630,6 +875,287 @@ function PupilsTab() {
   )
 }
 
+// ─── Teachers Tab ─────────────────────────────────────────────────────────────
+function TeachersTab() {
+  const [teachers, setTeachers] = useState<Profile[]>([])
+  const [schools, setSchools] = useState<School[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<'all' | 'independent' | 'school'>('all')
+  const [selected, setSelected] = useState<Profile | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [showInvite, setShowInvite] = useState(false)
+  const [inviteForm, setInviteForm] = useState({ email: '', fullName: '', schoolId: '' })
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const [{ data: teacherData }, { data: schoolData }] = await Promise.all([
+      supabase.from('profiles').select('*').eq('role', 'teacher').order('created_at', { ascending: false }),
+      supabase.from('schools').select('id, name').order('name'),
+    ])
+    setTeachers((teacherData as Profile[]) ?? [])
+    setSchools((schoolData as School[]) ?? [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const schoolMap = Object.fromEntries(schools.map(s => [s.id, s.name]))
+
+  const filtered = teachers.filter(t => {
+    if (filter === 'independent' && t.school_id) return false
+    if (filter === 'school' && !t.school_id) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return (t.first_name ?? '').toLowerCase().includes(q) || (t.email ?? '').toLowerCase().includes(q)
+    }
+    return true
+  })
+
+  const changeTier = async (userId: string, tier: string) => {
+    setSaving(true); setError('')
+    try {
+      await adminAction('change_tier', { userId, tier })
+      await load(); setSelected(null)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to update tier')
+    } finally { setSaving(false) }
+  }
+
+  const toggleActive = async (userId: string, activate: boolean) => {
+    setSaving(true); setError('')
+    try {
+      await adminAction('toggle_active', { userId, activate })
+      await load(); setSelected(null)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to update status')
+    } finally { setSaving(false) }
+  }
+
+  const resetPassword = async (userId: string) => {
+    setSaving(true); setError('')
+    try {
+      await adminAction('reset_password', { userId })
+      alert('Password reset email sent.')
+      setSelected(null)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed')
+    } finally { setSaving(false) }
+  }
+
+  const assignToSchool = async (userId: string, schoolId: string) => {
+    if (!schoolId) { setError('Please select a school'); return }
+    setSaving(true); setError('')
+    try {
+      await adminAction('assign_teacher_to_school', { userId, schoolId })
+      await load(); setSelected(null)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to assign to school')
+    } finally { setSaving(false) }
+  }
+
+  const inviteTeacher = async () => {
+    if (!inviteForm.email.trim()) { setError('Email is required'); return }
+    setSaving(true); setError('')
+    try {
+      await adminAction('create_user', {
+        email: inviteForm.email.trim(),
+        fullName: inviteForm.fullName.trim() || null,
+        role: 'teacher',
+        schoolId: inviteForm.schoolId || null,
+        membershipTier: inviteForm.schoolId ? 'school' : 'free',
+      })
+      setShowInvite(false)
+      setInviteForm({ email: '', fullName: '', schoolId: '' })
+      await load()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to invite teacher')
+    } finally { setSaving(false) }
+  }
+
+  if (loading) return <p className="text-sm py-8 text-center" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
+
+  const independentCount = teachers.filter(t => !t.school_id).length
+
+  return (
+    <div>
+      {/* Summary bar */}
+      {independentCount > 0 && (
+        <div
+          className="mb-4 p-3 rounded-lg text-sm flex items-center gap-2"
+          style={{ backgroundColor: '#fef3c7', border: '1px solid #fde68a', color: '#92400e' }}
+        >
+          <span>⚠️</span>
+          <span>
+            <strong>{independentCount}</strong> teacher{independentCount !== 1 ? 's' : ''} signed up independently without a school.
+            Use <strong>Assign to School</strong> to link them, or they operate on free tier.
+          </span>
+          <button
+            onClick={() => setFilter('independent')}
+            className="ml-auto text-xs underline font-medium"
+            style={{ color: '#92400e' }}
+          >
+            Show only
+          </button>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex-1 min-w-40">
+          <Input value={search} onChange={setSearch} placeholder="Search by name or email…" />
+        </div>
+        {/* Filter pills */}
+        {(['all', 'independent', 'school'] as const).map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+            style={filter === f
+              ? { backgroundColor: 'var(--color-brand-primary)', color: '#fff' }
+              : { backgroundColor: 'var(--color-surface)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }
+            }
+          >
+            {f === 'all' ? `All (${teachers.length})` : f === 'independent' ? `Independent (${independentCount})` : `School-attached (${teachers.length - independentCount})`}
+          </button>
+        ))}
+        <PrimaryBtn onClick={() => { setShowInvite(true); setError('') }} size="sm">+ Invite Teacher</PrimaryBtn>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid var(--color-border)' }}>
+        <table className="w-full text-sm">
+          <thead>
+            <tr style={{ backgroundColor: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}>
+              {['Name', 'School', 'Tier', 'Status', 'Joined', ''].map(h => (
+                <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((t, i) => (
+              <tr key={t.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>{t.first_name ?? '—'}</td>
+                <td className="px-4 py-3" style={{ color: 'var(--color-text-muted)' }}>
+                  {t.school_id ? (schoolMap[t.school_id] ?? 'Unknown school') : (
+                    <span className="text-xs font-medium" style={{ color: '#f59e0b' }}>Independent</span>
+                  )}
+                </td>
+                <td className="px-4 py-3"><Badge value={t.membership_tier} type="tier" /></td>
+                <td className="px-4 py-3"><Badge value={t.is_active ? 'active' : 'inactive'} type="status" /></td>
+                <td className="px-4 py-3" style={{ color: 'var(--color-text-muted)' }}>{new Date(t.created_at).toLocaleDateString('en-GB')}</td>
+                <td className="px-4 py-3">
+                  <PrimaryBtn size="sm" variant="ghost" onClick={() => { setSelected(t); setError('') }}>Manage</PrimaryBtn>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>No teachers found</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Manage modal */}
+      {selected && (
+        <Modal title={`Manage: ${selected.first_name ?? selected.email}`} onClose={() => setSelected(null)}>
+          <div className="flex flex-col gap-3">
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              {selected.email} · {selected.school_id ? schoolMap[selected.school_id] ?? 'School' : '⚠️ No school assigned'}
+            </p>
+
+            <Field label="Membership Tier">
+              <Select
+                value={selected.membership_tier}
+                onChange={v => setSelected(s => s ? { ...s, membership_tier: v } : s)}
+                options={[
+                  { label: 'Free', value: 'free' },
+                  { label: 'Pro', value: 'pro' },
+                  { label: 'School', value: 'school' },
+                ]}
+              />
+            </Field>
+
+            {!selected.school_id && (
+              <Field label="Assign to School">
+                <Select
+                  value={selected.school_id ?? ''}
+                  onChange={v => setSelected(s => s ? { ...s, school_id: v } : s)}
+                  options={[
+                    { label: 'Select a school…', value: '' },
+                    ...schools.map(s => ({ label: s.name, value: s.id })),
+                  ]}
+                />
+              </Field>
+            )}
+
+            {error && <p className="text-xs text-red-600">{error}</p>}
+
+            <div className="flex flex-wrap gap-2 mt-2">
+              <PrimaryBtn onClick={() => changeTier(selected.id, selected.membership_tier)} disabled={saving}>
+                {saving ? 'Saving…' : 'Save Tier'}
+              </PrimaryBtn>
+              {schools.length > 0 && (
+                <PrimaryBtn
+                  variant="ghost"
+                  onClick={() => {
+                    if (selected.school_id) assignToSchool(selected.id, selected.school_id)
+                    else setError('Select a school from the dropdown above first')
+                  }}
+                  disabled={saving || !selected.school_id}
+                >
+                  Assign to School
+                </PrimaryBtn>
+              )}
+              <PrimaryBtn variant="ghost" onClick={() => resetPassword(selected.id)} disabled={saving}>
+                Send Reset Email
+              </PrimaryBtn>
+              <PrimaryBtn
+                variant={selected.is_active ? 'danger' : 'primary'}
+                onClick={() => toggleActive(selected.id, !selected.is_active)}
+                disabled={saving}
+              >
+                {selected.is_active ? 'Deactivate' : 'Reactivate'}
+              </PrimaryBtn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Invite Teacher modal */}
+      {showInvite && (
+        <Modal title="Invite Teacher" onClose={() => setShowInvite(false)}>
+          <div className="flex flex-col gap-3">
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              The teacher will receive an email with a link to set up their account.
+            </p>
+            <Field label="Email *">
+              <Input value={inviteForm.email} onChange={v => setInviteForm(f => ({ ...f, email: v }))} placeholder="teacher@school.co.uk" type="email" />
+            </Field>
+            <Field label="Full Name">
+              <Input value={inviteForm.fullName} onChange={v => setInviteForm(f => ({ ...f, fullName: v }))} placeholder="James Okonkwo" />
+            </Field>
+            <Field label="School (optional — leave blank for independent)">
+              <Select
+                value={inviteForm.schoolId}
+                onChange={v => setInviteForm(f => ({ ...f, schoolId: v }))}
+                options={[
+                  { label: 'No school (independent)', value: '' },
+                  ...schools.map(s => ({ label: s.name, value: s.id })),
+                ]}
+              />
+            </Field>
+            {error && <p className="text-xs text-red-600">{error}</p>}
+            <div className="flex gap-2 justify-end mt-2">
+              <PrimaryBtn variant="ghost" onClick={() => setShowInvite(false)}>Cancel</PrimaryBtn>
+              <PrimaryBtn onClick={inviteTeacher} disabled={saving}>{saving ? 'Sending…' : 'Send Invite'}</PrimaryBtn>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
 // ─── Analytics Tab ────────────────────────────────────────────────────────────
 function AnalyticsTab() {
   const [stats, setStats] = useState({
@@ -765,6 +1291,7 @@ function PasswordsTab() {
 const TABS = [
   { id: 'analytics', label: '📊 Analytics' },
   { id: 'schools',   label: '🏫 Schools' },
+  { id: 'teachers',  label: '👩‍🏫 Teachers' },
   { id: 'parents',   label: '👨‍👩‍👧 Parents' },
   { id: 'pupils',    label: '🎒 Pupils' },
   { id: 'passwords', label: '🔑 Passwords' },
@@ -859,6 +1386,7 @@ export default function AdminPage() {
         >
           {activeTab === 'analytics' && <AnalyticsTab />}
           {activeTab === 'schools'   && <SchoolsTab />}
+          {activeTab === 'teachers'  && <TeachersTab />}
           {activeTab === 'parents'   && <ParentsTab />}
           {activeTab === 'pupils'    && <PupilsTab />}
           {activeTab === 'passwords' && <PasswordsTab />}
