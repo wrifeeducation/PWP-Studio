@@ -42,9 +42,12 @@ export const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) 
   // Not authenticated → login
   if (!session) return <Navigate to="/login" replace />
 
-  // Authenticated but profile not yet loaded → keep showing spinner
-  // (AuthInitialiser will populate the profile; avoid premature redirect)
-  if (!profile) return null
+  // Authenticated but profile not yet loaded — wait for AuthInitialiser
+  // If fully initialised and still no profile, the account is broken → send to login
+  if (!profile) {
+    if (isInitialised && !isLoading) return <Navigate to="/login" replace />
+    return null
+  }
 
   // Wrong role → redirect to own dashboard
   if (allowedRoles && role && !allowedRoles.includes(role)) {

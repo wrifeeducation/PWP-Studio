@@ -21,14 +21,14 @@ const ADMIN_EMAILS = [
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Profile {
   id: string
-  email: string
-  full_name: string | null
+  email?: string           // from auth.users via find_user_email action
+  first_name: string
   role: string
   membership_tier: string
   is_active: boolean
   created_at: string
-  school_name?: string | null
-  year_group?: string | null
+  school_id?: string | null
+  year_group?: number | null
   stripe_customer_id?: string | null
 }
 
@@ -300,8 +300,8 @@ function ParentsTab() {
   useEffect(() => { load() }, [load])
 
   const filtered = parents.filter(p =>
-    !search || p.email.toLowerCase().includes(search.toLowerCase()) ||
-    (p.full_name ?? '').toLowerCase().includes(search.toLowerCase())
+    !search || (p.email ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (p.first_name ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
   const changeTier = async (userId: string, tier: string) => {
@@ -376,7 +376,7 @@ function ParentsTab() {
           <tbody>
             {filtered.map((p, i) => (
               <tr key={p.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>{p.full_name ?? '—'}</td>
+                <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>{p.first_name ?? '—'}</td>
                 <td className="px-4 py-3" style={{ color: 'var(--color-text-muted)' }}>{p.email}</td>
                 <td className="px-4 py-3"><Badge value={p.membership_tier} type="tier" /></td>
                 <td className="px-4 py-3"><Badge value={p.is_active ? 'active' : 'inactive'} type="status" /></td>
@@ -394,7 +394,7 @@ function ParentsTab() {
       </div>
 
       {selected && (
-        <Modal title={`Manage: ${selected.full_name ?? selected.email}`} onClose={() => setSelected(null)}>
+        <Modal title={`Manage: ${selected.first_name ?? selected.email}`} onClose={() => setSelected(null)}>
           <div className="flex flex-col gap-3">
             <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{selected.email}</p>
 
@@ -489,8 +489,8 @@ function PupilsTab() {
   useEffect(() => { load() }, [load])
 
   const filtered = pupils.filter(p =>
-    !search || p.email.toLowerCase().includes(search.toLowerCase()) ||
-    (p.full_name ?? '').toLowerCase().includes(search.toLowerCase())
+    !search || (p.email ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (p.first_name ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
   const toggleActive = async (userId: string, activate: boolean) => {
@@ -555,7 +555,7 @@ function PupilsTab() {
           <tbody>
             {filtered.map((p, i) => (
               <tr key={p.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>{p.full_name ?? '—'}</td>
+                <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>{p.first_name ?? '—'}</td>
                 <td className="px-4 py-3" style={{ color: 'var(--color-text-muted)' }}>{p.email}</td>
                 <td className="px-4 py-3" style={{ color: 'var(--color-text-muted)' }}>{p.year_group ?? '—'}</td>
                 <td className="px-4 py-3"><Badge value={p.is_active ? 'active' : 'inactive'} type="status" /></td>
@@ -573,7 +573,7 @@ function PupilsTab() {
       </div>
 
       {selected && (
-        <Modal title={`Manage: ${selected.full_name ?? selected.email}`} onClose={() => setSelected(null)}>
+        <Modal title={`Manage: ${selected.first_name ?? selected.email}`} onClose={() => setSelected(null)}>
           <div className="flex flex-col gap-3">
             <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{selected.email} · Year: {selected.year_group ?? '—'}</p>
 
@@ -700,10 +700,20 @@ function PasswordsTab() {
   const findUser = async () => {
     if (!email.trim()) return
     setSearching(true); setError(''); setFound(null); setMessage('')
-    const { data } = await supabase.from('profiles').select('*').eq('email', email.trim().toLowerCase()).single()
-    if (data) { setFound(data as Profile); setUserId(data.id) }
-    else setError('No user found with that email address.')
-    setSearching(false)
+    try {
+      // Use admin-action Edge Function since profiles table has no email column
+      const result = await adminAction('find_user_email', { email: email.trim().toLowerCase() })
+      if (result?.user) {
+        setFound(result.user as Profile)
+        setUserId(result.user.id)
+      } else {
+        setError('No user found with that email address.')
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Search failed')
+    } finally {
+      setSearching(false)
+    }
   }
 
   const sendReset = async () => {
@@ -739,8 +749,8 @@ function PasswordsTab() {
           style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
         >
           <div>
-            <p className="font-medium text-sm" style={{ color: 'var(--color-text)' }}>{found.full_name ?? '(no name)'}</p>
-            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{found.email} · <Badge value={found.role} type="role" /></p>
+            <p className="font-medium text-sm" style={{ color: 'var(--color-text)' }}>{found.first_name ?? '(no name)'}</p>
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{found.email ?? email} · <Badge value={found.role} type="role" /></p>
           </div>
           <PrimaryBtn onClick={sendReset} disabled={sending}>
             {sending ? 'Sending…' : 'Send Reset Email'}
