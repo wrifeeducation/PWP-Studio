@@ -7,11 +7,11 @@ import type { MasteryTracking, Nullable } from '../types/index'
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
-const GATE_THRESHOLD = 80
-const GATE_WINDOW = 5
+const GATE_THRESHOLD = 70      // rolling average required to pass the level gate
+const GATE_WINDOW = 3          // number of sessions in the rolling window
 const FAST_TRACK_THRESHOLD = 95
 const FAST_TRACK_WINDOW = 3
-const CONSOLIDATION_THRESHOLD = 60
+const CONSOLIDATION_THRESHOLD = 50  // flag for extra help if average falls below this
 const MAX_SESSIONS = 7
 
 // ─── types ────────────────────────────────────────────────────────────────────
@@ -100,13 +100,13 @@ export const computeMasteryUpdate = (
 
   const sessionsCompleted = allScores.length
 
-  // Rolling average over last 5
+  // Rolling average over last 3
   const windowAvg = rollingAverage(allScores, GATE_WINDOW)
 
-  // Gate: 5 consecutive sessions all ≥ 80
+  // Gate: rolling 3-session average ≥ 70 (achievable for learners, ensures real progress)
   const gatePassed =
     (existing?.gate_passed ?? false) ||
-    allAboveThreshold(allScores, GATE_WINDOW, GATE_THRESHOLD)
+    (allScores.length >= GATE_WINDOW && (windowAvg ?? 0) >= GATE_THRESHOLD)
 
   const gatePassed_at = gatePassed && !(existing?.gate_passed ?? false)
     ? new Date().toISOString()
@@ -117,7 +117,7 @@ export const computeMasteryUpdate = (
     (existing?.fast_track_eligible ?? false) ||
     allAboveThreshold(allScores, FAST_TRACK_WINDOW, FAST_TRACK_THRESHOLD)
 
-  // Consolidation: average < 60
+  // Consolidation: rolling average < 50 (signals pupil needs extra support)
   const consolidationRequired =
     windowAvg !== null && windowAvg < CONSOLIDATION_THRESHOLD
 
