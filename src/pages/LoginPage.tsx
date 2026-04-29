@@ -167,9 +167,22 @@ export default function LoginPage() {
     try {
       const { data, error } = await supabase.auth.signUp({
         email, password,
-        options: { data: { first_name: firstName, role: Role.TEACHER } },
+        options: {
+          data: { first_name: firstName, role: Role.TEACHER },
+          emailRedirectTo: `${window.location.origin}/auth/confirm`,
+        },
       })
-      if (error) { setErrors({ general: error.message }); return }
+      if (error) {
+        const msg = error.message.toLowerCase()
+        if (msg.includes('already registered') || msg.includes('user already exists')) {
+          setErrors({ general: 'An account with this email already exists. Try signing in instead.' })
+        } else if (msg.includes('rate limit')) {
+          setErrors({ general: 'Too many attempts. Please wait a moment and try again.' })
+        } else {
+          setErrors({ general: error.message })
+        }
+        return
+      }
       if (data.user) {
         setSuccessMessage('Account created! Please check your email to verify your account before logging in.')
         setAuthMode('login')
@@ -230,9 +243,22 @@ export default function LoginPage() {
     try {
       const { data, error } = await supabase.auth.signUp({
         email, password,
-        options: { data: { first_name: firstName, role: Role.PARENT } },
+        options: {
+          data: { first_name: firstName, role: Role.PARENT },
+          emailRedirectTo: `${window.location.origin}/auth/confirm`,
+        },
       })
-      if (error) { setErrors({ general: error.message }); return }
+      if (error) {
+        const msg = error.message.toLowerCase()
+        if (msg.includes('already registered') || msg.includes('user already exists')) {
+          setErrors({ general: 'An account with this email already exists. Try signing in instead.' })
+        } else if (msg.includes('rate limit')) {
+          setErrors({ general: 'Too many attempts. Please wait a moment and try again.' })
+        } else {
+          setErrors({ general: error.message })
+        }
+        return
+      }
       if (data.user) {
         // Account created — move to child profile step
         setParentStep('child-profile')

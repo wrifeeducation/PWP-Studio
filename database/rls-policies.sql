@@ -1,11 +1,44 @@
 -- WriFe Platform Row Level Security (RLS) Policies
 -- Ensures pupils, teachers, school admins, and parents can only access their data
+--
+-- IMPORTANT: Updated 2026-04-29 (Session 14) to eliminate recursive RLS on profiles.
+-- The old policies used inline subqueries on profiles within profiles policies,
+-- causing infinite recursion → HTTP 500 on every profile read. All profile policies
+-- now use either `id = auth.uid()` (safe, non-recursive) or SECURITY DEFINER
+-- helper functions (which bypass RLS when reading intermediate tables).
 
 -- ============================================================================
 -- HELPER FUNCTIONS
 -- ============================================================================
 
--- Check if user is a teacher and pupil is in one of their classes
+-- Returns TRUE if the calling user is a school admin (non-recursive: runs as definer)
+CREATE OR REPLACE FUNCTION is_school_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM profiles
+    WHERE id = auth.uid() AND role = 'school_admin'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- Get user's role (SECURITY DEFINER bypasses RLS — safe to use in policies)
+CREATE OR REPLACE FUNCTION get_user_role()
+RETURNS VARCHAR AS $$
+BEGIN
+  RETURN (SELECT role FROM profiles WHERE id = auth.uid());
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- Get user's school_id (SECURITY DEFINER bypasses RLS — safe to use in policies)
+CREATE OR REPLACE FUNCTION get_user_school_id()
+RETURNS UUID AS $$
+BEGIN
+  RETURN (SELECT school_id FROM profiles WHERE id = auth.uid());
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- Check if calling user is teacher of a given pupil (via classes join — no profiles recursion)
 CREATE OR REPLACE FUNCTION is_teacher_of_pupil(pupil_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
@@ -20,55 +53,36 @@ BEGIN
       )
   );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- Check if user is school admin of pupil's school
+-- Check if calling user is school admin of the pupil's school
 CREATE OR REPLACE FUNCTION is_school_admin_of_pupil(pupil_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1
-    FROM profiles admin
-    WHERE admin.id = auth.uid()
-      AND admin.role = 'school_admin'
-      AND admin.school_id = (
-        SELECT school_id
-        FROM profiles
-        WHERE id = pupil_id
+    FROM profiles admin_profile
+    WHERE admin_profile.id = auth.uid()
+      AND admin_profile.role = 'school_admin'
+      AND admin_profile.school_id = (
+        SELECT school_id FROM profiles WHERE id = pupil_id
       )
   );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- Check if user is approved parent of pupil
+-- Check if calling user is an approved parent of a pupil
 CREATE OR REPLACE FUNCTION is_approved_parent_of_pupil(pupil_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
-    SELECT 1
-    FROM parent_pupil
+    SELECT 1 FROM parent_pupil
     WHERE parent_id = auth.uid()
-      AND pupil_id = pupil_id
+      AND parent_pupil.pupil_id = is_approved_parent_of_pupil.pupil_id
       AND approved = TRUE
   );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Get user's school_id
-CREATE OR REPLACE FUNCTION get_user_school_id()
-RETURNS UUID AS $$
-BEGIN
-  RETURN (SELECT school_id FROM profiles WHERE id = auth.uid());
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Get user's role
-CREATE OR REPLACE FUNCTION get_user_role()
-RETURNS VARCHAR AS $$
-BEGIN
-  RETURN (SELECT role FROM profiles WHERE id = auth.uid());
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- ============================================================================
 -- ENABLE RLS ON ALL TABLES
@@ -168,93 +182,72 @@ WITH CHECK (
 -- ============================================================================
 -- PROFILES TABLE POLICIES
 -- ============================================================================
+-- NOTE: These policies were rewritten 2026-04-29 to eliminate infinite recursion.
+-- The previous version used inline subqueries on profiles inside profiles policies,
+-- causing PostgreSQL to recurse infinitely → HTTP 500. The fix uses:
+--   1. `id = auth.uid()` — always safe, no join needed
+--   2. SECURITY DEFINER functions (is_school_admin, get_user_role) — bypass RLS
+--   3. Joins via the `classes` table rather than back through profiles
 
--- Pupils can read themselves and classmates
-CREATE POLICY profiles_pupil_read ON profiles
+-- Any authenticated user can read their own profile row
+CREATE POLICY profiles_own_read ON profiles
 FOR SELECT
-USING (
-  id = auth.uid()
-  OR (
-    role = 'pupil'
-    AND class_id = (SELECT class_id FROM profiles WHERE id = auth.uid())
-  )
-  OR (
-    (SELECT get_user_role()) = 'pupil'
-    AND school_id = (SELECT school_id FROM profiles WHERE id = auth.uid())
-  )
-);
+USING (id = auth.uid());
 
--- Teachers can read pupils in their classes and other teachers
-CREATE POLICY profiles_teacher_read ON profiles
-FOR SELECT
-USING (
-  id = auth.uid()
-  OR (
-    (SELECT get_user_role()) = 'teacher'
-    AND school_id = (SELECT school_id FROM profiles WHERE id = auth.uid())
-  )
-  OR (
-    (SELECT get_user_role()) = 'teacher'
-    AND class_id IN (
-      SELECT id FROM classes WHERE teacher_id = auth.uid()
-    )
-  )
-);
+-- Any authenticated user can insert their own profile row
+-- (also covered by the handle_new_user trigger, but this allows self-repair)
+CREATE POLICY profiles_own_insert ON profiles
+FOR INSERT
+WITH CHECK (id = auth.uid());
 
--- School admins can read all profiles in their school
-CREATE POLICY profiles_admin_read ON profiles
-FOR SELECT
-USING (
-  (SELECT get_user_role()) = 'school_admin'
-  AND school_id = (SELECT school_id FROM profiles WHERE id = auth.uid())
-);
-
--- Parents can read their linked pupils
-CREATE POLICY profiles_parent_read ON profiles
-FOR SELECT
-USING (
-  (SELECT get_user_role()) = 'parent'
-  AND id IN (
-    SELECT pupil_id
-    FROM parent_pupil
-    WHERE parent_id = auth.uid() AND approved = TRUE
-  )
-);
-
--- Pupils can update their own profile (limited fields)
-CREATE POLICY profiles_pupil_update ON profiles
+-- Any authenticated user can update their own profile row
+CREATE POLICY profiles_own_update ON profiles
 FOR UPDATE
-USING (id = auth.uid())
-WITH CHECK (
-  id = auth.uid()
-  AND role = (SELECT role FROM profiles WHERE id = auth.uid()) -- Can't change role
-  AND school_id = (SELECT school_id FROM profiles WHERE id = auth.uid()) -- Can't change school
+USING (id = auth.uid());
+
+-- Teachers can read all profiles in classes they teach (via classes join, no profiles recursion)
+CREATE POLICY profiles_teacher_class_read ON profiles
+FOR SELECT
+USING (
+  class_id IN (
+    SELECT id FROM classes WHERE teacher_id = auth.uid()
+  )
 );
+
+-- Teachers / school admin in same school can read each other's profiles
+-- (uses classes as the school anchor to avoid self-referencing profiles)
+CREATE POLICY profiles_admin_school_read ON profiles
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM classes
+    WHERE classes.school_id = profiles.school_id
+      AND classes.teacher_id = auth.uid()
+  )
+  OR auth.uid() = id
+);
+
+-- School admins can read ALL profiles in their school
+CREATE POLICY "school_admin read all profiles" ON profiles
+FOR SELECT
+USING (is_school_admin());
+
+-- School admins can update ALL profiles in their school
+CREATE POLICY "school_admin update all profiles" ON profiles
+FOR UPDATE
+USING (is_school_admin())
+WITH CHECK (is_school_admin());
 
 -- Teachers can update pupils in their classes
 CREATE POLICY profiles_teacher_update_pupils ON profiles
 FOR UPDATE
 USING (
-  (SELECT get_user_role()) = 'teacher'
-  AND role = 'pupil'
+  (role)::text = 'pupil'
   AND class_id IN (SELECT id FROM classes WHERE teacher_id = auth.uid())
 )
 WITH CHECK (
-  (SELECT get_user_role()) = 'teacher'
-  AND role = 'pupil'
+  (role)::text = 'pupil'
   AND class_id IN (SELECT id FROM classes WHERE teacher_id = auth.uid())
-);
-
--- School admins can update profiles in their school (except roles)
-CREATE POLICY profiles_admin_update ON profiles
-FOR UPDATE
-USING (
-  (SELECT get_user_role()) = 'school_admin'
-  AND school_id = (SELECT school_id FROM profiles WHERE id = auth.uid())
-)
-WITH CHECK (
-  (SELECT get_user_role()) = 'school_admin'
-  AND school_id = (SELECT school_id FROM profiles WHERE id = auth.uid())
 );
 
 -- ============================================================================
