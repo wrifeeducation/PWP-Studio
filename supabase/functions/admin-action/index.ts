@@ -212,7 +212,7 @@ Deno.serve(async (req: Request) => {
     if (action === 'update_role') {
       const { userId, role } = payload
       if (!userId || !role) return err('userId and role are required')
-      const validRoles = ['pupil', 'teacher', 'school_admin', 'parent']
+      const validRoles = ['pupil', 'teacher', 'school_admin', 'parent', 'admin']
       if (!validRoles.includes(role)) return err('Invalid role')
       const { error } = await admin.from('profiles').update({ role }).eq('id', userId)
       if (error) return err(error.message)

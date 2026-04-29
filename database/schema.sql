@@ -57,7 +57,7 @@ CREATE INDEX idx_classes_year_group ON classes(year_group);
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   school_id UUID NOT NULL REFERENCES schools(id) ON DELETE RESTRICT,
-  role VARCHAR(20) NOT NULL CHECK (role IN ('pupil', 'teacher', 'school_admin', 'parent')),
+  role VARCHAR(20) NOT NULL CHECK (role IN ('pupil', 'teacher', 'school_admin', 'parent', 'admin')),
   first_name VARCHAR(100) NOT NULL,
   year_group SMALLINT CHECK (year_group IS NULL OR (year_group >= 1 AND year_group <= 13)),
   class_id UUID REFERENCES classes(id) ON DELETE SET NULL,
