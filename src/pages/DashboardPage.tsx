@@ -1164,8 +1164,16 @@ export default function DashboardPage() {
   }
 
   // ── node click ──────────────────────────────────────────────────────────────
-  const handleNodeClick = (_level: number, _node: NodeType) => {
-    navigate('/practice')
+  const handleNodeClick = (level: number, _node: NodeType) => {
+    const currentLevel = progress?.current_formula_level ?? 1
+    const tier = levelTier(level, currentLevel)
+    if (tier === 'done') {
+      // Completed level — open in review mode so progress isn't affected
+      navigate(`/practice?level=${level}&review=true`)
+    } else {
+      // Active level — normal practice session
+      navigate('/practice')
+    }
   }
 
   // ── derived data ────────────────────────────────────────────────────────────

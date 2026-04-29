@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFormulaLevel } from '../hooks/useFormulaLevel'
@@ -55,9 +55,15 @@ export default function FormulaPage() {
   const queryClient = useQueryClient()
   const { user, profile } = useAuthStore()
 
+  // ── Review mode — load a specific previous level without affecting progression ─
+  const [searchParams] = useSearchParams()
+  const reviewLevelParam = searchParams.get('level')
+  const reviewLevelId = reviewLevelParam ? parseInt(reviewLevelParam, 10) : undefined
+  const isReviewMode = searchParams.get('review') === 'true' && !!reviewLevelId
+
   // ── Freemium gate ─────────────────────────────────────────────────────────
   const freemium = useFreemium()
-  const { isLoading, isError, data, refetch } = useFormulaLevel()
+  const { isLoading, isError, data, refetch } = useFormulaLevel(reviewLevelId)
   const { setAssessing, isAssessing, resetSession } = useFormulaStore()
 
   const [screen, setScreen] = useState<Screen>('concepts')
@@ -322,6 +328,7 @@ export default function FormulaPage() {
       setXpEarned(totalXpEarned)
 
       // WF-013: check level progression gate
+      // In review mode, we award XP but never advance the level
       let progressionUpdates: Record<string, unknown> = {
         total_xp: (progress?.total_xp ?? 0) + totalXpEarned,
         last_session_date: today,
@@ -331,7 +338,7 @@ export default function FormulaPage() {
       let didLevelUp = false
       let newLevelNum = data.level.id
 
-      if (shouldAdvance(masteryPayload)) {
+      if (!isReviewMode && shouldAdvance(masteryPayload)) {
         newLevelNum = nextLevel(data.level.id, masteryPayload)
         const newLevelsMastered = (progress?.levels_mastered_count ?? 0) + 1
         const paragraphNowUnlocked =
@@ -805,10 +812,10 @@ export default function FormulaPage() {
           className="text-sm px-3 py-1.5 rounded-lg transition-colors focus:outline-none focus-visible:ring-2"
           style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}
           data-testid="back-button"
-          data-tts="Back to dashboard"
-          aria-label="Back to dashboard"
+          data-tts={isReviewMode ? 'Back to my levels' : 'Back to dashboard'}
+          aria-label={isReviewMode ? 'Back to my levels' : 'Back to dashboard'}
         >
-          ← Back
+          ← {isReviewMode ? 'My levels' : 'Back'}
         </button>
 
         <div className="flex items-center gap-2">
@@ -822,38 +829,67 @@ export default function FormulaPage() {
           <span
             className="font-bold text-base"
             style={{ color: 'var(--color-text)' }}
-            data-tts="Formula Practice"
+            data-tts={isReviewMode ? `Reviewing Level ${data.level.id}` : 'Formula Practice'}
           >
-            Formula Practice
+            {isReviewMode ? `Reviewing L${data.level.id}` : 'Formula Practice'}
           </span>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Free tier: plays remaining badge */}
-          {freemium.isFree && !freemium.loading && (
+          {/* Review mode badge */}
+          {isReviewMode ? (
             <div
               className="text-xs font-semibold px-2 py-1 rounded"
-              style={{
-                backgroundColor: freemium.playsRemaining <= 1 ? '#FEE2E2' : '#ECFDF5',
-                color: freemium.playsRemaining <= 1 ? '#991B1B' : '#065F46',
-              }}
-              title="Free daily sessions remaining"
-              data-tts={`${freemium.playsRemaining} sessions left today`}
-              data-testid="freemium-counter"
+              style={{ backgroundColor: '#FFF7ED', color: '#C2410C', border: '1px solid #FED7AA' }}
+              data-tts={`Reviewing Level ${data.level.id}`}
+              data-testid="review-mode-badge"
             >
-              {freemium.playsRemaining}/{3} left
+              📖 Review
             </div>
-          )}
+          ) : (
+            <>
+              {/* Free tier: plays remaining badge */}
+              {freemium.isFree && !freemium.loading && (
+                <div
+                  className="text-xs font-semibold px-2 py-1 rounded"
+                  style={{
+                    backgroundColor: freemium.playsRemaining <= 1 ? '#FEE2E2' : '#ECFDF5',
+                    color: freemium.playsRemaining <= 1 ? '#991B1B' : '#065F46',
+                  }}
+                  title="Free daily sessions remaining"
+                  data-tts={`${freemium.playsRemaining} sessions left today`}
+                  data-testid="freemium-counter"
+                >
+                  {freemium.playsRemaining}/{3} left
+                </div>
+              )}
 
-          <div
-            className="text-xs font-semibold px-2 py-1 rounded"
-            style={{ backgroundColor: '#EFF6FF', color: 'var(--color-noun)' }}
-            data-tts={`Level ${data.level.id}`}
-          >
-            L{data.level.id}
-          </div>
+              <div
+                className="text-xs font-semibold px-2 py-1 rounded"
+                style={{ backgroundColor: '#EFF6FF', color: 'var(--color-noun)' }}
+                data-tts={`Level ${data.level.id}`}
+              >
+                L{data.level.id}
+              </div>
+            </>
+          )}
         </div>
       </header>
+
+      {/* Review mode info strip */}
+      {isReviewMode && (
+        <div
+          className="px-4 py-2.5 flex items-center gap-2 text-sm"
+          style={{ backgroundColor: '#FFF7ED', borderBottom: '1px solid #FED7AA' }}
+          data-tts={`You are reviewing Level ${data.level.id}. Your place on the main path is safe — this practice does not change your current level.`}
+          data-testid="review-mode-banner"
+        >
+          <span aria-hidden="true">📖</span>
+          <span style={{ color: '#92400E' }}>
+            <strong>Reviewing L{data.level.id}</strong> — your place on the main path is safe. This practice won't change your level.
+          </span>
+        </div>
+      )}
 
       <main className="max-w-xl mx-auto px-4 pt-6">
         {/* Submit error banner */}

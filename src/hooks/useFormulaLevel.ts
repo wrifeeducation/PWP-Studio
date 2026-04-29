@@ -41,11 +41,18 @@ interface FormulaLevelData {
   progress: PupilProgress
 }
 
-export const useFormulaLevel = () => {
+/**
+ * Loads a formula level for a pupil.
+ *
+ * @param overrideLevelId — when provided, load this specific level instead of
+ *   the pupil's current_formula_level. Used for the Level Library / review mode
+ *   so pupils can revisit any completed level without it affecting progression.
+ */
+export const useFormulaLevel = (overrideLevelId?: number) => {
   const { user } = useAuthStore()
   const pupilId = user?.id ?? null
 
-  // Step 1: fetch pupil_progress to get current_formula_level
+  // Step 1: always fetch pupil_progress (needed for XP, streak, and progression)
   const progressQuery = useQuery({
     queryKey: ['pupil_progress', pupilId],
     queryFn: async (): Promise<PupilProgress> => {
@@ -62,9 +69,10 @@ export const useFormulaLevel = () => {
     staleTime: 1000 * 60 * 5,
   })
 
-  const levelId = progressQuery.data?.current_formula_level ?? 1
+  // Step 2: determine which level to load — override takes priority
+  const levelId = overrideLevelId ?? progressQuery.data?.current_formula_level ?? 1
 
-  // Step 2: fetch the formula_levels row for that level
+  // Step 3: fetch the formula_levels row
   const levelQuery = useQuery({
     queryKey: ['formula_level', levelId],
     queryFn: async (): Promise<FormulaLevel> => {
@@ -76,7 +84,8 @@ export const useFormulaLevel = () => {
       if (error) throw error
       return data as FormulaLevel
     },
-    enabled: progressQuery.isSuccess,
+    // When overriding, we don't need to wait for progressQuery to succeed
+    enabled: overrideLevelId ? true : progressQuery.isSuccess,
     staleTime: 1000 * 60 * 30, // formula definitions rarely change
   })
 
