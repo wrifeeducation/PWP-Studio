@@ -33,8 +33,11 @@ const ParentPage = lazy(() => import('./pages/ParentPage'))
 const PricingPage = lazy(() => import('./pages/PricingPage'))
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
-// WF-056: Teacher onboarding
+// WF-056: Teacher onboarding (invite-only — not auto-redirected)
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage'))
+// Auth email link handler + password update
+const AuthConfirmPage = lazy(() => import('./pages/AuthConfirmPage'))
+const UpdatePasswordPage = lazy(() => import('./pages/UpdatePasswordPage'))
 
 // Role constants
 import { Role } from './types/index'
@@ -143,6 +146,8 @@ function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/auth/confirm" element={<AuthConfirmPage />} />
+            <Route path="/update-password" element={<UpdatePasswordPage />} />
 
             {/* Landing page — redirects logged-in users to their dashboard */}
             <Route path="/" element={<HomePage />} />

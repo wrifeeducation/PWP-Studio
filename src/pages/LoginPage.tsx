@@ -91,8 +91,19 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<FormErrors>({})
   const [isLoading, setIsLoading] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
+  const [resetSent, setResetSent] = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
 
   const clearErrors = () => setErrors({})
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) { setErrors({ email: 'Enter your email address first.' }); return }
+    setResetLoading(true)
+    const redirectTo = `${window.location.origin}/auth/confirm`
+    await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo })
+    setResetLoading(false)
+    setResetSent(true)
+  }
 
   const selectRole = (mode: 'teacher' | 'pupil' | 'parent') => {
     setLoginMode(mode)
@@ -710,6 +721,27 @@ export default function LoginPage() {
                       >
                         {isLoading ? 'Please wait…' : authMode === 'login' ? 'Sign In' : 'Create Account'}
                       </button>
+
+                      {authMode === 'login' && (
+                        <div className="text-center mt-3">
+                          {resetSent ? (
+                            <p className="text-xs" style={{ color: 'var(--color-brand-success)' }}>
+                              ✓ Reset link sent — check your email (including spam)
+                            </p>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleForgotPassword}
+                              disabled={resetLoading}
+                              className="text-xs hover:underline transition-opacity disabled:opacity-50"
+                              style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
+                              data-tts="Forgot password"
+                            >
+                              {resetLoading ? 'Sending…' : 'Forgot password?'}
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </form>
                   </>
                 )}
@@ -941,6 +973,27 @@ export default function LoginPage() {
                           ? 'Sign In'
                           : 'Create Account →'}
                       </button>
+
+                      {authMode === 'login' && (
+                        <div className="text-center mt-3">
+                          {resetSent ? (
+                            <p className="text-xs" style={{ color: 'var(--color-brand-success)' }}>
+                              ✓ Reset link sent — check your email (including spam)
+                            </p>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleForgotPassword}
+                              disabled={resetLoading}
+                              className="text-xs hover:underline transition-opacity disabled:opacity-50"
+                              style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
+                              data-tts="Forgot password"
+                            >
+                              {resetLoading ? 'Sending…' : 'Forgot password?'}
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </form>
                   </>
                 )}
