@@ -97,6 +97,9 @@ function AuthInitialiser() {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session)
       if (session?.user) {
+        // Mark as loading while we fetch the profile so ProtectedRoute
+        // shows the spinner instead of bouncing to /login mid-fetch.
+        setLoading(true)
         const profile = await fetchProfileWithTimeout(session.user.id)
         if (profile) setProfile(profile)
       } else {
