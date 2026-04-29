@@ -7,9 +7,14 @@ interface ProtectedRouteProps {
   allowedRoles?: Role[]
 }
 
+/**
+ * Guards routes by auth state and role.
+ * Never redirects to /onboarding — that page is invite-only for school-allocated teachers.
+ */
 export const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
   const { session, profile, role, isLoading, isInitialised } = useAuthStore()
 
+  // Show spinner while auth is initialising
   if (isLoading || !isInitialised) {
     return (
       <div
@@ -34,20 +39,19 @@ export const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) 
     )
   }
 
-  if (!session) {
-    return <Navigate to="/login" replace />
-  }
+  // Not authenticated → login
+  if (!session) return <Navigate to="/login" replace />
 
-  if (session && !profile) {
-    return <Navigate to="/onboarding" replace />
-  }
+  // Authenticated but profile not yet loaded → keep showing spinner
+  // (AuthInitialiser will populate the profile; avoid premature redirect)
+  if (!profile) return null
 
+  // Wrong role → redirect to own dashboard
   if (allowedRoles && role && !allowedRoles.includes(role)) {
-    // Redirect to appropriate dashboard based on role
-    if (role === 'pupil') return <Navigate to="/dashboard" replace />
-    if (role === 'teacher') return <Navigate to="/teacher" replace />
+    if (role === 'pupil')        return <Navigate to="/dashboard" replace />
+    if (role === 'teacher')      return <Navigate to="/teacher" replace />
     if (role === 'school_admin') return <Navigate to="/admin" replace />
-    if (role === 'parent') return <Navigate to="/parent" replace />
+    if (role === 'parent')       return <Navigate to="/parent" replace />
     return <Navigate to="/login" replace />
   }
 
