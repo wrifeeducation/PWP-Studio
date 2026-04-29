@@ -177,7 +177,7 @@ export interface Profile extends WithTimestamps {
   selected_avatar: string; // AvatarVariantId
   coins: number;
   stripe_customer_id: Nullable<string>;
-  membership_tier: 'free' | 'pro';
+  membership_tier: 'free' | 'pro' | 'school';
 }
 
 export interface Class extends WithTimestamps {
