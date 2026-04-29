@@ -37,6 +37,7 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage'))
 // Auth email link handler + password update
 const AuthConfirmPage = lazy(() => import('./pages/AuthConfirmPage'))
+const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage'))
 const UpdatePasswordPage = lazy(() => import('./pages/UpdatePasswordPage'))
 
 // Role constants
@@ -149,6 +150,7 @@ function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/auth/confirm" element={<AuthConfirmPage />} />
             <Route path="/update-password" element={<UpdatePasswordPage />} />
 
@@ -219,11 +221,11 @@ function App() {
               }
             />
 
-            {/* School admin panel — admins only */}
+            {/* Platform admin panel — admin role only */}
             <Route
               path="/admin"
               element={
-                <ProtectedRoute allowedRoles={[Role.SCHOOL_ADMIN]}>
+                <ProtectedRoute allowedRoles={[Role.ADMIN]}>
                   <AdminPage />
                 </ProtectedRoute>
               }

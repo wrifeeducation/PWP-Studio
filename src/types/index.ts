@@ -13,6 +13,7 @@ export enum Role {
   TEACHER = 'teacher',
   SCHOOL_ADMIN = 'school_admin',
   PARENT = 'parent',
+  ADMIN = 'admin',
 }
 
 export enum Phase {
