@@ -576,9 +576,11 @@ function ok(data: Record<string, unknown>) {
   })
 }
 
-function err(message: string, status = 400) {
+function err(message: string) {
+  // Return 200 with { error } so supabase.functions.invoke() keeps res.data populated.
+  // 4xx/5xx causes invoke() to null out res.data and we lose the actual message.
   return new Response(JSON.stringify({ error: message }), {
-    status,
+    status: 200,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 }
