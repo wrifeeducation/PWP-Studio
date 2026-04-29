@@ -25,6 +25,8 @@ export interface WordClassTileProps {
   size?: 'sm' | 'md' | 'lg'
   /** Called on click (for click-to-select fallback) */
   onClick?: () => void
+  /** Called on double-click / double-tap — places tile into next matching slot */
+  onDoubleClick?: () => void
   dataTestId?: string
 }
 
@@ -72,6 +74,7 @@ export const WordClassTile: React.FC<WordClassTileProps> = ({
   isStatic = false,
   size = 'md',
   onClick,
+  onDoubleClick,
   dataTestId,
 }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -114,6 +117,7 @@ export const WordClassTile: React.FC<WordClassTileProps> = ({
       {...(isStatic ? {} : listeners)}
       {...(isStatic ? {} : attributes)}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
       data-testid={dataTestId ?? `word-tile-${word}-${wordClass}`}
       data-tts={`${label} tile: ${word}`}
       aria-label={`${word} — ${wordClass}`}

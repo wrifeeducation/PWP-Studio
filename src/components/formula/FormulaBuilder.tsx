@@ -78,6 +78,20 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
   )
 
+  // Double-click / double-tap: place tile into the first empty matching slot
+  const handleTileDoubleClick = useCallback(
+    (word: string, wordClass: WordClass, tileId: string) => {
+      if (usedWordIds.has(tileId)) return // already placed
+      const matchingSlot = level.formula_elements.find(
+        (el) => el.word_class === wordClass && !slotSelections[el.position]
+      )
+      if (matchingSlot) {
+        setSlotWord(matchingSlot.position, word, tileId)
+      }
+    },
+    [level.formula_elements, slotSelections, usedWordIds, setSlotWord]
+  )
+
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event
@@ -245,9 +259,9 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
           <p
             className="text-xs uppercase tracking-wider font-semibold mb-3"
             style={{ color: 'var(--color-text-muted)' }}
-            data-tts="Word bank — drag a word to a slot"
+            data-tts="Word bank — drag or double-tap a word to place it"
           >
-            Word Bank — drag a word to a slot
+            Word Bank — drag or double-tap to place
           </p>
           <div className="flex flex-wrap gap-2">
             {uniqueBankEntries.map((entry) => (
@@ -259,6 +273,9 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
                 state={usedWordIds.has(entry.id) ? 'disabled' : 'idle'}
                 size="md"
                 dataTestId={`word-tile-${entry.id}`}
+                onDoubleClick={() =>
+                  handleTileDoubleClick(entry.word, entry.wordClass, entry.id)
+                }
               />
             ))}
           </div>
