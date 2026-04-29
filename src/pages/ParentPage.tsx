@@ -475,17 +475,26 @@ export default function ParentPage() {
       setSetupPending(true)
       sessionStorage.removeItem('wrife_pending_child')
 
-      // Call the create-child-profile Edge Function (built in task #36+)
-      // For now, log and clear — function will be deployed separately
-      let pending: { nickname: string; year_group: number }
-      try {
-        pending = JSON.parse(pendingRaw) as { nickname: string; year_group: number }
-        console.log('ParentPage: pending child setup', pending)
-        // TODO: supabase.functions.invoke('create-child-profile', { body: pending })
-      } catch {
-        // malformed data, ignore
-      }
-      setSetupPending(false)
+      // Call the create-child-profile Edge Function
+      ;(async () => {
+        try {
+          const pending = JSON.parse(pendingRaw) as { nickname: string; year_group: number }
+          const { data, error } = await supabase.functions.invoke('create-child-profile', {
+            body: { nickname: pending.nickname, year_group: pending.year_group },
+          })
+          if (error) {
+            console.error('ParentPage: create-child-profile error', error)
+          } else {
+            console.log('ParentPage: child profile created', data)
+            // Reload so the new child appears in the dashboard
+            window.location.reload()
+          }
+        } catch {
+          // malformed sessionStorage data, ignore
+        } finally {
+          setSetupPending(false)
+        }
+      })()
     }
   }, [profile])
 

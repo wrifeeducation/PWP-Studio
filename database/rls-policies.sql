@@ -250,6 +250,19 @@ WITH CHECK (
   AND class_id IN (SELECT id FROM classes WHERE teacher_id = auth.uid())
 );
 
+-- Parents can read profiles of their approved linked pupils
+-- (Added 2026-04-29 Session 16 — previously missing, broke parent dashboard)
+CREATE POLICY profiles_parent_read ON profiles
+FOR SELECT
+USING (
+  id IN (
+    SELECT pupil_id
+    FROM parent_pupil
+    WHERE parent_id = auth.uid()
+      AND approved = true
+  )
+);
+
 -- ============================================================================
 -- PARENT_PUPIL TABLE POLICIES
 -- ============================================================================

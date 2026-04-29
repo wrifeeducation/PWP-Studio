@@ -41,14 +41,16 @@ Deno.serve(async (req: Request) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // Invite user via Supabase Admin API
+    // Invite user via Supabase Admin API.
+    // redirectTo lands on /auth/confirm, which handles all email link types.
+    const siteUrl = Deno.env.get('SITE_URL') ?? 'https://pwp-studio.wrife.co.uk'
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: {
         first_name,
         school_id,
         role: 'teacher',
       },
-      redirectTo: `${Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '') ?? ''}/accept-invite`,
+      redirectTo: `${siteUrl}/auth/confirm`,
     })
 
     if (error) {
@@ -59,15 +61,17 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // After invite, create a pending profile row so the admin can see the teacher
-    // (auth trigger may also do this — check on_auth_user_created trigger if set up)
+    // Ensure a profile row exists. The handle_new_user trigger fires on auth.users
+    // INSERT and creates the row — but invited users may not trigger it immediately.
+    // Upsert here as a safety net; ignore conflicts if the trigger already fired.
     if (data?.user) {
       await supabaseAdmin.from('profiles').upsert({
         id: data.user.id,
         school_id,
         role: 'teacher',
         first_name,
-        avatar_colour: 'blue',
+        membership_tier: 'free',
+        is_active: true,
       }, { onConflict: 'id', ignoreDuplicates: true })
     }
 

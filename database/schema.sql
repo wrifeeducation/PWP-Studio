@@ -446,51 +446,90 @@ FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 -- ============================================================================
 -- VIEWS FOR COMMON QUERIES
 -- ============================================================================
+-- IMPORTANT: All views use security_invoker = true so they run under the
+-- calling user's RLS context. They also include explicit WHERE clauses scoping
+-- results to the calling teacher's classes — belt-and-braces isolation.
+-- Updated 2026-04-29 (Session 16) — prior versions used security_definer
+-- (default), which bypassed RLS and exposed all pupils across all schools.
 
-CREATE OR REPLACE VIEW v_class_formula_progress AS
+-- Per-pupil detail view: used by teacher dashboard progress tabs.
+-- Returns only pupils in classes taught by auth.uid().
+CREATE OR REPLACE VIEW v_class_formula_progress
+WITH (security_invoker = true)
+AS
 SELECT
-  c.id,
-  c.name,
-  c.school_id,
-  COUNT(DISTINCT p.id) as total_pupils,
-  ROUND(AVG(pp.current_formula_level)::NUMERIC, 1) as avg_formula_level,
-  COUNT(DISTINCT CASE WHEN pp.writing_studio_unlocked THEN p.id END) as writing_studio_unlocked_count,
-  ROUND(AVG(COALESCE(pp.total_xp, 0))::NUMERIC, 0) as avg_total_xp
-FROM classes c
-LEFT JOIN profiles p ON p.class_id = c.id AND p.role = 'pupil'
+  p.id AS pupil_id,
+  p.first_name,
+  p.class_id,
+  p.school_id,
+  c.name AS class_name,
+  c.year_group,
+  pp.current_formula_level,
+  pp.current_streak,
+  pp.longest_streak,
+  pp.total_xp,
+  pp.writing_studio_unlocked,
+  pp.last_session_date,
+  round(avg(fs.formula_score) FILTER (WHERE fs.session_date >= CURRENT_DATE - INTERVAL '30 days'), 1) AS avg_score_30d,
+  count(fs.id) FILTER (WHERE fs.session_date >= CURRENT_DATE - INTERVAL '30 days') AS sessions_30d,
+  bool_or(mt.consolidation_required) AS has_consolidation_flag
+FROM profiles p
+LEFT JOIN classes c ON c.id = p.class_id
 LEFT JOIN pupil_progress pp ON pp.pupil_id = p.id
-GROUP BY c.id, c.name, c.school_id;
+LEFT JOIN formula_sessions fs ON fs.pupil_id = p.id
+LEFT JOIN mastery_tracking mt ON mt.pupil_id = p.id AND mt.consolidation_required = true
+WHERE p.role = 'pupil'
+  AND c.teacher_id = auth.uid()
+GROUP BY
+  p.id, p.first_name, p.class_id, p.school_id,
+  c.name, c.year_group,
+  pp.current_formula_level, pp.current_streak, pp.longest_streak,
+  pp.total_xp, pp.writing_studio_unlocked, pp.last_session_date;
 
-CREATE OR REPLACE VIEW v_pupil_transfer_rate AS
+-- Success rate view: used by teacher intervention/analytics tabs.
+-- Returns only pupils in classes taught by auth.uid().
+CREATE OR REPLACE VIEW v_pupil_transfer_rate
+WITH (security_invoker = true)
+AS
 SELECT
   pp.pupil_id,
   p.class_id,
   pp.current_formula_level,
-  COUNT(CASE WHEN fs.formula_score >= 80 THEN 1 END)::FLOAT /
-    NULLIF(COUNT(*), 0) as success_rate_last_5,
-  MAX(fs.session_date) as last_session_date
+  (
+    count(CASE WHEN fs.formula_score >= 80 THEN 1 END)::double precision
+    / NULLIF(count(*), 0)::double precision
+  ) AS success_rate_last_5,
+  max(fs.session_date) AS last_session_date
 FROM pupil_progress pp
 JOIN profiles p ON p.id = pp.pupil_id
 LEFT JOIN formula_sessions fs ON fs.pupil_id = pp.pupil_id
   AND fs.session_date >= CURRENT_DATE - INTERVAL '30 days'
+WHERE p.class_id IN (
+  SELECT id FROM classes WHERE teacher_id = auth.uid()
+)
 GROUP BY pp.pupil_id, p.class_id, pp.current_formula_level;
 
-CREATE OR REPLACE VIEW v_pending_writing_reviews AS
+-- Pending reviews view: used by teacher writing review tab.
+-- Returns only writing pieces from pupils in the calling teacher's classes.
+CREATE OR REPLACE VIEW v_pending_writing_reviews
+WITH (security_invoker = true)
+AS
 SELECT
   wp.id,
   wp.pupil_id,
-  p.first_name as pupil_name,
+  p.first_name AS pupil_name,
   p.class_id,
   wp.genre,
   wp.word_count,
   wp.submitted_at,
-  CURRENT_DATE - wp.submitted_at::DATE as days_pending,
+  (CURRENT_DATE - wp.submitted_at::date) AS days_pending,
   c.teacher_id
 FROM writing_pieces wp
 JOIN profiles p ON p.id = wp.pupil_id
 LEFT JOIN classes c ON c.id = p.class_id
 WHERE wp.status = 'submitted'
-ORDER BY wp.submitted_at ASC;
+  AND c.teacher_id = auth.uid()
+ORDER BY wp.submitted_at;
 
 -- ============================================================================
 -- PERMISSIONS: Create special roles for application logic
