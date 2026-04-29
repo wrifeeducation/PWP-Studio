@@ -1540,9 +1540,14 @@ function AdminsTab() {
             />
           </div>
           <div className="sm:col-span-2">
-            <PrimaryBtn type="submit" loading={submitting} disabled={submitting}>
-              Create admin account
-            </PrimaryBtn>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-50"
+              style={{ backgroundColor: 'var(--color-brand-primary)' }}
+            >
+              {submitting ? 'Creating…' : 'Create admin account'}
+            </button>
           </div>
         </form>
       </div>
