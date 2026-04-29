@@ -77,9 +77,9 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
         <p
           className="text-xs font-semibold uppercase tracking-wider"
           style={{ color: 'var(--color-text-muted)' }}
-          data-tts="Quick reminder — word classes in today's formula"
+          data-tts="Quick reminder — word types in today's sentence"
         >
-          Quick reminder
+          Quick reminder — word types for today
         </p>
         <div className="flex flex-wrap gap-2">
           {cards.map((card) => {
@@ -87,12 +87,13 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
             return (
               <div
                 key={card.wordClass}
-                className="px-3 py-1.5 rounded-full text-xs font-semibold text-white"
+                className="px-3 py-1.5 rounded-full text-xs font-semibold text-white flex flex-col items-center leading-tight"
                 style={{ backgroundColor: colorVar }}
-                data-tts={`${card.label}: ${card.definition}`}
-                title={card.definition}
+                data-tts={`${card.plainEnglishName}: ${card.childFriendlyDefinition}`}
+                title={card.childFriendlyDefinition}
               >
-                {card.label}
+                <span>{card.plainEnglishName}</span>
+                <span className="opacity-75 text-[9px] font-normal uppercase tracking-wide">{card.label}</span>
               </div>
             )
           })}
@@ -142,13 +143,18 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
   return (
     <div className="space-y-4" data-testid="concept-card-sequence">
       <div className="flex items-center justify-between">
-        <p
-          className="text-sm font-medium"
-          style={{ color: 'var(--color-text-muted)' }}
-          data-tts="Before you practice — learn the word classes in today's formula"
-        >
-          Before you practice
-        </p>
+        <div>
+          <p
+            className="text-base font-bold"
+            style={{ color: 'var(--color-text)' }}
+            data-tts="First, let's learn the word types you'll need today"
+          >
+            First, let's learn your word types 📖
+          </p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+            You'll use these in today's sentence
+          </p>
+        </div>
       </div>
 
       <AnimatePresence mode="wait">

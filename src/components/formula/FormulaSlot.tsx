@@ -62,6 +62,18 @@ const LABEL_MAP: Record<WordClass, string> = {
   [WordClass.CONJUNCTION]: 'Conjunction',
 }
 
+/** Child-friendly plain-English names for each word class (shown prominently in Stage 1) */
+const PLAIN_ENGLISH_MAP: Record<WordClass, string> = {
+  [WordClass.DETERMINER]: 'pointer word',
+  [WordClass.ADJECTIVE]: 'describing word',
+  [WordClass.NOUN]: 'naming word',
+  [WordClass.VERB]: 'doing word',
+  [WordClass.ADVERB]: 'how/when word',
+  [WordClass.PREPOSITION]: 'position word',
+  [WordClass.PRONOUN]: 'replacement word',
+  [WordClass.CONJUNCTION]: 'joining word',
+}
+
 // ─── hint tooltip ─────────────────────────────────────────────────────────────
 
 interface HintTooltipProps {
@@ -89,9 +101,14 @@ const HintTooltip: React.FC<HintTooltipProps> = ({ wordClass, wordBankExamples, 
       data-testid={`hint-tooltip-${wordClass}`}
     >
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs font-bold uppercase tracking-wider" style={{ color }}>
-          {hint.label}
-        </span>
+        <div>
+          <span className="text-xs font-bold uppercase tracking-wider block" style={{ color }}>
+            {hint.label}
+          </span>
+          <span className="text-[10px] font-medium opacity-75" style={{ color }}>
+            {hint.plainEnglishName}
+          </span>
+        </div>
         <button
           onClick={onClose}
           className="text-xs px-1 rounded"
@@ -102,7 +119,7 @@ const HintTooltip: React.FC<HintTooltipProps> = ({ wordClass, wordBankExamples, 
         </button>
       </div>
       <p className="text-xs leading-snug mb-2" style={{ color: 'var(--color-text)' }}>
-        {hint.definition}
+        {hint.childFriendlyDefinition}
       </p>
       <div className="flex flex-wrap gap-1">
         {hint.examples.slice(0, 3).map((ex) => (
@@ -149,6 +166,7 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
 
   const color = VAR_MAP[wordClass]
   const label = LABEL_MAP[wordClass]
+  const plainEnglishLabel = PLAIN_ENGLISH_MAP[wordClass]
 
   // Show label in slot: Stage 1 always shows labels; Stage 2+ respects Phase
   const showLabel = scaffoldStage === 1 || phase === Phase.A
@@ -203,33 +221,44 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
         aria-label={`${label} slot${selectedWord ? ' — ' + selectedWord : ' — empty'}`}
         role="region"
       >
-        {/* Phase A / Stage 1 label */}
-        {showLabel && (
-          <span
-            className="text-[9px] uppercase tracking-widest font-semibold leading-none mb-1"
-            style={{ color: isEmpty ? '#6B7280' : 'rgba(255,255,255,0.8)' }}
-            aria-hidden="true"
-          >
-            {label}
-          </span>
-        )}
-
         {isEmpty ? (
-          <div className="flex flex-col items-center gap-0.5">
-            {!showLabel && (
-              <span
-                className="w-3 h-3 rounded-full inline-block mb-1"
-                style={{ backgroundColor: color }}
-                aria-hidden="true"
-              />
-            )}
-            <span className="text-xl text-gray-400 leading-none" aria-hidden="true">
-              +
-            </span>
-            {showLabel && (
-              <span className="text-[10px] text-gray-400 mt-0.5" aria-hidden="true">
-                {instruction}
-              </span>
+          <div className="flex flex-col items-center gap-0.5 w-full text-center">
+            {showLabel ? (
+              <>
+                {/* Plain-English name — big and friendly */}
+                <span
+                  className="text-xs font-bold leading-tight"
+                  style={{ color }}
+                  aria-hidden="true"
+                >
+                  {plainEnglishLabel}
+                </span>
+                {/* Technical label — smaller, muted */}
+                <span
+                  className="text-[9px] uppercase tracking-wider font-semibold leading-none opacity-60"
+                  style={{ color: '#6B7280' }}
+                  aria-hidden="true"
+                >
+                  {label}
+                </span>
+                <span className="text-lg text-gray-300 leading-none mt-0.5" aria-hidden="true">
+                  +
+                </span>
+                <span className="text-[10px] text-gray-400 mt-0.5 leading-tight px-1" aria-hidden="true">
+                  {instruction}
+                </span>
+              </>
+            ) : (
+              <>
+                <span
+                  className="w-3 h-3 rounded-full inline-block mb-1"
+                  style={{ backgroundColor: color }}
+                  aria-hidden="true"
+                />
+                <span className="text-xl text-gray-400 leading-none" aria-hidden="true">
+                  +
+                </span>
+              </>
             )}
           </div>
         ) : (

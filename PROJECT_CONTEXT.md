@@ -1,45 +1,35 @@
 # WriFe PWP Studio
-*Last updated: 2026-04-29 · Session 17*
+*Last updated: 2026-04-29 · Session 18*
 
 ## Current state
-The app is live at https://pwp-studio.wrife.co.uk. Admin dashboard has been expanded with a Teachers tab and a fully rebuilt Schools tab. Schools schema now supports quotas, plan tiers, and status. Three new Edge Function actions deployed. All DB changes applied directly to production.
+The app is live at https://pwp-studio.wrife.co.uk. All recent fixes deployed and confirmed working. Progression model replaced with Duolingo-inspired auto-advance (Phase A complete).
 
-## Pending git push
-Run from the wrifeapp folder in terminal:
-```
-rm -f .git/HEAD.lock .git/index.lock && git add src/pages/AdminPage.tsx src/pages/ParentPage.tsx supabase/functions/admin-action/index.ts supabase/functions/create-child-profile/index.ts supabase/functions/invite-teacher/index.ts supabase/migrations/20260429000002_fix_view_rls_and_parent_policy.sql supabase/migrations/20260429000003_schools_quota_and_status.sql database/rls-policies.sql database/schema.sql && git commit -m "feat: teachers tab, expanded schools tab, quota management, RLS fixes, new edge functions" && git push
-```
+## Progression model (Phase A — LIVE)
+**No score gates.** Pupils auto-advance after 3 sessions at any level, regardless of score.
+- `MIN_SESSIONS_TO_ADVANCE = 3` in `progressionEngine.ts`
+- `shouldAdvance(mastery)` checks `sessions_completed >= 3` only
+- Mastery scores still tracked silently in `mastery_tracking` for teacher insight
+- WhatsNext screen shows "Level progress" bar — fills toward 3, then says "🚀 Moving to the next level!"
+- Paragraph Builder unlocks automatically at L4 (no score gate)
 
-## Key decisions — Session 17
-- **Teachers tab:** Lists all teachers with filter (All / Independent / School-attached). Amber warning banner when independent teachers exist. Actions: invite, assign to school, change tier, reset password, deactivate. "Independent" teachers (school_id = null) are teachers who self-signed-up and aren't linked to any school — they operate on free tier until assigned.
-- **Schools tab rebuild:** Card layout replaces flat table. Each card shows: usage bars (teachers/pupils vs quota), plan tier, status badge, contact email. Actions: Set Quota (tier + max_teachers/max_pupils), Invite School Admin (sends Supabase invite → creates school_admin profile + sets schools.admin_user_id), Suspend/Activate.
-- **Schools schema:** Added contact_email, subscription_tier, max_teachers, max_pupils, status, admin_user_id, notes to schools table.
-- **admin-action new actions:** invite_school_admin, assign_teacher_to_school, set_school_quota, toggle_school_status, change_tier, toggle_active, create_user (all now included).
+**Phase B (next):** Four practice modes per level (Build → Fill → Correct → Create), rotating variety so 3 sessions don't feel repetitive.
+**Phase C (future):** Level decay and spaced repetition review scheduling.
 
-## School sign-up best practice (recommendation)
-The industry-leading approach for EdTech school access management (used by Seesaw, Century Tech, Lexia, Myon):
+## Admin panel — Access tab (LIVE)
+- Universal search-and-upgrade panel (first tab in admin)
+- Pupils tab: "Manage" modal includes Membership Tier dropdown + "Save Tier" button
+- Access tab: search any user by name or PIN, change tier inline
 
-**Tier structure (recommended for WriFe):**
-| Tier | Teachers | Pupils | Price signal |
-|------|----------|--------|-------------|
-| Trial | 2 | 30 | Free, 30-day |
-| Starter | 5 | 150 | £299/year |
-| Professional | 20 | 600 | £799/year |
-| Enterprise | Unlimited | Unlimited | Custom |
+## Bug fixes deployed (this session)
+- **Bug #1 fixed:** Auto-save now works — RLS policies added for pupil writes to mastery_tracking, mastery_events, intervention_log, teacher_notifications
+- **Bug #2 fixed:** Dashboard has prominent "Continue" card above learning path
+- **Bug #3 fixed:** Formula session now shows "What's Next" screen instead of bouncing to dashboard
+- **Mastery gate removed:** Was "5 consecutive sessions ALL ≥ 80" — impossibly strict. Now session-count only.
+- **TypeScript fix:** membership_tier union type now includes 'school' (was causing Vercel build failures)
 
-**Recommended school onboarding flow:**
-1. School contacts WriFe (email/form) → WriFe admin creates school in Admin Dashboard → sets tier + quota → clicks "Invite School Admin"
-2. School admin receives email → clicks link → sets password → lands on `/admin/school` dashboard
-3. School admin invites teachers (via Invite Teacher button) → teachers accept invite → set password
-4. School admin creates classes and assigns pupils (PIN-based, no email required)
-5. WriFe admin monitors usage from Admin → Schools tab (usage bars show teachers/pupils vs quota)
-
-**Self-service school signup (future):** A `/school/signup` page where a school admin enters school name + URN + email → creates a trial account automatically → WriFe admin approves (or auto-approves for trial) → invitation email sent. This requires a school_applications table and an approval workflow — not yet built.
-
-**Access enforcement (to build next):**
-- When `profiles` table INSERT fires for role=teacher and school_id is set, check `SELECT count(*) FROM profiles WHERE school_id = X AND role = 'teacher'` against `schools.max_teachers` → block if at limit (enforce in Edge Function, not RLS, to give a good error message)
-- Same for pupils vs `max_pupils`
-- schools.status = 'suspended' → profiles.is_active = false for all users in that school (batch update via admin-action)
+## Alex's account (test pupil)
+- Manually advanced to L2 — had 3 sessions at L1 (avg score 77) which meets the new rule
+- 415 XP, levels_mastered_count = 1
 
 ## Key decisions — carried forward
 - **RLS recursion fix:** is_school_admin() SECURITY DEFINER + own-row policies
@@ -49,34 +39,29 @@ The industry-leading approach for EdTech school access management (used by Seesa
 - **invite-teacher (Session 16):** Deployed, fixed redirectTo
 - **create-child-profile (Session 16):** Deployed, 6-digit home-pupil PIN scheme
 - **Admin email allowlist:** ['mankrah@kafed.org.uk', 'wrife.education@gmail.com', 'miyk99@gmail.com', 'admin@wrife-test.com']
-- **Paragraph Builder gate:** Unlocks at L4 mastery
 
 ## Test accounts
 | Role | Email | Password/PIN | Notes |
 |------|-------|-------------|-------|
 | School Admin | miyk99@gmail.com | existing | Test Primary School |
 | Teacher | teacher@pwptest.com | WriFe2026! | Test Primary School |
-| Pupil | pupil-7777@wrife.school | PIN 7777 | Year 5 Oaks class |
-| Parent | parent@pwptest.com | WriFe2026! | Linked to Jamie (pupil) |
+| Pupil | Alex | PIN (see admin) | Now at L2, 415 XP |
+| Parent | parent@pwptest.com | WriFe2026! | Linked to Jamie |
 
-## Files & locations
-- `src/pages/AdminPage.tsx` — Teachers tab + expanded Schools tab (pending git push)
-- `src/pages/ParentPage.tsx` — create-child-profile wired up
-- `src/pages/LoginPage.tsx` — emailRedirectTo; friendly error messages
-- `database/rls-policies.sql` — profiles_parent_read added; all policies match production
-- `database/schema.sql` — views updated to security_invoker + teacher scope
-- `supabase/migrations/20260429000001_fix_profiles_rls.sql` — Session 14 RLS fix
-- `supabase/migrations/20260429000002_fix_view_rls_and_parent_policy.sql` — APPLIED
-- `supabase/migrations/20260429000003_schools_quota_and_status.sql` — APPLIED
-- `supabase/functions/admin-action/index.ts` — all admin actions (DEPLOYED v3)
-- `supabase/functions/invite-teacher/index.ts` — DEPLOYED
-- `supabase/functions/create-child-profile/index.ts` — DEPLOYED
+## Files changed this session
+- `src/lib/progressionEngine.ts` — shouldAdvance uses session count, MIN_SESSIONS_TO_ADVANCE exported
+- `src/lib/masteryEngine.ts` — gate threshold lowered (kept for teacher data, not gating)
+- `src/components/formula/WhatsNext.tsx` — LevelProgressBar replaces MasteryBar
+- `src/pages/AdminPage.tsx` — Access tab + Pupils tier management
+- `src/types/index.ts` — membership_tier union includes 'school'
+- Supabase migration: fix_pupil_write_rls_policies (APPLIED)
 
-## Open questions / next build items
-- **Quota enforcement:** Check teacher/pupil count against max on create (Edge Function logic)
-- **School self-service signup page** (`/school/apply`) — trial account + approval workflow
-- **Class code + username pupil login** — currently PIN-only, no class code validation
-- **Next major feature:** Consider which of these is highest priority for the next session
+## Open next steps
+- **Phase B progression:** Add Fill, Correct, and Create session modes per level (variety within a level)
+- **Level decay / review scheduling** (Phase C): Completed levels show "needs review" after 7 days
+- **Task #19:** Full automated learning journey test suite still pending
+- **Quota enforcement:** Teacher/pupil count vs school max (Edge Function logic)
+- **School self-service signup** (`/school/apply`)
 
 ---
 
@@ -84,6 +69,7 @@ The industry-leading approach for EdTech school access management (used by Seesa
 
 | # | Date | Summary |
 |---|------|---------|
+| 18 | 2026-04-29 | Bug fixes (#1 RLS, #2 Continue card, #3 WhatsNext); admin tier management; mastery gate replaced with Phase A auto-advance (3 sessions) |
 | 17 | 2026-04-29 | Teachers tab built; Schools tab rebuilt with usage bars + quota + invite admin; schools schema expanded; admin-action v3 deployed |
 | 16 | 2026-04-29 | Audit-driven fixes: view RLS, profiles_parent_read, invite-teacher deployed, create-child-profile built + deployed, ParentPage wired |
 | 15 | 2026-04-29 | Auth review: emailRedirectTo fix, improved error messages, migration for RLS codification |

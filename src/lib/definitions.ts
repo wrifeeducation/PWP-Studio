@@ -11,19 +11,24 @@ import { WordClass } from '../types/index'
 
 export interface WordClassDefinition {
   wordClass: WordClass
-  label: string          // Display name shown to pupils
-  colour: string         // Tailwind bg colour class (matches WORD_CLASS_COLOUR tokens)
-  definition: string     // The one-sentence canonical definition
-  examples: string[]     // 3–5 general examples (session-specific examples come from word bank)
-  teacherNote?: string   // Shown in teacher dashboard only — extra pedagogical context
+  label: string                   // Technical name (Noun, Verb, etc.)
+  plainEnglishName: string        // Child-friendly name shown on concept cards and slots (e.g. "naming word")
+  colour: string                  // Tailwind bg colour class (matches WORD_CLASS_COLOUR tokens)
+  definition: string              // Technical one-sentence canonical definition (teacher-facing)
+  childFriendlyDefinition: string // Plain-English explanation for pupil-facing concept cards
+  examples: string[]              // 3–5 general examples (session-specific examples come from word bank)
+  teacherNote?: string            // Shown in teacher dashboard only — extra pedagogical context
 }
 
 export const WORD_CLASS_DEFINITIONS: Record<WordClass, WordClassDefinition> = {
   [WordClass.NOUN]: {
     wordClass: WordClass.NOUN,
     label: 'Noun',
+    plainEnglishName: 'naming word',
     colour: 'bg-blue-500',
     definition: 'A noun is the name of a person, place, thing or idea.',
+    childFriendlyDefinition:
+      'A naming word is a word that names a person, a place or a thing — like a label for the world around you!',
     examples: ['teacher', 'London', 'table', 'happiness'],
     teacherNote:
       'Covers common nouns (table), proper nouns (London), and abstract nouns (happiness). ' +
@@ -32,8 +37,11 @@ export const WORD_CLASS_DEFINITIONS: Record<WordClass, WordClassDefinition> = {
   [WordClass.VERB]: {
     wordClass: WordClass.VERB,
     label: 'Verb',
+    plainEnglishName: 'doing word',
     colour: 'bg-red-500',
     definition: 'A verb is a doing, being or feeling word.',
+    childFriendlyDefinition:
+      'A doing word shows what someone or something does, is, or feels. Without a doing word, nothing happens in your sentence!',
     examples: ['run', 'is', 'love', 'think'],
     teacherNote:
       'The most difficult word class for primary pupils. Covers action verbs (run, jump), ' +
@@ -43,15 +51,21 @@ export const WORD_CLASS_DEFINITIONS: Record<WordClass, WordClassDefinition> = {
   [WordClass.ADJECTIVE]: {
     wordClass: WordClass.ADJECTIVE,
     label: 'Adjective',
+    plainEnglishName: 'describing word',
     colour: 'bg-green-500',
     definition: 'An adjective is a describing word. It tells you more about a noun.',
+    childFriendlyDefinition:
+      'A describing word paints a picture of a naming word — it tells you what something looks, feels, sounds or smells like.',
     examples: ['tall', 'red', 'busy', 'ancient'],
   },
   [WordClass.DETERMINER]: {
     wordClass: WordClass.DETERMINER,
     label: 'Determiner',
+    plainEnglishName: 'pointer word',
     colour: 'bg-purple-500',
     definition: 'A determiner introduces a noun. It tells you which one or how many.',
+    childFriendlyDefinition:
+      'A pointer word always goes in front of a naming word and points to which one you mean — like "the cat" or "my dog".',
     examples: ['the', 'a', 'my', 'some', 'this'],
     teacherNote:
       'Includes articles (the, a/an), possessives (my, his, their), demonstratives (this, that), ' +
@@ -61,9 +75,12 @@ export const WORD_CLASS_DEFINITIONS: Record<WordClass, WordClassDefinition> = {
   [WordClass.ADVERB]: {
     wordClass: WordClass.ADVERB,
     label: 'Adverb',
+    plainEnglishName: 'how/when word',
     colour: 'bg-orange-500',
     definition:
       'An adverb describes a verb, an adjective or another adverb. It often tells you how, when or where.',
+    childFriendlyDefinition:
+      'A how/when word tells you more about a doing word — how something happens ("quickly"), when ("always") or where ("here").',
     examples: ['quickly', 'always', 'very', 'nearly'],
     teacherNote:
       'Pupils often think adverbs only end in -ly. Include manner (quickly), ' +
@@ -72,16 +89,22 @@ export const WORD_CLASS_DEFINITIONS: Record<WordClass, WordClassDefinition> = {
   [WordClass.PREPOSITION]: {
     wordClass: WordClass.PREPOSITION,
     label: 'Preposition',
+    plainEnglishName: 'position word',
     colour: 'bg-amber-800',
     definition:
       'A preposition shows the relationship between one thing and another. It tells you position, direction or time.',
+    childFriendlyDefinition:
+      'A position word shows where something is or when something happens — words like "on the table", "under the bed" or "before lunch".',
     examples: ['on', 'under', 'before', 'through', 'beside'],
   },
   [WordClass.PRONOUN]: {
     wordClass: WordClass.PRONOUN,
     label: 'Pronoun',
+    plainEnglishName: 'replacement word',
     colour: 'bg-pink-500',
     definition: 'A pronoun takes the place of a noun. It saves you repeating the same name.',
+    childFriendlyDefinition:
+      'A replacement word takes the place of a naming word so you don\'t repeat it — instead of "Sam ran, Sam fell", you say "Sam ran, he fell".',
     examples: ['he', 'she', 'it', 'they', 'we'],
     teacherNote:
       'Focus on personal pronouns at KS1/2. Relative pronouns (who, which, that) and ' +
@@ -90,8 +113,11 @@ export const WORD_CLASS_DEFINITIONS: Record<WordClass, WordClassDefinition> = {
   [WordClass.CONJUNCTION]: {
     wordClass: WordClass.CONJUNCTION,
     label: 'Conjunction',
+    plainEnglishName: 'joining word',
     colour: 'bg-yellow-400',
     definition: 'A conjunction is a joining word. It connects words, phrases or clauses.',
+    childFriendlyDefinition:
+      'A joining word connects two ideas together, like glue between sentences — words like "and", "but" and "because".',
     examples: ['and', 'but', 'because', 'although', 'so'],
     teacherNote:
       'Distinguish co-ordinating conjunctions (and, but, or, so) from subordinating ' +

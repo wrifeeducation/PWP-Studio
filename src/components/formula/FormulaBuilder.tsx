@@ -186,6 +186,22 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
           </span>
         </div>
 
+        {/* ── Task instruction banner ── */}
+        <div
+          className="rounded-xl px-4 py-3 flex items-start gap-3"
+          style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE' }}
+          data-tts="How to play: choose one word for each coloured box below. Drag a word from the word bank, or double-tap it to place it."
+          data-testid="task-instruction"
+        >
+          <span className="text-xl leading-none mt-0.5" aria-hidden="true">🎯</span>
+          <div>
+            <p className="text-sm font-bold text-blue-800 mb-0.5">What to do</p>
+            <p className="text-sm text-blue-700 leading-snug">
+              Choose one word for each coloured box. Drag a word from the bank below — or <strong>double-tap</strong> it to place it automatically.
+            </p>
+          </div>
+        </div>
+
         {/* ── Formula slots row ── */}
         <div
           className="flex flex-wrap gap-3 justify-center"
@@ -259,9 +275,9 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
           <p
             className="text-xs uppercase tracking-wider font-semibold mb-3"
             style={{ color: 'var(--color-text-muted)' }}
-            data-tts="Word bank — drag or double-tap a word to place it"
+            data-tts="Your words — pick from these to fill the boxes above"
           >
-            Word Bank — drag or double-tap to place
+            Your words — drag or double-tap to place
           </p>
           <div className="flex flex-wrap gap-2">
             {uniqueBankEntries.map((entry) => (

@@ -51,7 +51,7 @@ export const ConceptCard: React.FC<ConceptCardProps> = ({
     : definition.examples
   ).join(', ')
 
-  const ttsText = `${definition.label}. ${definition.definition} Examples: ${examples}.`
+  const ttsText = `${definition.plainEnglishName}. ${definition.childFriendlyDefinition} Examples: ${examples}.`
 
   return (
     <motion.div
@@ -69,12 +69,18 @@ export const ConceptCard: React.FC<ConceptCardProps> = ({
         className="px-5 py-4 flex items-center justify-between"
         style={{ backgroundColor: color }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-0.5">
           <span
-            className="text-white font-bold text-lg tracking-wide uppercase"
+            className="text-white font-bold text-lg tracking-wide uppercase leading-tight"
             data-tts={definition.label}
           >
             {definition.label}
+          </span>
+          <span
+            className="text-white text-sm font-medium opacity-90 lowercase"
+            data-tts={definition.plainEnglishName}
+          >
+            {definition.plainEnglishName}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -96,9 +102,9 @@ export const ConceptCard: React.FC<ConceptCardProps> = ({
         <p
           className="text-base font-medium leading-snug"
           style={{ color: 'var(--color-text)' }}
-          data-tts={definition.definition}
+          data-tts={definition.childFriendlyDefinition}
         >
-          {definition.definition}
+          {definition.childFriendlyDefinition}
         </p>
 
         {/* Examples */}
@@ -126,6 +132,21 @@ export const ConceptCard: React.FC<ConceptCardProps> = ({
               </span>
             ))}
           </div>
+        </div>
+
+        {/* Your task callout */}
+        <div
+          className="rounded-xl px-4 py-3"
+          style={{ backgroundColor: `${color}18`, border: `1px solid ${color}44` }}
+          data-tts={`Your task: look for a ${definition.plainEnglishName} in the word bank and drag or tap it into the coloured box.`}
+        >
+          <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color }}>
+            Your task
+          </p>
+          <p className="text-sm leading-snug" style={{ color: 'var(--color-text)' }}>
+            Find a <strong>{definition.plainEnglishName}</strong> in the word bank and drag or double-tap it into the{' '}
+            <span className="font-bold" style={{ color }}>{definition.label}</span> box.
+          </p>
         </div>
 
         {/* Progress dots */}
