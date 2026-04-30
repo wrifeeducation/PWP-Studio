@@ -3,6 +3,7 @@
  * Slides in from bottom, shows icon + name + rarity colour, auto-dismisses.
  */
 
+import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Badge, BadgeRarity } from '../../types/index'
 
@@ -39,6 +40,13 @@ const RARITY_STYLES: Record<BadgeRarity, { bg: string; border: string; text: str
 }
 
 export const BadgeToast: React.FC<BadgeToastProps> = ({ badge, onDismiss }) => {
+  // Auto-dismiss after 5 seconds
+  useEffect(() => {
+    if (!badge) return
+    const t = setTimeout(onDismiss, 5000)
+    return () => clearTimeout(t)
+  }, [badge, onDismiss])
+
   if (!badge) return null
 
   const rarity = RARITY_STYLES[badge.rarity]

@@ -106,6 +106,8 @@ export interface WhatsNextProps {
   onRetry: () => void
   /** Go to dashboard */
   onDashboard: () => void
+  /** Continue to next formula level */
+  onNextLevel?: () => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -120,6 +122,7 @@ export const WhatsNext: React.FC<WhatsNextProps> = ({
   onParagraph,
   onRetry,
   onDashboard,
+  onNextLevel,
 }) => {
   const colour = CHAPTER_COLOUR_FOR_LEVEL(level.id)
 
@@ -265,30 +268,56 @@ export const WhatsNext: React.FC<WhatsNextProps> = ({
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {/* Practice again — primary CTA */}
-          <button
-            onClick={onRetry}
-            data-testid="whats-next-retry"
-            data-tts="Practice this level again"
-            style={{
-              width: '100%',
-              padding: '16px',
-              borderRadius: 16,
-              background: colour,
-              border: 'none',
-              color: '#fff',
-              fontSize: 15,
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-            }}
-          >
-            <span style={{ fontSize: 18 }}>🔁</span>
-            Practice Level {level.id} Again
-          </button>
+          {/* ── Primary CTA: Next Level (when available) or Practice Again ── */}
+          {onNextLevel ? (
+            <button
+              onClick={onNextLevel}
+              data-testid="whats-next-next-level"
+              data-tts={`Continue to Level ${level.id + 1}`}
+              style={{
+                width: '100%',
+                padding: '16px',
+                borderRadius: 16,
+                background: colour,
+                border: 'none',
+                color: '#fff',
+                fontSize: 15,
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 18 }}>🚀</span>
+              Continue to Level {level.id + 1}
+            </button>
+          ) : (
+            <button
+              onClick={onRetry}
+              data-testid="whats-next-retry"
+              data-tts="Practice this level again"
+              style={{
+                width: '100%',
+                padding: '16px',
+                borderRadius: 16,
+                background: colour,
+                border: 'none',
+                color: '#fff',
+                fontSize: 15,
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 18 }}>🔁</span>
+              Practice Level {level.id} Again
+            </button>
+          )}
 
           {/* Paragraph builder — if unlocked */}
           {paragraphActive && onParagraph && (
@@ -314,6 +343,33 @@ export const WhatsNext: React.FC<WhatsNextProps> = ({
             >
               <span style={{ fontSize: 18 }}>📝</span>
               Continue to Paragraph Builder
+            </button>
+          )}
+
+          {/* Practice Again — secondary, only shown when Next Level is the primary */}
+          {onNextLevel && (
+            <button
+              onClick={onRetry}
+              data-testid="whats-next-retry"
+              data-tts="Practice this level again"
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: 16,
+                background: '#F8F9FA',
+                border: '1.5px solid #EDEBE7',
+                color: '#636E72',
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 16 }}>🔁</span>
+              Practice Level {level.id} Again
             </button>
           )}
 

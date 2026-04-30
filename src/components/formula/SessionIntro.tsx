@@ -253,17 +253,26 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
       ? `Hi, welcome back! ${todaysSubject ? `Today we are writing about ${todaysSubject}.` : "Let's keep going!"} Watch me build a sentence first.`
       : `Hi there! ${todaysSubject ? `Today we are writing about ${todaysSubject}.` : "Let's build some sentences!"} Watch me put one together first.`
 
-    // Small delay so the mascot animation settles, then speak.
-    // When speech finishes, advance to the example phase automatically.
-    const t = setTimeout(() => {
-      speak(greetText, () => {
-        setTimeout(() => {
-          setPhase('example')
-          setMascotPose('point')
-        }, 400) // brief breath between phrases
-      })
-    }, 500)
-    return () => clearTimeout(t)
+    let advanced = false
+    const advance = () => {
+      if (advanced) return
+      advanced = true
+      setTimeout(() => {
+        setPhase('example')
+        setMascotPose('point')
+      }, 400)
+    }
+
+    // Speak; advance when speech ends.
+    // Fallback timer (5 s) guards against Chrome onend not firing — a known
+    // Web Speech API bug where onend is silently dropped if voices load late.
+    const tSpeak = setTimeout(() => speak(greetText, advance), 500)
+    const tFallback = setTimeout(advance, 5000)
+
+    return () => {
+      clearTimeout(tSpeak)
+      clearTimeout(tFallback)
+    }
   }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Narrate example phase ────────────────────────────────────────────────────

@@ -674,6 +674,12 @@ export default function FormulaPage() {
     setScreen('practice')
   }
 
+  const handleWhatsNextNextLevel = () => {
+    if (!data) return
+    const nextLevelId = data.level.id + 1
+    navigate(`/practice?level=${nextLevelId}`)
+  }
+
   // ─── loading state ──────────────────────────────────────────────────────────
 
   if (isLoading || screen === 'loading') {
@@ -999,6 +1005,11 @@ export default function FormulaPage() {
             onParagraph={handleWhatsNextParagraph}
             onRetry={handleWhatsNextRetry}
             onDashboard={() => navigate('/dashboard')}
+            onNextLevel={
+              !isReviewMode && data.level.id < 67
+                ? handleWhatsNextNextLevel
+                : undefined
+            }
           />
         )}
       </main>
