@@ -55,7 +55,10 @@ export function useStars(): StarsState {
       return
     }
 
-    const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+    // Use LOCAL date so replenishment aligns with the pupil's calendar day,
+    // not UTC midnight (which in BST would be 01:00 local time).
+    const now = new Date()
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
     supabase
       .from('pupil_progress')
