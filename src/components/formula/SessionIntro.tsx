@@ -67,20 +67,27 @@ function WriFeMascot({ pose }: { pose: 'wave' | 'point' | 'cheer' }) {
             d={pose === 'cheer' ? 'M 37 60 Q 45 68 53 60' : 'M 38 59 Q 45 65 52 59'}
             stroke="#2D3436" strokeWidth="2.2" strokeLinecap="round" fill="none"
           />
-          {/* Left arm */}
-          <motion.line
-            x1="28" y1="55"
-            x2={pose === 'wave' ? '10' : '18'}
-            y2={pose === 'wave' ? '38' : '65'}
-            stroke="#FFD166" strokeWidth="7" strokeLinecap="round"
-            animate={pose === 'wave' ? { x2: ['10', '6', '10'], y2: ['38', '32', '38'] } : {}}
-            transition={{ repeat: Infinity, duration: 0.8, ease: 'easeInOut' }}
-          />
+          {/* Left arm — rotate around shoulder point (28,55) for waving */}
+          <motion.g
+            animate={pose === 'wave' ? { rotate: [0, -25, 0] } : { rotate: 0 }}
+            transition={pose === 'wave'
+              ? { repeat: Infinity, duration: 0.8, ease: 'easeInOut' }
+              : { duration: 0.2 }
+            }
+            style={{ originX: '28px', originY: '55px' }}
+          >
+            <line
+              x1="28" y1="55"
+              x2={pose === 'wave' ? 10 : 18}
+              y2={pose === 'wave' ? 38 : 65}
+              stroke="#FFD166" strokeWidth="7" strokeLinecap="round"
+            />
+          </motion.g>
           {/* Right arm */}
           <line
             x1="62" y1="55"
-            x2={pose === 'point' ? '80' : '72'}
-            y2={pose === 'point' ? '48' : '65'}
+            x2={pose === 'point' ? 80 : 72}
+            y2={pose === 'point' ? 48 : 65}
             stroke="#FFD166" strokeWidth="7" strokeLinecap="round"
           />
           {/* Stars around mascot when cheering */}
