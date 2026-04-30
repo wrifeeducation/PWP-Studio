@@ -43,8 +43,9 @@ import { awardCertificate } from '../lib/certificateEngine'
 import { sanitizeText } from '../lib/sanitize'
 import type { MasteryTracking, Badge, PupilProgress, WordClass } from '../types/index'
 import { DefinitionUnlock } from '../components/gamification/DefinitionUnlock'
-import { useFreemium } from '../hooks/useFreemium'
-import { UpgradePrompt } from '../components/ui/UpgradePrompt'
+import { useStars } from '../hooks/useStars'
+import { StarsDisplay } from '../components/gamification/StarsDisplay'
+import { OutOfStars } from '../components/formula/OutOfStars'
 
 // ─── Screen states ────────────────────────────────────────────────────────────
 
@@ -61,8 +62,10 @@ export default function FormulaPage() {
   const reviewLevelId = reviewLevelParam ? parseInt(reviewLevelParam, 10) : undefined
   const isReviewMode = searchParams.get('review') === 'true' && !!reviewLevelId
 
-  // ── Freemium gate ─────────────────────────────────────────────────────────
-  const freemium = useFreemium()
+  // ── Stars gate (WF-050) ───────────────────────────────────────────────────
+  const stars = useStars()
+  // Track mistakes in this session to award a bonus star on a perfect run
+  const [sessionMistakes, setSessionMistakes] = useState(0)
   const { isLoading, isError, data, refetch } = useFormulaLevel(reviewLevelId)
   const { setAssessing, isAssessing, resetSession } = useFormulaStore()
 
@@ -326,6 +329,24 @@ export default function FormulaPage() {
       const levelXp = calcFormulaXP(data.level.id, raw.overall_score)
       const totalXpEarned = levelXp + streakBonus
       setXpEarned(totalXpEarned)
+
+      // WF-050: Stars model — deduct on poor score, award on perfect session
+      // Only applies to free-tier pupils in active (non-review) mode
+      if (stars.isFree && !isReviewMode) {
+        if (raw.overall_score < 60) {
+          // Clear fail — deduct a full star
+          setSessionMistakes(prev => prev + 1)
+          await stars.deductStar(1)
+        } else if (raw.overall_score < 80) {
+          // Partial — deduct half a star
+          setSessionMistakes(prev => prev + 1)
+          await stars.deductStar(0.5)
+        }
+        // Perfect session (≥ 80) with no mistakes this session → earn a star back
+        if (raw.overall_score >= 80 && sessionMistakes === 0) {
+          await stars.awardStar()
+        }
+      }
 
       // WF-013: check level progression gate
       // In review mode, we award XP but never advance the level
@@ -713,17 +734,13 @@ export default function FormulaPage() {
     )
   }
 
-  // ─── freemium gate ──────────────────────────────────────────────────────────
-  // Show upgrade prompt if free user has used all their daily sessions.
-  // We still allow the page to render while freemium data is loading.
-
-  if (!freemium.loading && freemium.isAtLimit) {
+  // ─── Stars gate (WF-050) ────────────────────────────────────────────────────
+  // Review mode is always free — never block it with the stars gate.
+  if (!stars.loading && stars.isOutOfStars && !isReviewMode) {
     return (
-      <UpgradePrompt
-        variant="limit"
-        playsUsed={freemium.playsToday}
-        playsTotal={3}
-        onBack={() => navigate('/dashboard')}
+      <OutOfStars
+        onReview={() => navigate('/dashboard')}
+        onUpgrade={() => navigate('/pricing')}
       />
     )
   }
@@ -848,20 +865,13 @@ export default function FormulaPage() {
             </div>
           ) : (
             <>
-              {/* Free tier: plays remaining badge */}
-              {freemium.isFree && !freemium.loading && (
-                <div
-                  className="text-xs font-semibold px-2 py-1 rounded"
-                  style={{
-                    backgroundColor: freemium.playsRemaining <= 1 ? '#FEE2E2' : '#ECFDF5',
-                    color: freemium.playsRemaining <= 1 ? '#991B1B' : '#065F46',
-                  }}
-                  title="Free daily sessions remaining"
-                  data-tts={`${freemium.playsRemaining} sessions left today`}
-                  data-testid="freemium-counter"
-                >
-                  {freemium.playsRemaining}/{3} left
-                </div>
+              {/* Free tier: daily stars display */}
+              {!stars.loading && (
+                <StarsDisplay
+                  starsRemaining={stars.starsRemaining}
+                  shieldActive={stars.shieldActive}
+                  isFree={stars.isFree}
+                />
               )}
 
               <div

@@ -311,6 +311,10 @@ export interface PupilProgress extends WithTimestamps {
   writing_studio_confirmed_at: Nullable<string>; // ISO timestamp
   levels_mastered_count: number;
   phases_completed: Phase[];
+  // Stars model (WF-050): daily star allocation for free-tier pupils
+  stars_remaining: number;          // 0–3, depletes on mistakes
+  stars_last_replenished: Nullable<string>; // ISO date — resets to 3 each new day
+  star_shield_active: boolean;      // absorbs next mistake without deducting a star
 }
 
 export interface PupilBadge extends WithTimestamps {

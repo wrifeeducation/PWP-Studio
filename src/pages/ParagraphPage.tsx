@@ -16,8 +16,7 @@ import { ParagraphFeedback } from '../components/paragraph/ParagraphFeedback'
 import { Genre, Phase } from '../types/index'
 import paragraphStartersJson from '../../content/paragraph-starters.json'
 import { sanitizeText } from '../lib/sanitize'
-import { useFreemium } from '../hooks/useFreemium'
-import { UpgradePrompt } from '../components/ui/UpgradePrompt'
+// WF-050: Paragraph Builder is now open to all tiers — stars model gates free users via mistake cost
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,18 +86,7 @@ export default function ParagraphPage() {
   const location = useLocation()
   const queryClient = useQueryClient()
   const { user, profile } = useAuthStore()
-  const freemium = useFreemium()
-
-  // Freemium gate — Paragraph Builder is pro-only
-  if (!freemium.loading && freemium.isFree) {
-    return (
-      <UpgradePrompt
-        variant="pro"
-        feature="Paragraph Builder"
-        onBack={() => navigate('/dashboard')}
-      />
-    )
-  }
+  // WF-050: No tier gate here — all pupils can access Paragraph Builder
 
   // Props passed from FormulaPage via router state
   const state = location.state as {
