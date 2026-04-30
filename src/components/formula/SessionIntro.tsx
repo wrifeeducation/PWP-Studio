@@ -239,23 +239,48 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
   const [mascotPose, setMascotPose] = useState<'wave' | 'point' | 'cheer'>('wave')
   const { speak, stop } = useTTS()
 
-  // Build formula description in plain English
+  // Build formula description — use technical names for the spoken pattern
   const wordClassNames = level.formula_elements
-    .map(el => WORD_CLASS_DEFINITIONS[el.word_class]?.plainEnglishName ?? el.word_class)
-    .join(' plus ')
+    .map(el => WORD_CLASS_DEFINITIONS[el.word_class]?.label ?? el.word_class)
+    .join(', ')
 
-  // ── Auto-narrate each phase ──────────────────────────────────────────────────
+  // ── Narrate greeting, then advance to example when speech ends ───────────────
   useEffect(() => {
-    let t: ReturnType<typeof setTimeout>
-    if (phase === 'greeting') {
-      const greet = isReturning ? 'Welcome back!' : "Let's get started!"
-      const subject = todaysSubject ? ` Today you are writing about ${todaysSubject}.` : ''
-      t = setTimeout(() => speak(`${greet}${subject}`), 400)
-    } else if (phase === 'example') {
-      t = setTimeout(() => speak(`Today's sentence pattern is: ${wordClassNames}. Watch how to build your sentence.`), 300)
-    } else if (phase === 'ready') {
-      t = setTimeout(() => speak(`That's how it works! Now it's your turn. Press the button when you're ready.`), 300)
-    }
+    if (phase !== 'greeting') return
+    setMascotPose('wave')
+
+    const greetText = isReturning
+      ? `Hi, welcome back! ${todaysSubject ? `Today we are writing about ${todaysSubject}.` : "Let's keep going!"} Watch me build a sentence first.`
+      : `Hi there! ${todaysSubject ? `Today we are writing about ${todaysSubject}.` : "Let's build some sentences!"} Watch me put one together first.`
+
+    // Small delay so the mascot animation settles, then speak.
+    // When speech finishes, advance to the example phase automatically.
+    const t = setTimeout(() => {
+      speak(greetText, () => {
+        setTimeout(() => {
+          setPhase('example')
+          setMascotPose('point')
+        }, 400) // brief breath between phrases
+      })
+    }, 500)
+    return () => clearTimeout(t)
+  }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Narrate example phase ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== 'example') return
+    const t = setTimeout(() => {
+      speak(`Here is today's sentence pattern: ${wordClassNames}. Watch how the words fit together!`)
+    }, 300)
+    return () => clearTimeout(t)
+  }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Narrate ready phase ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== 'ready') return
+    const t = setTimeout(() => {
+      speak(`Great! Now it is your turn. Can you build one?`)
+    }, 300)
     return () => clearTimeout(t)
   }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -263,17 +288,6 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
   useEffect(() => {
     return () => stop()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-advance from greeting to example after 1.8s
-  useEffect(() => {
-    if (phase !== 'greeting') return
-    setMascotPose('wave')
-    const t = setTimeout(() => {
-      setPhase('example')
-      setMascotPose('point')
-    }, 1800)
-    return () => clearTimeout(t)
-  }, [phase])
 
   const handleExampleComplete = () => {
     setPhase('ready')

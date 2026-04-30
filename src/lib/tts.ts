@@ -10,8 +10,11 @@
  * @param rate - Speech rate (default 0.85, child-appropriate)
  * @param pitch - Speech pitch (default 1.1)
  */
-export const speak = (text: string, rate = 0.85, pitch = 1.1): void => {
-  if (!window.speechSynthesis) return
+export const speak = (text: string, rate = 0.85, pitch = 1.1, onEnd?: () => void): void => {
+  if (!window.speechSynthesis) {
+    onEnd?.()
+    return
+  }
 
   // Stop any current speech first
   stopSpeaking()
@@ -27,6 +30,8 @@ export const speak = (text: string, rate = 0.85, pitch = 1.1): void => {
     (v) => v.lang === 'en-GB' || v.lang.startsWith('en-GB')
   )
   if (ukVoice) utterance.voice = ukVoice
+
+  if (onEnd) utterance.onend = onEnd
 
   window.speechSynthesis.speak(utterance)
 }

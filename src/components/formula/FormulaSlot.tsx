@@ -105,7 +105,7 @@ const HintTooltip: React.FC<HintTooltipProps> = ({ wordClass, wordBankExamples, 
           <span className="text-xs font-bold uppercase tracking-wider block" style={{ color }}>
             {hint.label}
           </span>
-          <span className="text-[10px] font-medium opacity-75" style={{ color }}>
+          <span className="text-[10px] font-medium" style={{ color: '#6B7280' }}>
             {hint.plainEnglishName}
           </span>
         </div>
@@ -225,21 +225,21 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
           <div className="flex flex-col items-center gap-0.5 w-full text-center">
             {showLabel ? (
               <>
-                {/* Plain-English name — big and friendly */}
+                {/* Technical label — bold, coloured, prominent */}
                 <span
-                  className="text-xs font-bold leading-tight"
+                  className="text-xs font-bold uppercase tracking-wide leading-tight"
                   style={{ color }}
                   aria-hidden="true"
                 >
-                  {plainEnglishLabel}
+                  {label}
                 </span>
-                {/* Technical label — smaller, muted */}
+                {/* Plain-English name — smaller, softer, explanatory */}
                 <span
-                  className="text-[9px] uppercase tracking-wider font-semibold leading-none opacity-60"
+                  className="text-[9px] font-semibold leading-none"
                   style={{ color: '#6B7280' }}
                   aria-hidden="true"
                 >
-                  {label}
+                  {plainEnglishLabel}
                 </span>
                 <span className="text-lg text-gray-300 leading-none mt-0.5" aria-hidden="true">
                   +

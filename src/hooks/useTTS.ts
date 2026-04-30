@@ -26,9 +26,12 @@ export const useTTS = (): UseTTSReturn => {
   }, [])
 
   const speak = useCallback(
-    (text: string) => {
-      if (!ttsEnabled) return
-      ttsSpeak(text, ttsRate)
+    (text: string, onEnd?: () => void) => {
+      if (!ttsEnabled) {
+        onEnd?.() // advance UI even when TTS is off
+        return
+      }
+      ttsSpeak(text, ttsRate, 1.1, onEnd)
       setIsSpeakingState(true)
     },
     [ttsEnabled, ttsRate]
