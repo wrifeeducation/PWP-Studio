@@ -208,3 +208,44 @@ export const getConceptCardsForFormula = (
   }
   return result
 }
+
+/**
+ * The formula level at which each word class is first introduced.
+ * Derived from the live DB formula_elements data (levels 1–67).
+ *
+ * Use this to show full concept cards only for terms that are
+ * genuinely new at the pupil's current level, and reminder chips
+ * for word classes they have already encountered.
+ */
+export const WORD_CLASS_FIRST_LEVEL: Record<WordClass, number> = {
+  [WordClass.NOUN]:        1,
+  [WordClass.VERB]:        1,
+  [WordClass.DETERMINER]:  2,
+  [WordClass.ADJECTIVE]:   3,
+  [WordClass.ADVERB]:      4,
+  [WordClass.PREPOSITION]: 8,
+  [WordClass.PRONOUN]:     12,
+  [WordClass.CONJUNCTION]: 17,
+}
+
+/**
+ * Returns word class definitions that are *new* at the given level.
+ * Used by ConceptCardSequence to show full acquisition cards only for
+ * genuinely new terms, not ones already seen in prior levels.
+ */
+export const getNewConceptCardsForLevel = (
+  formulaWordClasses: WordClass[],
+  currentLevelId: number
+): WordClassDefinition[] => {
+  const seen = new Set<WordClass>()
+  const result: WordClassDefinition[] = []
+  for (const wc of formulaWordClasses) {
+    if (!seen.has(wc)) {
+      seen.add(wc)
+      if (WORD_CLASS_FIRST_LEVEL[wc] === currentLevelId) {
+        result.push(WORD_CLASS_DEFINITIONS[wc])
+      }
+    }
+  }
+  return result
+}

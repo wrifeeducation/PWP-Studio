@@ -2,18 +2,26 @@
  * Phase 2: ConceptCardSequence
  * Orchestrates the pre-session concept card flow.
  *
- * Trigger logic (§10.3):
- *   - Stage 1 (Acquisition): all cards shown, no skip
- *   - Stage 2+: skip available; brief reminder chips shown instead if already seen
+ * Revised logic (WF-057):
+ *   - Full acquisition cards are shown ONLY for word classes that are
+ *     genuinely new at this level (first introduced here).
+ *   - Previously-seen word classes appear as quick-reference chips below.
+ *   - Stage 1 (first session at level): no skip allowed for new cards.
+ *   - Stage 2+: skip available; chips shown by default with option to review.
+ *   - If no new word classes exist at this level, chips mode is used directly.
  *
  * Word classes are deduplicated and ordered by formula position.
  * Examples from today's word bank are injected per word class.
  */
 
+import { sfx } from '../../lib/sfx'
 import React, { useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ConceptCard } from './ConceptCard'
-import { getConceptCardsForFormula } from '../../lib/definitions'
+import {
+  getConceptCardsForFormula,
+  getNewConceptCardsForLevel,
+} from '../../lib/definitions'
 import type { FormulaElement } from '../../types/index'
 import { WordClass } from '../../types/index'
 
@@ -22,8 +30,8 @@ interface ConceptCardSequenceProps {
   wordBanks: Record<string, string[]>
   /** Current scaffold stage for this pupil on this level (1–4) */
   scaffoldStage: number
-  /** Word classes the pupil has already seen in previous levels */
-  seenWordClasses?: WordClass[]
+  /** The formula level ID — used to identify genuinely new word classes */
+  currentLevelId?: number
   onComplete: () => void
 }
 
@@ -31,18 +39,35 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
   formulaElements,
   wordBanks,
   scaffoldStage,
-  seenWordClasses = [],
+  currentLevelId,
   onComplete,
 }) => {
-  const cards = getConceptCardsForFormula(formulaElements.map((el) => el.word_class as WordClass))
+  const allWordClasses = formulaElements.map((el) => el.word_class as WordClass)
+
+  // All cards for the formula (deduplicated, ordered by position)
+  const allCards = getConceptCardsForFormula(allWordClasses)
+
+  // Cards for word classes that are brand-new at this level
+  const newCards = currentLevelId
+    ? getNewConceptCardsForLevel(allWordClasses, currentLevelId)
+    : []
+
+  // Cards for word classes already seen in prior levels
+  const newWordClassSet = new Set(newCards.map((c) => c.wordClass))
+  const reminderCards = allCards.filter((c) => !newWordClassSet.has(c.wordClass))
+
+  // Determine which set of cards to show as full acquisition cards:
+  // - If there are new word classes → show only those as full cards
+  // - If nothing new (e.g. level reuses same word classes) → show all as chips
+  const acquisitionCards = newCards.length > 0 ? newCards : []
 
   const [cardIndex, setCardIndex] = useState(0) // 0-based
-  // Ref tracks the committed "next" index so rapid double-clicks can't
-  // queue two increments before React re-renders (WF-056 race condition fix).
-  // Reset to 0 whenever the card set changes (new formula level).
+  const [forceFullReview, setForceFullReview] = useState(false)
+
+  // Ref tracks committed index to guard against rapid-click double-increment
   const committedIndexRef = useRef(0)
-  const prevCardsKeyRef = useRef(cards.map((c) => c.wordClass).join(','))
-  const cardsKey = cards.map((c) => c.wordClass).join(',')
+  const prevCardsKeyRef = useRef(acquisitionCards.map((c) => c.wordClass).join(','))
+  const cardsKey = acquisitionCards.map((c) => c.wordClass).join(',')
   if (cardsKey !== prevCardsKeyRef.current) {
     prevCardsKeyRef.current = cardsKey
     committedIndexRef.current = 0
@@ -51,13 +76,9 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
   // Stage 1: no skip. Stage 2+: skip available
   const canSkip = scaffoldStage >= 2
 
-  // At stage 2+ show brief reminder chips instead of full cards
-  // for word classes the pupil has already seen
-  const isReminderMode = scaffoldStage >= 2 && seenWordClasses.length > 0
-
   const handleNext = () => {
-    // Guard: if we're already at (or past) the last card, complete immediately
-    if (committedIndexRef.current >= cards.length - 1) {
+    const activeCards = forceFullReview ? allCards : acquisitionCards
+    if (committedIndexRef.current >= activeCards.length - 1) {
       onComplete()
       return
     }
@@ -65,8 +86,24 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
     setCardIndex(committedIndexRef.current)
   }
 
-  // ── Reminder chip mode (Stage 2+, previously seen word classes) ──────────────
-  if (isReminderMode) {
+  const handleForceReview = () => {
+    committedIndexRef.current = 0
+    setCardIndex(0)
+    setForceFullReview(true)
+  }
+
+  // ── Chips-only mode: no new word classes, or stage 2+ with no force-review ────
+  const showChipsMode =
+    !forceFullReview && (acquisitionCards.length === 0 || (scaffoldStage >= 2 && reminderCards.length > 0 && acquisitionCards.length === 0))
+
+  // ── Reminder chips + new-term cards: stage 1 with new terms ─────────────────
+  // Show full cards for new terms, chips beneath for already-known terms
+  const showMixedMode = !forceFullReview && acquisitionCards.length > 0
+
+  // ── Pure chip mode (stage 2+ OR no new terms) ────────────────────────────────
+  const isPureChipsMode = !forceFullReview && acquisitionCards.length === 0
+
+  if (isPureChipsMode) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 8 }}
@@ -79,15 +116,15 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
           style={{ color: 'var(--color-text-muted)' }}
           data-tts="Quick reminder — word types in today's sentence"
         >
-          Quick reminder — word types for today
+          Word types for today
         </p>
         <div className="flex flex-wrap gap-2">
-          {cards.map((card) => {
+          {allCards.map((card) => {
             const colorVar = `var(--color-${card.wordClass})`
             return (
               <div
                 key={card.wordClass}
-                className="px-3 py-1.5 rounded-full text-xs font-semibold text-white flex flex-col items-center leading-tight"
+                className="px-3 py-1.5 rounded-full text-xs font-semibold text-white flex flex-col items-center leading-tight cursor-default"
                 style={{ backgroundColor: colorVar }}
                 data-tts={`${card.plainEnglishName}: ${card.childFriendlyDefinition}`}
                 title={card.childFriendlyDefinition}
@@ -100,7 +137,7 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
         </div>
         <div className="flex gap-3">
           <button
-            onClick={onComplete}
+            onClick={() => { sfx.click(); onComplete() }}
             className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white"
             style={{ backgroundColor: 'var(--color-noun)' }}
             data-testid="reminder-start-button"
@@ -109,11 +146,7 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
             Start practice →
           </button>
           <button
-            onClick={() => {
-              // Switch to full card mode so pupil can review any card
-              committedIndexRef.current = 0
-              setCardIndex(0)
-            }}
+            onClick={() => { sfx.click(); handleForceReview() }}
             className="px-4 py-2.5 rounded-xl text-sm font-medium"
             style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
             data-testid="reminder-review-button"
@@ -126,49 +159,97 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
     )
   }
 
-  // ── Full card mode ────────────────────────────────────────────────────────────
-  if (cards.length === 0) {
+  // ── Full card mode (new terms or force review) ────────────────────────────────
+  const activeCards = forceFullReview ? allCards : acquisitionCards
+
+  if (activeCards.length === 0) {
     onComplete()
     return null
   }
 
-  const currentCard = cards[cardIndex]
-  // Safety net: if cardIndex somehow exceeds bounds (e.g. stale render), complete
+  const currentCard = activeCards[cardIndex]
   if (!currentCard) {
     onComplete()
     return null
   }
+
   const wordBankExamples = (wordBanks[currentCard.wordClass] ?? []).slice(0, 4)
+  const isNew = !forceFullReview && newWordClassSet.has(currentCard.wordClass)
 
   return (
     <div className="space-y-4" data-testid="concept-card-sequence">
       <div className="flex items-center justify-between">
         <div>
-          <p
-            className="text-base font-bold"
-            style={{ color: 'var(--color-text)' }}
-            data-tts="First, let's learn the word types you'll need today"
-          >
-            First, let's learn your word types 📖
-          </p>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-            You'll use these in today's sentence
-          </p>
+          {isNew ? (
+            <>
+              <p
+                className="text-base font-bold"
+                style={{ color: 'var(--color-text)' }}
+                data-tts="You've unlocked a new word type today!"
+              >
+                ✨ New word type unlocked!
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                Learn it before you start building
+              </p>
+            </>
+          ) : (
+            <>
+              <p
+                className="text-base font-bold"
+                style={{ color: 'var(--color-text)' }}
+                data-tts="Let's review your word types"
+              >
+                Word type review 📖
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                You've seen these before — quick reminder
+              </p>
+            </>
+          )}
         </div>
       </div>
 
       <AnimatePresence mode="wait">
         <ConceptCard
-          key={cardIndex}
+          key={`${forceFullReview ? 'review' : 'new'}-${cardIndex}`}
           definition={currentCard}
           wordBankExamples={wordBankExamples}
           cardIndex={cardIndex + 1}
-          totalCards={cards.length}
+          totalCards={activeCards.length}
           onNext={handleNext}
           canSkip={canSkip}
           onSkipAll={onComplete}
         />
       </AnimatePresence>
+
+      {/* Chips strip for already-known word classes shown below new-term cards */}
+      {!forceFullReview && reminderCards.length > 0 && (
+        <div className="pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
+          <p
+            className="text-[10px] font-semibold uppercase tracking-wider mb-2"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            Already know these:
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {reminderCards.map((card) => {
+              const colorVar = `var(--color-${card.wordClass})`
+              return (
+                <div
+                  key={card.wordClass}
+                  className="px-2.5 py-1 rounded-full text-[10px] font-semibold text-white opacity-80"
+                  style={{ backgroundColor: colorVar }}
+                  title={card.childFriendlyDefinition}
+                  data-tts={card.plainEnglishName}
+                >
+                  {card.plainEnglishName}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

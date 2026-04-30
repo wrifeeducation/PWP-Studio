@@ -17,6 +17,7 @@ import { WORD_CLASS_DEFINITIONS } from '../../lib/definitions'
 import type { FormulaLevel } from '../../types/index'
 import { WordClass } from '../../types/index'
 import { useTTS } from '../../hooks/useTTS'
+import { sfx } from '../../lib/sfx'
 
 // ─── Colour map ───────────────────────────────────────────────────────────────
 
@@ -428,7 +429,7 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
               initial={{ opacity: 0, scale: 0.85, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{ type: 'spring', stiffness: 320, damping: 18 }}
-              onClick={onReady}
+              onClick={() => { sfx.click(); onReady() }}
               style={{
                 background: 'var(--color-primary)',
                 color: '#fff',

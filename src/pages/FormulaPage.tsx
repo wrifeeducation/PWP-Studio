@@ -47,6 +47,8 @@ import { useStars } from '../hooks/useStars'
 import { StarsDisplay } from '../components/gamification/StarsDisplay'
 import { OutOfStars } from '../components/formula/OutOfStars'
 import { SessionIntro } from '../components/formula/SessionIntro'
+import { sfx } from '../lib/sfx'
+import { FullscreenButton } from '../components/ui/FullscreenButton'
 
 // ─── Screen states ────────────────────────────────────────────────────────────
 
@@ -332,6 +334,13 @@ export default function FormulaPage() {
       const totalXpEarned = levelXp + streakBonus
       setXpEarned(totalXpEarned)
 
+      // Play feedback sound based on score
+      if (raw.overall_score >= 80) {
+        sfx.success()
+      } else {
+        sfx.error()
+      }
+
       // WF-050: Stars model — deduct on any score < 80, award on perfect session
       // Whole stars only (integer DB column). Free tier, active mode only.
       if (stars.isFree && !isReviewMode) {
@@ -441,6 +450,7 @@ export default function FormulaPage() {
           { onConflict: 'pupil_id,badge_id' }
         )
         setNewBadge(badge)
+        sfx.star()
       }
 
       // Invalidate React Query cache so dashboard refreshes
@@ -448,6 +458,7 @@ export default function FormulaPage() {
 
       if (didLevelUp) {
         setShowLevelUp(true)
+        sfx.levelUp()
         // WF-042: award formula mastery certificate on gate pass
         if (user?.id) {
           const cert = await awardCertificate(user.id, data.level.id, 'formula_mastery')
@@ -887,6 +898,9 @@ export default function FormulaPage() {
               </div>
             </>
           )}
+
+          {/* Fullscreen play mode toggle — always visible */}
+          <FullscreenButton />
         </div>
       </header>
 
@@ -905,7 +919,7 @@ export default function FormulaPage() {
         </div>
       )}
 
-      <main className="max-w-xl mx-auto px-4 pt-6">
+      <main className="max-w-xl mx-auto px-3 sm:px-4 pt-4 sm:pt-6 pb-8">
         {/* Submit error banner */}
         {submitError && (
           <motion.div
@@ -943,6 +957,7 @@ export default function FormulaPage() {
               formulaElements={data.level.formula_elements}
               wordBanks={data.level.word_banks as Record<string, string[]>}
               scaffoldStage={masteryState.scaffoldStage}
+              currentLevelId={data.level.id}
               onComplete={() => setScreen('practice')}
             />
           </motion.div>
@@ -968,6 +983,7 @@ export default function FormulaPage() {
                 onSubmit={handleSubmit}
                 isSubmitting={isAssessing}
                 scaffoldStage={masteryState.scaffoldStage}
+                currentLevelId={data.level.id}
               />
             )}
           </motion.div>

@@ -9,6 +9,7 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import { TTSButton } from '../ui/TTSButton'
 import type { WordClassDefinition } from '../../lib/definitions'
+import { sfx } from '../../lib/sfx'
 
 interface ConceptCardProps {
   definition: WordClassDefinition
@@ -167,7 +168,7 @@ export const ConceptCard: React.FC<ConceptCardProps> = ({
         <div className="flex gap-3 pt-1">
           {canSkip && (
             <button
-              onClick={onSkipAll}
+              onClick={() => { sfx.click(); onSkipAll() }}
               className="px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
               style={{
                 border: '1px solid var(--color-border)',
@@ -181,7 +182,7 @@ export const ConceptCard: React.FC<ConceptCardProps> = ({
             </button>
           )}
           <button
-            onClick={onNext}
+            onClick={() => { sfx.flip(); onNext() }}
             className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
             style={{ backgroundColor: color }}
             data-testid="concept-card-next"
