@@ -8,7 +8,7 @@ import { speak as ttsSpeak, stopSpeaking, isSpeaking as ttsIsSpeaking } from '..
 import { useSettingsStore } from '../stores/settingsStore'
 
 interface UseTTSReturn {
-  speak: (text: string) => void
+  speak: (text: string, onEnd?: () => void) => void
   stop: () => void
   isSpeaking: boolean
 }
