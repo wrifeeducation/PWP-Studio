@@ -919,7 +919,7 @@ export default function FormulaPage() {
         </div>
       )}
 
-      <main className="max-w-xl mx-auto px-3 sm:px-4 pt-4 sm:pt-6 pb-8">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-8">
         {/* Submit error banner */}
         {submitError && (
           <motion.div

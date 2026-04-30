@@ -303,7 +303,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
         >
           <span className="text-xl leading-none mt-0.5" aria-hidden="true">🎯</span>
           <div>
-            <p className="text-sm font-bold text-blue-800 mb-0.5">What to do</p>
+            <p className="text-base font-bold text-blue-800 mb-1">What to do</p>
             <p className="text-sm text-blue-700 leading-snug">
               Choose one word for each coloured box. Drag a word from the bank below — or <strong>double-tap</strong> it to place it automatically.
             </p>
@@ -312,7 +312,8 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
 
         {/* ── Formula slots row ── */}
         <div
-          className="flex flex-wrap gap-3 sm:gap-4 md:gap-5 justify-center"
+          className="grid gap-3 sm:gap-4"
+          style={{ gridTemplateColumns: `repeat(${level.formula_elements.length}, minmax(0, 1fr))` }}
           role="group"
           aria-label="Formula slots"
           data-testid="formula-slots"
