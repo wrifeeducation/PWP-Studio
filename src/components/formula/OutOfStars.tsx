@@ -6,7 +6,6 @@
  */
 
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 
 interface OutOfStarsProps {
   onReview: () => void   // navigate to review / dashboard
