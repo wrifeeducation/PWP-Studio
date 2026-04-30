@@ -46,10 +46,11 @@ import { DefinitionUnlock } from '../components/gamification/DefinitionUnlock'
 import { useStars } from '../hooks/useStars'
 import { StarsDisplay } from '../components/gamification/StarsDisplay'
 import { OutOfStars } from '../components/formula/OutOfStars'
+import { SessionIntro } from '../components/formula/SessionIntro'
 
 // ─── Screen states ────────────────────────────────────────────────────────────
 
-type Screen = 'loading' | 'error' | 'concepts' | 'practice' | 'feedback' | 'whats-next'
+type Screen = 'loading' | 'error' | 'intro' | 'concepts' | 'practice' | 'feedback' | 'whats-next'
 
 export default function FormulaPage() {
   const navigate = useNavigate()
@@ -69,7 +70,7 @@ export default function FormulaPage() {
   const { isLoading, isError, data, refetch } = useFormulaLevel(reviewLevelId)
   const { setAssessing, isAssessing, resetSession } = useFormulaStore()
 
-  const [screen, setScreen] = useState<Screen>('concepts')
+  const [screen, setScreen] = useState<Screen>('intro')
   const [assessmentResult, setAssessmentResult] = useState<RawAssessmentResult | null>(null)
   const [xpEarned, setXpEarned] = useState(0)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -82,9 +83,9 @@ export default function FormulaPage() {
   // Track whether we've already notified the teacher about being stuck this level
   const stuckNotifiedRef = useRef(false)
 
-  // Reset concept screen when level changes
+  // Reset to intro screen when level changes (WF-051)
   useEffect(() => {
-    setScreen('concepts')
+    setScreen('intro')
     stuckNotifiedRef.current = false
   }, [data?.level.id])
 
@@ -917,7 +918,18 @@ export default function FormulaPage() {
           </motion.div>
         )}
 
-        {/* Phase 2: Concept cards shown before the first practice screen */}
+        {/* WF-051: Session intro with mascot + animated worked example */}
+        {screen === 'intro' && data && (
+          <SessionIntro
+            level={data.level}
+            todaysSubject={data.todaysSubject}
+            isReturning={(masteryState.sessionsOnLevel ?? 0) > 0}
+            onReady={() => setScreen('concepts')}
+            onSkip={() => setScreen('practice')}
+          />
+        )}
+
+        {/* Concept cards shown after intro, before first practice */}
         {screen === 'concepts' && data && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
