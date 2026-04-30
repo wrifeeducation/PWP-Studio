@@ -47,7 +47,7 @@ function WriFeMascot({ pose }: { pose: 'wave' | 'point' | 'cheer' }) {
         animate={{ y: [0, -6, 0] }}
         transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
       >
-        <svg width="90" height="110" viewBox="0 0 90 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg width="120" height="146" viewBox="0 0 90 110" fill="none" xmlns="http://www.w3.org/2000/svg">
           {/* Body — pencil shape */}
           <rect x="28" y="20" width="34" height="60" rx="10" fill="#FFD166" stroke="#E8B923" strokeWidth="2.5"/>
           {/* Pencil tip */}
@@ -138,9 +138,9 @@ function AnimatedExample({ level, onComplete }: AnimatedExampleProps) {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-      {/* Slots row */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, width: '100%' }}>
+      {/* Slots row — fills full width equally */}
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${elements.length}, minmax(0, 1fr))`, gap: 12, width: '100%' }}>
         {elements.map((el, idx) => {
           const colour = WC_COLOUR[el.word_class] ?? '#999'
           const def = WORD_CLASS_DEFINITIONS[el.word_class]
@@ -148,19 +148,19 @@ function AnimatedExample({ level, onComplete }: AnimatedExampleProps) {
           const exampleWord = el.example || (level.word_banks[el.word_class]?.[0] ?? '...')
 
           return (
-            <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+            <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
               {/* Slot */}
               <motion.div
                 style={{
-                  minWidth: 64,
-                  height: 44,
-                  borderRadius: 10,
+                  width: '100%',
+                  minHeight: 72,
+                  borderRadius: 14,
                   border: `2px solid ${colour}`,
                   background: isFilled ? colour : `${colour}18`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: '0 10px',
+                  padding: '12px 8px',
                   position: 'relative',
                   overflow: 'hidden',
                 }}
@@ -173,11 +173,12 @@ function AnimatedExample({ level, onComplete }: AnimatedExampleProps) {
                       animate={{ y: 0, opacity: 1 }}
                       transition={{ type: 'spring', stiffness: 340, damping: 20 }}
                       style={{
-                        fontSize: 14,
+                        fontSize: 18,
                         fontWeight: 800,
                         color: '#fff',
                         fontFamily: "'Nunito', sans-serif",
                         whiteSpace: 'nowrap',
+                        textAlign: 'center',
                       }}
                     >
                       {exampleWord}
@@ -185,7 +186,7 @@ function AnimatedExample({ level, onComplete }: AnimatedExampleProps) {
                   ) : (
                     <motion.span
                       key="empty"
-                      style={{ fontSize: 11, fontWeight: 700, color: colour, opacity: 0.7 }}
+                      style={{ fontSize: 20, fontWeight: 700, color: colour, opacity: 0.7 }}
                     >
                       ?
                     </motion.span>
@@ -193,7 +194,7 @@ function AnimatedExample({ level, onComplete }: AnimatedExampleProps) {
                 </AnimatePresence>
               </motion.div>
               {/* Label */}
-              <span style={{ fontSize: 9, fontWeight: 700, color: colour, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: colour, textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: 'center' }}>
                 {def?.plainEnglishName ?? el.word_class}
               </span>
             </div>
@@ -211,16 +212,17 @@ function AnimatedExample({ level, onComplete }: AnimatedExampleProps) {
             style={{
               background: '#ECFDF5',
               border: '2px solid #6EE7B7',
-              borderRadius: 12,
-              padding: '10px 18px',
+              borderRadius: 14,
+              padding: '14px 24px',
               display: 'flex',
               alignItems: 'center',
-              gap: 8,
+              gap: 10,
               marginTop: 4,
+              width: '100%',
             }}
           >
-            <span style={{ fontSize: 18 }}>✅</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#065F46', fontFamily: "'Nunito', sans-serif" }}>
+            <span style={{ fontSize: 22 }}>✅</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: '#065F46', fontFamily: "'Nunito', sans-serif" }}>
               {elements.map(el => el.example || (level.word_banks[el.word_class]?.[0] ?? '')).join(' ')}
             </span>
           </motion.div>
@@ -350,9 +352,9 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '8px 20px 28px',
-        gap: 20,
-        maxWidth: 480,
+        padding: '8px 24px 32px',
+        gap: 24,
+        maxWidth: 720,
         margin: '0 auto',
         width: '100%',
       }}>
@@ -371,13 +373,13 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
               style={{ textAlign: 'center' }}
             >
               <h1
-                style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 6px' }}
+                style={{ fontSize: 30, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 8px' }}
                 data-tts={isReturning ? "Welcome back! Let's practise." : "Let's get started!"}
               >
                 {isReturning ? 'Welcome back! 👋' : "Let's get started! 👋"}
               </h1>
               {todaysSubject && (
-                <p style={{ fontSize: 15, color: 'var(--color-text-muted)', margin: 0 }}
+                <p style={{ fontSize: 18, color: 'var(--color-text-muted)', margin: 0 }}
                    data-tts={`Today you are writing about ${todaysSubject}`}>
                   Today you're writing about{' '}
                   <strong style={{ color: 'var(--color-text)' }}>{todaysSubject}</strong>
@@ -401,17 +403,17 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
                 padding: '12px 16px',
                 marginBottom: 16,
               }}>
-                <p style={{ fontSize: 11, fontWeight: 800, color: '#1E40AF', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 4px' }}>
+                <p style={{ fontSize: 12, fontWeight: 800, color: '#1E40AF', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 6px' }}>
                   Today's sentence pattern
                 </p>
-                <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}
+                <p style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', margin: 0 }}
                    data-tts={`Today's pattern is ${wordClassNames}`}>
                   {wordClassNames}
                 </p>
               </div>
 
               {/* Worked example */}
-              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 12 }}
+              <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 16 }}
                  data-tts="Watch how to build your sentence">
                 {phase === 'ready' ? '⬆️ That\'s how it works! Now it\'s YOUR turn.' : '👀 Watch how to build your sentence…'}
               </p>
@@ -434,15 +436,14 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
                 background: 'var(--color-primary)',
                 color: '#fff',
                 border: 'none',
-                borderRadius: 16,
-                padding: '16px 36px',
-                fontSize: 17,
+                borderRadius: 18,
+                padding: '20px 48px',
+                fontSize: 20,
                 fontWeight: 800,
                 fontFamily: 'inherit',
                 cursor: 'pointer',
                 width: '100%',
-                maxWidth: 320,
-                boxShadow: '0 4px 14px rgba(108,92,231,0.35)',
+                boxShadow: '0 6px 20px rgba(108,92,231,0.4)',
               }}
               data-tts="I'm ready! Let's go"
               data-testid="ready-btn"
