@@ -57,8 +57,11 @@ export function PupilWelcomeModal({ pupilId, firstName, onComplete }: PupilWelco
           last_session_date: null,
           total_xp: 0,
           double_xp_until: null,
+          stars_remaining: 3,
+          stars_last_replenished: null,
+          star_shield_active: false,
         },
-        { onConflict: 'pupil_id' }
+        { onConflict: 'pupil_id', ignoreDuplicates: true }
       )
     } catch {
       // Non-blocking

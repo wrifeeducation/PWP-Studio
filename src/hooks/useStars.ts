@@ -66,6 +66,34 @@ export function useStars(): StarsState {
       .eq('pupil_id', profile.id)
       .single()
       .then(async ({ data, error }) => {
+        // PGRST116 = "no rows returned" — pupil skipped Welcome Modal and has no row yet.
+        // Create a full default row so subsequent deductStar/awardStar writes succeed.
+        if (!data && (error as { code?: string } | null)?.code === 'PGRST116') {
+          await supabase
+            .from('pupil_progress')
+            .upsert(
+              {
+                pupil_id: profile.id,
+                stars_remaining: DAILY_STAR_MAX,
+                stars_last_replenished: today,
+                star_shield_active: false,
+                current_formula_level: 1,
+                current_paragraph_phase: 'A',
+                writing_studio_unlocked: false,
+                current_streak: 0,
+                longest_streak: 0,
+                streak_shield_active: false,
+                total_xp: 0,
+              },
+              { onConflict: 'pupil_id', ignoreDuplicates: true }
+            )
+          setStarsRemaining(DAILY_STAR_MAX)
+          setShieldActive(false)
+          setLoading(false)
+          return
+        }
+
+        // Any other error (RLS, network) → graceful degradation: show 3 stars, bypass DB writes
         if (error || !data) {
           setLoading(false)
           return
