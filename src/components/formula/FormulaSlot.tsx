@@ -216,7 +216,7 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
         ref={setNodeRef}
         data-testid={dataTestId ?? `formula-slot-${id}`}
         data-tts={`${label} slot${selectedWord ? ': ' + selectedWord : ' — empty'}`}
-        className="flex flex-col items-center justify-center rounded-xl transition-all duration-150 min-w-[80px] sm:min-w-[90px] md:min-w-[100px] min-h-[64px] sm:min-h-[72px] px-3 sm:px-4 py-2 sm:py-3 relative"
+        className="flex flex-col items-center justify-center rounded-xl transition-all duration-150 min-w-[92px] sm:min-w-[104px] md:min-w-[116px] min-h-[76px] sm:min-h-[88px] px-3 sm:px-4 py-3 sm:py-3.5 relative"
         style={containerStyle}
         aria-label={`${label} slot${selectedWord ? ' — ' + selectedWord : ' — empty'}`}
         role="region"
@@ -235,13 +235,13 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
                 </span>
                 {/* Plain-English name — smaller, softer, explanatory */}
                 <span
-                  className="text-[9px] font-semibold leading-none"
+                  className="text-[10px] font-semibold leading-none mt-0.5"
                   style={{ color: '#6B7280' }}
                   aria-hidden="true"
                 >
                   {plainEnglishLabel}
                 </span>
-                <span className="text-lg text-gray-300 leading-none mt-0.5" aria-hidden="true">
+                <span className="text-xl text-gray-300 leading-none mt-1" aria-hidden="true">
                   +
                 </span>
                 <span className="text-[10px] text-gray-400 mt-0.5 leading-tight px-1" aria-hidden="true">
@@ -251,11 +251,11 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
             ) : (
               <>
                 <span
-                  className="w-3 h-3 rounded-full inline-block mb-1"
+                  className="w-3.5 h-3.5 rounded-full inline-block mb-1.5"
                   style={{ backgroundColor: color }}
                   aria-hidden="true"
                 />
-                <span className="text-xl text-gray-400 leading-none" aria-hidden="true">
+                <span className="text-2xl text-gray-400 leading-none" aria-hidden="true">
                   +
                 </span>
               </>
@@ -264,7 +264,7 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
         ) : (
           <button
             onClick={onClear}
-            className="text-white font-mono font-bold text-sm leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="text-white font-mono font-bold text-base leading-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-white px-1"
             data-testid={`slot-word-${id}`}
             data-tts={selectedWord}
             aria-label={`${selectedWord} — tap to remove`}
@@ -279,12 +279,12 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
       {hintsAvailable && (
         <button
           onClick={handleHintClick}
-          className="mt-1 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all focus:outline-none focus-visible:ring-2"
+          className="mt-1.5 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all focus:outline-none focus-visible:ring-2"
           style={{
             backgroundColor: hintVisible ? color : 'var(--color-border)',
             color: hintVisible ? 'white' : 'var(--color-text-muted)',
             minWidth: '44px',
-            minHeight: '28px',
+            minHeight: '32px',
           }}
           data-testid={`hint-button-${id}`}
           aria-label={`${hintHasCost ? 'Hint (−5 pts): ' : 'Hint: '}${label} definition`}

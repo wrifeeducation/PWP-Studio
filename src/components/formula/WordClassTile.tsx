@@ -59,9 +59,9 @@ const LABEL_MAP: Record<WordClass, string> = {
 // ─── size classes ─────────────────────────────────────────────────────────────
 
 const SIZE_CLASSES = {
-  sm: 'text-xs px-2 py-1 min-w-[56px]',
-  md: 'text-sm px-3 py-2 min-w-[72px]',
-  lg: 'text-base px-4 py-2.5 min-w-[88px]',
+  sm: 'text-xs px-2.5 py-1.5 min-w-[64px]',
+  md: 'text-sm px-3.5 py-2.5 min-w-[88px]',
+  lg: 'text-base px-4 py-3 min-w-[100px]',
 }
 
 // ─── component ────────────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ export const WordClassTile: React.FC<WordClassTileProps> = ({
     >
       {/* Word class label (small caps) */}
       <span
-        className="text-[9px] uppercase tracking-widest opacity-75 leading-none mb-0.5"
+        className="text-[10px] uppercase tracking-widest opacity-80 leading-none mb-0.5 font-semibold"
         aria-hidden="true"
       >
         {label}

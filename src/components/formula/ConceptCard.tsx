@@ -78,7 +78,7 @@ export const ConceptCard: React.FC<ConceptCardProps> = ({
             {definition.label}
           </span>
           <span
-            className="text-white text-sm font-medium opacity-90 lowercase"
+            className="text-white text-base font-medium opacity-90 lowercase"
             data-tts={definition.plainEnglishName}
           >
             {definition.plainEnglishName}
@@ -169,7 +169,7 @@ export const ConceptCard: React.FC<ConceptCardProps> = ({
           {canSkip && (
             <button
               onClick={() => { sfx.click(); onSkipAll() }}
-              className="px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
+              className="px-4 py-3 rounded-xl text-sm font-semibold transition-colors"
               style={{
                 border: '1px solid var(--color-border)',
                 color: 'var(--color-text-muted)',
@@ -183,7 +183,7 @@ export const ConceptCard: React.FC<ConceptCardProps> = ({
           )}
           <button
             onClick={() => { sfx.flip(); onNext() }}
-            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
+            className="flex-1 py-3 rounded-xl text-base font-bold text-white transition-all"
             style={{ backgroundColor: color }}
             data-testid="concept-card-next"
             data-tts={cardIndex < totalCards ? 'Next word class' : "Got it — let's practice"}

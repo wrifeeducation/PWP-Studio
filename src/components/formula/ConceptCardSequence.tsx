@@ -130,7 +130,7 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
         <div className="flex gap-3">
           <button
             onClick={() => { sfx.click(); onComplete() }}
-            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white"
+            className="flex-1 py-3 rounded-xl text-base font-bold text-white"
             style={{ backgroundColor: 'var(--color-noun)' }}
             data-testid="reminder-start-button"
             data-tts="Start practice"
@@ -139,7 +139,7 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
           </button>
           <button
             onClick={() => { sfx.click(); handleForceReview() }}
-            className="px-4 py-2.5 rounded-xl text-sm font-medium"
+            className="px-4 py-3 rounded-xl text-sm font-semibold"
             style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
             data-testid="reminder-review-button"
             data-tts="Review definitions"

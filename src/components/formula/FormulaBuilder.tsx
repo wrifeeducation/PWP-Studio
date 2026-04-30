@@ -312,7 +312,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
 
         {/* ── Formula slots row ── */}
         <div
-          className="flex flex-wrap gap-2 sm:gap-3 md:gap-4 justify-center"
+          className="flex flex-wrap gap-3 sm:gap-4 md:gap-5 justify-center"
           role="group"
           aria-label="Formula slots"
           data-testid="formula-slots"
@@ -400,7 +400,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
             </div>
           </div>
           <p
-            className="text-base font-mono font-medium"
+            className="text-lg font-mono font-semibold leading-snug"
             style={{ color: allFilled ? 'var(--color-text)' : 'var(--color-text-muted)' }}
             data-tts={buildDisplaySentence()}
           >
@@ -417,7 +417,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
           >
             Your words — drag or double-tap to place
           </p>
-          <div className="flex flex-wrap gap-2 sm:gap-3">
+          <div className="flex flex-wrap gap-2.5 sm:gap-3.5">
             {uniqueBankEntries.map((entry) => (
               <WordClassTile
                 key={entry.id}
@@ -439,7 +439,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
         <div className="flex gap-3 sm:gap-4">
           <button
             onClick={() => { resetSession(); sfx.clear() }}
-            className="px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2"
+            className="px-5 py-3.5 rounded-xl text-sm font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2"
             style={{
               border: '2px solid var(--color-border)',
               color: 'var(--color-text-muted)',
@@ -460,7 +460,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
             }}
             disabled={!allFilled || isSubmitting}
             aria-disabled={!allFilled || isSubmitting}
-            className="flex-1 py-3 rounded-xl text-sm font-semibold text-white transition-all duration-150 focus:outline-none focus-visible:ring-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 py-3.5 rounded-xl text-base font-bold text-white transition-all duration-150 focus:outline-none focus-visible:ring-2 disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ backgroundColor: allFilled ? 'var(--color-noun)' : '#9CA3AF' }}
             data-testid="submit-button"
             data-tts={allFilled ? 'Submit your sentence' : 'Fill all slots to submit'}

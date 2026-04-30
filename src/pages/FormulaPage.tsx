@@ -852,14 +852,14 @@ export default function FormulaPage() {
 
         <div className="flex items-center gap-2">
           <span
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold"
             style={{ backgroundColor: 'var(--color-noun)' }}
             aria-hidden="true"
           >
             W
           </span>
           <span
-            className="font-bold text-base"
+            className="font-bold text-lg"
             style={{ color: 'var(--color-text)' }}
             data-tts={isReviewMode ? `Reviewing Level ${data.level.id}` : 'Formula Practice'}
           >
@@ -890,7 +890,7 @@ export default function FormulaPage() {
               )}
 
               <div
-                className="text-xs font-semibold px-2 py-1 rounded"
+                className="text-sm font-bold px-2.5 py-1 rounded-lg"
                 style={{ backgroundColor: '#EFF6FF', color: 'var(--color-noun)' }}
                 data-tts={`Level ${data.level.id}`}
               >
