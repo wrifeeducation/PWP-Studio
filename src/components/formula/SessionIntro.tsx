@@ -212,7 +212,7 @@ function AnimatedExample({ level, onComplete }: AnimatedExampleProps) {
           >
             <span style={{ fontSize: 18 }}>✅</span>
             <span style={{ fontSize: 13, fontWeight: 700, color: '#065F46', fontFamily: "'Nunito', sans-serif" }}>
-              {elements.map(el => el.example || level.word_banks[el.word_class]?.[0] ?? '').join(' ')}
+              {elements.map(el => el.example || (level.word_banks[el.word_class]?.[0] ?? '')).join(' ')}
             </span>
           </motion.div>
         )}
