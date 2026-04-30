@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { WORD_CLASS_DEFINITIONS } from '../../lib/definitions'
 import type { FormulaLevel } from '../../types/index'
 import { WordClass } from '../../types/index'
+import { useTTS } from '../../hooks/useTTS'
 
 // ─── Colour map ───────────────────────────────────────────────────────────────
 
@@ -236,11 +237,32 @@ type IntroPhase = 'greeting' | 'example' | 'ready'
 export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSkip }: SessionIntroProps) {
   const [phase, setPhase] = useState<IntroPhase>('greeting')
   const [mascotPose, setMascotPose] = useState<'wave' | 'point' | 'cheer'>('wave')
+  const { speak, stop } = useTTS()
 
   // Build formula description in plain English
   const wordClassNames = level.formula_elements
     .map(el => WORD_CLASS_DEFINITIONS[el.word_class]?.plainEnglishName ?? el.word_class)
-    .join(' + ')
+    .join(' plus ')
+
+  // ── Auto-narrate each phase ──────────────────────────────────────────────────
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout>
+    if (phase === 'greeting') {
+      const greet = isReturning ? 'Welcome back!' : "Let's get started!"
+      const subject = todaysSubject ? ` Today you are writing about ${todaysSubject}.` : ''
+      t = setTimeout(() => speak(`${greet}${subject}`), 400)
+    } else if (phase === 'example') {
+      t = setTimeout(() => speak(`Today's sentence pattern is: ${wordClassNames}. Watch how to build your sentence.`), 300)
+    } else if (phase === 'ready') {
+      t = setTimeout(() => speak(`That's how it works! Now it's your turn. Press the button when you're ready.`), 300)
+    }
+    return () => clearTimeout(t)
+  }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Stop TTS if the pupil skips or navigates away
+  useEffect(() => {
+    return () => stop()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-advance from greeting to example after 1.8s
   useEffect(() => {
