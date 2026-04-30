@@ -92,15 +92,7 @@ export const ConceptCardSequence: React.FC<ConceptCardSequenceProps> = ({
     setForceFullReview(true)
   }
 
-  // ── Chips-only mode: no new word classes, or stage 2+ with no force-review ────
-  const showChipsMode =
-    !forceFullReview && (acquisitionCards.length === 0 || (scaffoldStage >= 2 && reminderCards.length > 0 && acquisitionCards.length === 0))
-
-  // ── Reminder chips + new-term cards: stage 1 with new terms ─────────────────
-  // Show full cards for new terms, chips beneath for already-known terms
-  const showMixedMode = !forceFullReview && acquisitionCards.length > 0
-
-  // ── Pure chip mode (stage 2+ OR no new terms) ────────────────────────────────
+  // ── Pure chip mode: no new terms at this level ───────────────────────────────
   const isPureChipsMode = !forceFullReview && acquisitionCards.length === 0
 
   if (isPureChipsMode) {
