@@ -86,6 +86,7 @@ export default function FormulaPage() {
   // Reset to intro screen when level changes (WF-051)
   useEffect(() => {
     setScreen('intro')
+    setSessionMistakes(0)
     stuckNotifiedRef.current = false
   }, [data?.level.id])
 
@@ -331,20 +332,14 @@ export default function FormulaPage() {
       const totalXpEarned = levelXp + streakBonus
       setXpEarned(totalXpEarned)
 
-      // WF-050: Stars model — deduct on poor score, award on perfect session
-      // Only applies to free-tier pupils in active (non-review) mode
+      // WF-050: Stars model — deduct on any score < 80, award on perfect session
+      // Whole stars only (integer DB column). Free tier, active mode only.
       if (stars.isFree && !isReviewMode) {
-        if (raw.overall_score < 60) {
-          // Clear fail — deduct a full star
+        if (raw.overall_score < 80) {
           setSessionMistakes(prev => prev + 1)
           await stars.deductStar(1)
-        } else if (raw.overall_score < 80) {
-          // Partial — deduct half a star
-          setSessionMistakes(prev => prev + 1)
-          await stars.deductStar(0.5)
-        }
-        // Perfect session (≥ 80) with no mistakes this session → earn a star back
-        if (raw.overall_score >= 80 && sessionMistakes === 0) {
+        } else if (sessionMistakes === 0) {
+          // Score ≥ 80 AND no mistakes this session → earn a star back
           await stars.awardStar()
         }
       }
@@ -618,6 +613,7 @@ export default function FormulaPage() {
     resetSession()
     setAssessmentResult(null)
     setSubmitError(null)
+    setSessionMistakes(0)
     // Skip concept cards on retry — go straight to practice
     setScreen('practice')
   }
@@ -674,6 +670,7 @@ export default function FormulaPage() {
     resetSession()
     setAssessmentResult(null)
     setSubmitError(null)
+    setSessionMistakes(0)
     setScreen('practice')
   }
 
