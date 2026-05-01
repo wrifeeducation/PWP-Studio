@@ -17,7 +17,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
@@ -75,16 +75,21 @@ const CoinIcon: React.FC<{ size?: number; style?: React.CSSProperties }> = ({ si
 
 // ─── colour tokens (inline, matches existing HomePage pattern) ────────────────
 
+/**
+ * R-04: Replaced hardcoded hex values with CSS custom property references.
+ * These resolve to the WriFe PWP design tokens defined in src/index.css.
+ * Do NOT revert to hex — all colour decisions must go through CSS variables.
+ */
 const C = {
-  brand:   '#6C5CE7',
-  orange:  '#F5A623',
-  bg:      '#FAF9F7',
-  surface: '#FFFFFF',
-  border:  '#EDEBE7',
-  text:    '#2D3436',
-  muted:   '#8E9BAE',
-  green:   '#27AE60',
-  pink:    '#E84393',
+  brand:   'var(--color-brand-secondary)',  /* was #6C5CE7 — now maps to app's blue */
+  orange:  'var(--color-brand-primary)',    /* was #F5A623 — now maps to app's orange */
+  bg:      'var(--color-background)',       /* was #FAF9F7 — now the sky-blue page bg */
+  surface: 'var(--color-surface)',          /* was #FFFFFF */
+  border:  'var(--color-border)',           /* was #EDEBE7 */
+  text:    'var(--color-text)',             /* was #2D3436 */
+  muted:   'var(--color-text-muted)',       /* was #8E9BAE */
+  green:   'var(--color-brand-success)',    /* was #27AE60 */
+  pink:    'var(--color-brand-accent)',     /* was #E84393 — closest token: warm yellow; revisit if pink is needed */
 } as const
 
 // ─── Path geometry ────────────────────────────────────────────────────────────
@@ -903,10 +908,14 @@ const LearningPath: React.FC<LearningPathProps> = ({ currentLevel, avatarVariant
               completed={chapterDone}
             />
 
-            <div style={{ overflowX: 'visible' }}>
+            {/* R-07: SVG now uses viewBox so it scales down on screens narrower than PATH_W (300px).
+                 width="100%" makes it fill its container; the viewBox preserves the coordinate system. */}
+            <div style={{ overflowX: 'hidden' }}>
               <svg
-                width={PATH_W}
+                viewBox={`0 0 ${PATH_W} ${svgHeight}`}
+                width="100%"
                 height={svgHeight}
+                preserveAspectRatio="xMidYMid meet"
                 style={{ display: 'block', margin: '0 auto', overflow: 'visible' }}
                 aria-label={`Chapter ${chapter.num} levels`}
               >
@@ -1097,6 +1106,8 @@ export default function DashboardPage() {
   const navigate = useNavigate()
   const { user, profile } = useAuthStore()
   const { isPro: isProUser } = useFreemium()
+  // R-08: respect prefers-reduced-motion for all Framer Motion animations in this page
+  const prefersReducedMotion = useReducedMotion()
   const [wardrobeOpen, setWardrobeOpen] = useState(false)
   // Profile is typed without the new selected_avatar column; cast through any
   const profileAny = profile as (typeof profile & { selected_avatar?: string }) | null
@@ -1219,8 +1230,9 @@ export default function DashboardPage() {
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
+    // R-06: fontFamily:'Inter' removed — Inter is not loaded; Nunito cascades from :root
     <div
-      style={{ minHeight: '100vh', background: C.bg, fontFamily: "'Inter', sans-serif" }}
+      style={{ minHeight: '100dvh', background: C.bg }}
       data-testid="dashboard-page"
     >
       {/* Top bar */}
@@ -1266,26 +1278,27 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: 'easeOut' }}
               data-tts="Your learning path"
+              className="gradient-heading-animate"
               style={{
                 fontSize: 'clamp(22px, 5vw, 32px)',
                 fontWeight: 900,
                 margin: '0 0 6px',
                 letterSpacing: '-0.01em',
                 lineHeight: 1.1,
-                background: 'linear-gradient(90deg, #6C5CE7, #a855f7, #F5A623, #6C5CE7)',
+                background: `linear-gradient(90deg, var(--color-brand-secondary), var(--color-brand-primary), var(--color-brand-secondary))`,
                 backgroundSize: '300% 100%',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
-                animation: 'gradientShift 4s ease-in-out infinite',
                 display: 'inline-block',
               }}
             >
               Your Learning Path
               {' '}
+              {/* R-08: skip decorative wiggle when prefers-reduced-motion is set */}
               <motion.span
                 style={{ display: 'inline-block', WebkitTextFillColor: 'initial', backgroundClip: 'unset' }}
-                animate={{ rotate: [0, 15, -10, 15, 0], scale: [1, 1.3, 1.1, 1.3, 1] }}
+                animate={prefersReducedMotion ? {} : { rotate: [0, 15, -10, 15, 0], scale: [1, 1.3, 1.1, 1.3, 1] }}
                 transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 3 }}
                 aria-hidden="true"
               >
@@ -1301,7 +1314,7 @@ export default function DashboardPage() {
               style={{
                 height: 3,
                 borderRadius: 2,
-                background: 'linear-gradient(90deg, #6C5CE7, #F5A623)',
+                background: 'linear-gradient(90deg, var(--color-brand-secondary), var(--color-brand-primary))',
                 maxWidth: 260,
                 margin: '0 auto 10px',
                 transformOrigin: 'left',
@@ -1354,27 +1367,10 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* Responsive grid style */}
-      <style>{`
-        @media (min-width: 768px) {
-          .dashboard-grid {
-            grid-template-columns: 1fr 320px !important;
-          }
-        }
-        @media (min-width: 1024px) {
-          .dashboard-grid {
-            grid-template-columns: 1fr 360px !important;
-          }
-        }
-        button:hover:not(:disabled) {
-          transform: scale(1.04);
-        }
-        @keyframes gradientShift {
-          0%   { background-position: 0%   50%; }
-          50%  { background-position: 100% 50%; }
-          100% { background-position: 0%   50%; }
-        }
-      `}</style>
+      {/* R-05: inline <style> tag removed — all rules moved to src/index.css.
+           - .dashboard-grid breakpoints are now in the WF-051 responsive section
+           - gradientShift keyframe is now in index.css with a prefers-reduced-motion override
+           - global `button:hover` rule was REMOVED — it overrode node animations globally */}
 
       {/* Wardrobe modal */}
       <AnimatePresence>

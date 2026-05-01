@@ -22,8 +22,22 @@ let _ctx: AudioContext | null = null
 let _enabled = true
 let _volume = 0.35  // master volume (0–1)
 
+/**
+ * S-06: Returns true when the user has opted into reduced motion.
+ * We silence SFX too — many gamification sounds accompany animations,
+ * and playing sounds without their paired animation is confusing.
+ */
+function motionReduced(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+}
+
 function getCtx(): AudioContext | null {
   if (!_enabled) return null
+  // S-06: respect prefers-reduced-motion — do not play sounds tied to animations
+  if (motionReduced()) return null
   if (!_ctx) {
     try {
       _ctx = new AudioContext()
@@ -88,6 +102,19 @@ function sequence(
 // ─── Public sound effects ──────────────────────────────────────────────────────
 
 export const sfx = {
+  /**
+   * S-02: Prime the AudioContext within a synchronous user gesture handler.
+   * Call this at the very TOP of any async onClick before any `await` statements.
+   * iOS Safari requires AudioContext creation/resume to happen within the same
+   * synchronous call stack as the user gesture; after the first `await`, the
+   * gesture context is lost and AudioContext will be silently blocked.
+   */
+  prime(): void {
+    // Calling getCtx() creates and/or resumes the AudioContext within the gesture.
+    // No sound plays — this is purely a context warm-up call.
+    getCtx()
+  },
+
   /** Enable or disable all sound effects */
   setEnabled(enabled: boolean): void {
     _enabled = enabled

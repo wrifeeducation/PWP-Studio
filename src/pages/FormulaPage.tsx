@@ -174,6 +174,11 @@ export default function FormulaPage() {
   // ─── submit handler ─────────────────────────────────────────────────────────
 
   const handleSubmit = async (sentence: string, wordsUsed: string[], hintsUsed: WordClass[] = []) => {
+    // S-02: Prime AudioContext synchronously within the user gesture BEFORE any awaits.
+    // iOS Safari silently blocks AudioContext creation/resume after the first await,
+    // causing all sfx.success() / sfx.error() calls later in this function to be silent.
+    sfx.prime()
+
     if (!user?.id || !data) return
     setSubmitError(null)
     setAssessing(true)
@@ -458,7 +463,9 @@ export default function FormulaPage() {
 
       if (didLevelUp) {
         setShowLevelUp(true)
-        sfx.levelUp()
+        // S-04: delay levelUp fanfare by 500ms so it doesn't clash with sfx.star()
+        // which may have just played — the star sound is ~200ms, 500ms gap is safe.
+        setTimeout(() => sfx.levelUp(), 500)
         // WF-042: award formula mastery certificate on gate pass
         if (user?.id) {
           const cert = await awardCertificate(user.id, data.level.id, 'formula_mastery')

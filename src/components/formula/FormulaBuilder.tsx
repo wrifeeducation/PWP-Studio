@@ -200,7 +200,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
         {todaysSubject && (
           <div
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium"
-            style={{ backgroundColor: '#EFF6FF', color: 'var(--color-noun)' }}
+            style={{ backgroundColor: 'var(--color-surface-alt)', color: 'var(--color-noun)' }}
             data-tts={`Today's subject: ${todaysSubject}`}
             data-testid="subject-badge"
           >
@@ -297,14 +297,14 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
         {/* ── Task instruction banner ── */}
         <div
           className="rounded-xl px-4 py-3 flex items-start gap-3"
-          style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE' }}
+          style={{ backgroundColor: 'var(--color-surface-alt)', border: '1px solid var(--color-border)' }}
           data-tts="How to play: choose one word for each coloured box below. Drag a word from the word bank, or double-tap it to place it."
           data-testid="task-instruction"
         >
           <span className="text-xl leading-none mt-0.5" aria-hidden="true">🎯</span>
           <div>
-            <p className="text-base font-bold text-blue-800 mb-1">What to do</p>
-            <p className="text-sm text-blue-700 leading-snug">
+            <p className="text-base font-bold mb-1" style={{ color: 'var(--color-brand-secondary)' }}>What to do</p>
+            <p className="text-sm leading-snug" style={{ color: 'var(--color-text)' }}>
               Choose one word for each coloured box. Drag a word from the bank below — or <strong>double-tap</strong> it to place it automatically.
             </p>
           </div>
@@ -376,8 +376,8 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
                   <span
                     className="px-1.5 py-0.5 rounded"
                     style={{
-                      backgroundColor: hasCapital ? '#DCFCE7' : '#FEE2E2',
-                      color: hasCapital ? '#166534' : '#991B1B',
+                      backgroundColor: hasCapital ? 'var(--color-correct-bg)' : 'var(--color-incorrect-bg)',
+                      color: hasCapital ? 'var(--color-correct-text)' : 'var(--color-incorrect-text)',
                     }}
                     title="First letter must be a capital"
                     data-tts={hasCapital ? 'Capital letter: correct' : 'Capital letter missing'}
@@ -387,8 +387,8 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
                   <span
                     className="px-1.5 py-0.5 rounded"
                     style={{
-                      backgroundColor: hasPunctuation ? '#DCFCE7' : '#FEE2E2',
-                      color: hasPunctuation ? '#166534' : '#991B1B',
+                      backgroundColor: hasPunctuation ? 'var(--color-correct-bg)' : 'var(--color-incorrect-bg)',
+                      color: hasPunctuation ? 'var(--color-correct-text)' : 'var(--color-incorrect-text)',
                     }}
                     title="Sentence must end with a full stop"
                     data-tts={hasPunctuation ? 'Full stop: correct' : 'Full stop needed'}
@@ -462,7 +462,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
             disabled={!allFilled || isSubmitting}
             aria-disabled={!allFilled || isSubmitting}
             className="flex-1 py-3.5 rounded-xl text-base font-bold text-white transition-all duration-150 focus:outline-none focus-visible:ring-2 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ backgroundColor: allFilled ? 'var(--color-noun)' : '#9CA3AF' }}
+            style={{ backgroundColor: allFilled ? 'var(--color-brand-primary)' : 'var(--color-disabled)' }}
             data-testid="submit-button"
             data-tts={allFilled ? 'Submit your sentence' : 'Fill all slots to submit'}
             aria-label="Submit formula for assessment"

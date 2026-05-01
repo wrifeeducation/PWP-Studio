@@ -4,7 +4,9 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/mascot/mascot_std_1.png" />
     <link rel="apple-touch-icon" href="/mascot/mascot_std_1.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- R-11: viewport-fit=cover lets the app fill the full screen on notched iPhones
+         and allows env(safe-area-inset-*) CSS to apply proper padding. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>WriFe PWP — Progressive Writing Practice</title>
     <!-- WF-055: Content Security Policy -->
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;">

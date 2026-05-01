@@ -275,16 +275,19 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
         )}
       </div>
 
-      {/* Hint button — sits below the slot, min 44×44px tap target */}
+      {/* Hint button — 44×44px tap target (WCAG 2.1 SC 2.5.5) */}
       {hintsAvailable && (
         <button
           onClick={handleHintClick}
-          className="mt-1.5 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all focus:outline-none focus-visible:ring-2"
+          className="mt-1.5 rounded-full flex items-center justify-center text-xs font-bold transition-all focus:outline-none focus-visible:ring-2"
           style={{
             backgroundColor: hintVisible ? color : 'var(--color-border)',
             color: hintVisible ? 'white' : 'var(--color-text-muted)',
+            /* R-09: was minHeight: 32px which violated the 44px minimum tap target rule */
             minWidth: '44px',
-            minHeight: '32px',
+            minHeight: '44px',
+            width: '44px',
+            height: '44px',
           }}
           data-testid={`hint-button-${id}`}
           aria-label={`${hintHasCost ? 'Hint (−5 pts): ' : 'Hint: '}${label} definition`}

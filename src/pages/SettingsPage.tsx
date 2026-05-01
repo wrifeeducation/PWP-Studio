@@ -10,6 +10,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { supabase } from '../lib/supabase'
 import { applyHighContrastPreference } from '../lib/contrastMode'
+import { sfx } from '../lib/sfx'
 
 const AVATAR_COLOURS = [
   '#2563EB', // blue (noun)
@@ -31,16 +32,29 @@ export default function SettingsPage() {
     highContrast,
     fontSize,
     avatarColour,
+    sfxEnabled,
+    sfxVolume,
     setTtsEnabled,
     setTtsRate,
     setHighContrast,
     setFontSize,
     setAvatarColour,
+    setSfxEnabled,
+    setSfxVolume,
   } = useSettingsStore()
 
   const [firstName, setFirstName] = useState(profile?.first_name ?? '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  // S-03: Sync persisted sfx settings → sfx module on every mount.
+  // The sfx module resets to defaults when the page reloads; the store is
+  // the source of truth since it persists to localStorage.
+  // Using a one-time init pattern avoids useEffect dependency churn.
+  useState(() => {
+    sfx.setEnabled(sfxEnabled)
+    sfx.setVolume(sfxVolume)
+  })
 
   const handleSaveName = async () => {
     if (!user?.id || !firstName.trim()) return
@@ -63,6 +77,19 @@ export default function SettingsPage() {
   const handleHighContrastToggle = (enabled: boolean) => {
     setHighContrast(enabled)
     applyHighContrastPreference(enabled)
+  }
+
+  // S-03: SFX handlers — keep sfx module in sync with persisted settings
+  const handleSfxEnabledToggle = (enabled: boolean) => {
+    setSfxEnabled(enabled)
+    sfx.setEnabled(enabled)
+    // Play a preview tone so the user can hear the change
+    if (enabled) sfx.click()
+  }
+
+  const handleSfxVolumeChange = (vol: number) => {
+    setSfxVolume(vol)
+    sfx.setVolume(vol)
   }
 
   const handleFontSizeChange = (size: 'normal' | 'large') => {
@@ -164,6 +191,74 @@ export default function SettingsPage() {
               ))}
             </div>
           </div>
+        </section>
+
+        {/* ── Sound Effects ─────────────────────────────────────────── */}
+        {/* S-03: new section — previously sfxEnabled/sfxVolume had no UI */}
+        <section
+          className="rounded-xl p-5 space-y-4"
+          style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+          data-testid="settings-sfx"
+        >
+          <h2 className="font-semibold text-base" style={{ color: 'var(--color-text)' }} data-tts="Sound Effects">
+            Sound Effects
+          </h2>
+
+          {/* SFX on/off toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }} data-tts="Sound effects">
+                Sound Effects
+              </p>
+              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                Tones for correct answers, badges, and level-ups
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={sfxEnabled}
+              onClick={() => handleSfxEnabledToggle(!sfxEnabled)}
+              data-testid="sfx-toggle"
+              className="relative w-11 h-6 rounded-full transition-colors focus:outline-none focus-visible:ring-2"
+              style={{ backgroundColor: sfxEnabled ? 'var(--color-brand-primary)' : 'var(--color-border)' }}
+            >
+              <span
+                className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform"
+                style={{ transform: sfxEnabled ? 'translateX(20px)' : 'translateX(0)' }}
+              />
+            </button>
+          </div>
+
+          {/* SFX volume slider — only shown when SFX is on */}
+          {sfxEnabled && (
+            <div>
+              <label
+                className="text-xs font-medium flex items-center justify-between mb-2"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                <span>Volume</span>
+                <span>{Math.round(sfxVolume * 100)}%</span>
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={sfxVolume}
+                onChange={(e) => handleSfxVolumeChange(Number(e.target.value))}
+                onMouseUp={() => sfx.click()}
+                onTouchEnd={() => sfx.click()}
+                data-testid="sfx-volume-slider"
+                className="w-full accent-orange-500"
+                aria-label="Sound effects volume"
+              />
+              <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                <span>Quieter</span>
+                <span>Louder</span>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* ── Accessibility ────────────────────────────────────────────── */}
