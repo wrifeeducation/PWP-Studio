@@ -31,6 +31,9 @@ interface AssessFormulaRequest {
   year_group: number;
   phase: string;
   attempt_number: number;
+  /** Phase 3: full word bank available to the pupil (base forms only). Used to exempt
+   *  word-bank-sourced verbs from subject_agreement penalties. */
+  available_word_banks?: Record<string, string[]>;
 }
 
 interface ElementScore {
@@ -119,7 +122,17 @@ confidence_calculation:
 - subject_agreement: Verb doesn't agree with subject (e.g. "dogs runs")
 - register_inconsistency: Register shifts (contractions in formal, slang in academic, etc.)
 - preposition_choice: Preposition is semantically odd or incorrect
-- incomplete_clause: Clause after conjunction lacks a verb`;
+- incomplete_clause: Clause after conjunction lacks a verb
+
+**WORD BANK CONSTRAINT — VERB FORMS (CRITICAL)**
+When an \`available_word_banks\` object is provided, the word bank contains ONLY the exact words the pupil could select. Verb entries are always bare infinitives (base forms) — the pupil has no way to produce inflected forms such as "dances", "ran", or "is running".
+
+RULE: If the pupil's verb exactly matches a verb listed in the available verb word bank, you MUST NOT flag or penalise for subject-verb agreement. Instead:
+- Award the same element score you would for the correctly inflected form
+- Do not mention agreement in feedback_short or feedback_detail
+- Do not set common_error_type to "subject_agreement" if the mismatch is solely due to using a base form from the bank
+
+This rule takes precedence over the subject_agreement entry in the COMMON ERROR DETECTION TABLE for word-bank-constrained sessions. Only flag subject_agreement if the pupil typed a word that was NOT in the available bank AND it still fails to agree.`;
 
   const levelSpecific: Record<string, string> = {
     L1: `
@@ -244,6 +257,7 @@ Deno.serve(async (req: Request) => {
       year_group,
       phase,
       attempt_number,
+      available_word_banks,
     } = body;
 
     if (!level_id || !formula_definition || !pupil_sentence) {
@@ -263,6 +277,10 @@ Deno.serve(async (req: Request) => {
 
     const systemPrompt = buildSystemPrompt(level_id);
 
+    const wordBankSection = available_word_banks
+      ? `\n\nAvailable Word Banks (ALL words the pupil could choose from — base forms only): ${JSON.stringify(available_word_banks)}\nRemember: verbs in this bank are bare infinitives. Do NOT penalise for subject-verb agreement if the verb matches an entry in the available verb bank.`
+      : '';
+
     const userMessage = `Please assess this pupil's sentence.
 
 Level ID: ${level_id}
@@ -275,7 +293,7 @@ ${JSON.stringify(formula_definition, null, 2)}
 
 Pupil's Sentence: "${pupil_sentence}"
 
-Word Banks Used (words the pupil selected from): ${JSON.stringify(word_banks_used)}
+Word Banks Used (words the pupil selected from): ${JSON.stringify(word_banks_used)}${wordBankSection}
 
 Assess each slot in the formula definition, calculate the overall score, and provide feedback.`;
 

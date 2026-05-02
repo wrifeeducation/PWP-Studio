@@ -272,12 +272,14 @@ export default function FormulaPage() {
         scaffoldStage: masteryState.scaffoldStage,
         hintsUsed: hintsUsed.map(String),
         sessionNumberOnLevel: (masteryState.sessionsOnLevel ?? 0) + 1,
-        // Phase 3: session content for formula_sessions record
+        // Phase 3: session content for formula_sessions record + fair assessment
         contextSentence: sessionContent?.contextSentence ?? null,
         subjectUsed: sessionContent?.subject ?? null,
         distractorWordsUsed: sessionContent?.distractorWords && Object.keys(sessionContent.distractorWords).length > 0
           ? sessionContent.distractorWords
           : null,
+        // Pass full word bank so assessor doesn't penalise base-form verbs
+        availableWordBanks: sessionContent?.wordBankSubset ?? null,
       })
 
       setAssessmentResult(raw)

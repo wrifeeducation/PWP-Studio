@@ -24,6 +24,9 @@ export interface AssessFormulaInput {
   year_group: number
   phase: Phase
   attempt_number: 1 | 2
+  /** Phase 3: full curated word bank available to the pupil (base forms only).
+   *  Exempts word-bank-sourced verbs from subject_agreement penalty. */
+  available_word_banks?: Record<string, string[]>
 }
 
 // ─── Edge Function raw output shape (before we map to our types) ─────────────
@@ -85,6 +88,9 @@ export interface AssessFormulaParams {
   subjectUsed?: string | null
   /** Phase 3: distractor words used (wrong-class words added to word bank) */
   distractorWordsUsed?: Record<string, string[]> | null
+  /** Phase 3: full word bank available to the pupil (base forms). Passed to the
+   *  assessor so it does not penalise for verb agreement on word-bank verbs. */
+  availableWordBanks?: Record<string, string[]> | null
 }
 
 export const assessFormula = async (
@@ -99,6 +105,7 @@ export const assessFormula = async (
     contextSentence = null,
     subjectUsed = null,
     distractorWordsUsed = null,
+    availableWordBanks = null,
   } = params
 
   // Build input per Edge Function contract
@@ -116,6 +123,8 @@ export const assessFormula = async (
     year_group: yearGroup,
     phase: level.phase,
     attempt_number: attemptNumber,
+    // Phase 3: pass full bank so assessor doesn't penalise base-form verbs
+    ...(availableWordBanks ? { available_word_banks: availableWordBanks } : {}),
   }
 
   // Call Edge Function
