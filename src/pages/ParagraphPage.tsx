@@ -26,6 +26,10 @@ import {
   checkSingleGenreMastery,
   COMPOSITE_THRESHOLD,
 } from '../hooks/useParagraphProgress'
+import {
+  checkWritingStudioReadiness,
+  triggerWritingStudioSuggestion,
+} from '../lib/writingStudioReadiness'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -287,6 +291,29 @@ export default function ParagraphPage() {
         setGenreJustMastered(selectedGenre)
         // Invalidate paragraph_progress so genre unlock chain updates immediately
         queryClient.invalidateQueries({ queryKey: ['paragraph_progress', user.id] })
+      }
+
+      // Phase 5: Writing Studio readiness check — only if not already suggested
+      try {
+        const { data: progressSnap } = await supabase
+          .from('pupil_progress')
+          .select('writing_studio_suggested_at, writing_studio_unlocked')
+          .eq('pupil_id', user.id)
+          .single()
+
+        const alreadySuggested = !!progressSnap?.writing_studio_suggested_at
+        const alreadyUnlocked = !!progressSnap?.writing_studio_unlocked
+
+        if (!alreadySuggested && !alreadyUnlocked) {
+          const readiness = await checkWritingStudioReadiness(user.id)
+          if (readiness.ready) {
+            await triggerWritingStudioSuggestion(user.id, readiness.evidence)
+            // Invalidate so the dashboard reflects the new suggested_at state
+            queryClient.invalidateQueries({ queryKey: ['pupil_progress', user.id] })
+          }
+        }
+      } catch {
+        // Readiness check failure is non-critical — swallow silently
       }
 
       queryClient.invalidateQueries({ queryKey: ['pupil_progress', user.id] })

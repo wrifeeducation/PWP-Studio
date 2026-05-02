@@ -14,7 +14,7 @@ import { AnalyticsTab } from '../components/teacher/AnalyticsTab'
 import { generateConsolidationPack } from '../lib/consolidationPack'
 import type { ConsolidationPackData } from '../lib/consolidationPack'
 import type { PendingWritingReview, PupilTransferRate, InterventionLog, InterventionTrigger } from '../types/index'
-import { Genre } from '../types/index'
+import { Genre, MasteryEventType, TeacherNotificationType } from '../types/index'
 import { NCProgressReport } from '../components/dashboard/NCProgressReport'
 
 // ─── Local types for views ─────────────────────────────────────────────────────
@@ -39,7 +39,7 @@ interface WritingTask {
   prompt_text: string
 }
 
-type TabId = 'pending' | 'progress' | 'assign' | 'interventions' | 'wordbanks' | 'analytics' | 'classes' | 'programme' | 'nc-report'
+type TabId = 'pending' | 'progress' | 'assign' | 'interventions' | 'wordbanks' | 'analytics' | 'classes' | 'programme' | 'nc-report' | 'notifications'
 
 const TAB_LABELS: Record<TabId, string> = {
   classes: 'My Classes',
@@ -51,6 +51,7 @@ const TAB_LABELS: Record<TabId, string> = {
   wordbanks: 'Word Banks',
   analytics: 'Analytics',
   'nc-report': 'NC Report',
+  notifications: 'Notifications',
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -60,6 +61,7 @@ export default function TeacherPage() {
   const { profile } = useAuthStore()
   const [activeTab, setActiveTab] = useState<TabId>('pending')
   const [unresolvedCount, setUnresolvedCount] = useState(0)
+  const [actionRequiredCount, setActionRequiredCount] = useState(0)
 
   // Load unresolved intervention count for badge
   useEffect(() => {
@@ -70,6 +72,18 @@ export default function TeacherPage() {
       .is('resolved_at', null)
       .then(({ count }) => setUnresolvedCount(count ?? 0))
   }, [profile])
+
+  // Load action-required notification count for Notifications badge
+  useEffect(() => {
+    if (!profile?.id) return
+    supabase
+      .from('teacher_notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('teacher_id', profile.id)
+      .eq('action_required', true)
+      .is('actioned_at', null)
+      .then(({ count }) => setActionRequiredCount(count ?? 0))
+  }, [profile?.id])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -146,6 +160,15 @@ export default function TeacherPage() {
                 {unresolvedCount}
               </span>
             )}
+            {tab === 'notifications' && actionRequiredCount > 0 && (
+              <span
+                className="text-xs font-bold px-1.5 py-0.5 rounded-full text-white"
+                style={{ backgroundColor: '#F5A623', minWidth: '18px', textAlign: 'center' }}
+                data-testid="notifications-badge"
+              >
+                {actionRequiredCount}
+              </span>
+            )}
           </button>
         ))}
       </nav>
@@ -163,6 +186,12 @@ export default function TeacherPage() {
         {activeTab === 'wordbanks' && <WordBankEditor />}
         {activeTab === 'analytics' && <AnalyticsTab />}
         {activeTab === 'nc-report' && <NCProgressReport />}
+        {activeTab === 'notifications' && (
+          <NotificationsTab
+            teacherId={profile?.id ?? ''}
+            onActionTaken={() => setActionRequiredCount((c) => Math.max(0, c - 1))}
+          />
+        )}
       </main>
     </div>
   )
@@ -1489,6 +1518,294 @@ function ProgrammeTab({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
           </div>
         </div>
       </section>
+    </div>
+  )
+}
+
+// ─── Notifications Tab (Phase 5: Writing Studio confirmation) ────────────────
+
+interface NotificationRow {
+  id: string
+  pupil_id: string | null
+  notification_type: string
+  title: string
+  body: string | null
+  action_required: boolean
+  actioned_at: string | null
+  created_at: string
+  data: Record<string, unknown>
+  pupil_name?: string
+}
+
+interface NotificationsTabProps {
+  teacherId: string
+  onActionTaken: () => void
+}
+
+function NotificationsTab({ teacherId, onActionTaken }: NotificationsTabProps) {
+  const [notifications, setNotifications] = useState<NotificationRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (!teacherId) return
+    supabase
+      .from('teacher_notifications')
+      .select('id, pupil_id, notification_type, title, body, action_required, actioned_at, created_at, data')
+      .eq('teacher_id', teacherId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(async ({ data: rows }) => {
+        if (!rows) { setLoading(false); return }
+
+        // Enrich with pupil first names
+        const pupilIds = [...new Set(rows.map((r) => r.pupil_id).filter(Boolean) as string[])]
+        let nameMap: Record<string, string> = {}
+        if (pupilIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, first_name')
+            .in('id', pupilIds)
+          if (profiles) {
+            nameMap = Object.fromEntries(profiles.map((p) => [p.id, p.first_name]))
+          }
+        }
+
+        setNotifications(
+          rows.map((r) => ({
+            ...r,
+            pupil_name: r.pupil_id ? nameMap[r.pupil_id] : undefined,
+          }))
+        )
+        setLoading(false)
+      })
+  }, [teacherId])
+
+  /**
+   * Confirm Writing Studio for a pupil.
+   * Sets writing_studio_unlocked + writing_studio_confirmed_at, writes a
+   * mastery_event, and marks the notification as actioned.
+   */
+  const handleConfirmWritingStudio = async (notification: NotificationRow) => {
+    if (!notification.pupil_id) return
+    setConfirmingId(notification.id)
+
+    try {
+      const now = new Date().toISOString()
+
+      await supabase
+        .from('pupil_progress')
+        .update({
+          writing_studio_unlocked: true,
+          writing_studio_confirmed_at: now,
+        })
+        .eq('pupil_id', notification.pupil_id)
+
+      await supabase.from('mastery_events').insert({
+        pupil_id: notification.pupil_id,
+        event_type: MasteryEventType.WRITING_STUDIO_CONFIRMED,
+        triggered_by: 'teacher' as const,
+        evidence: { notification_id: notification.id, ...(notification.data ?? {}) },
+      })
+
+      await supabase
+        .from('teacher_notifications')
+        .update({ actioned_at: now })
+        .eq('id', notification.id)
+
+      setConfirmedIds((prev) => new Set([...prev, notification.id]))
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notification.id ? { ...n, actioned_at: now } : n))
+      )
+      onActionTaken()
+    } catch {
+      // Silently handle — UI remains showing the confirm button
+    } finally {
+      setConfirmingId(null)
+    }
+  }
+
+  if (loading) return <LoadingSpinner />
+
+  const pending = notifications.filter(
+    (n) => n.action_required && !n.actioned_at && !confirmedIds.has(n.id)
+  )
+  const actioned = notifications.filter(
+    (n) => !n.action_required || !!n.actioned_at || confirmedIds.has(n.id)
+  )
+
+  const formatDate = (iso: string) => {
+    const d = new Date(iso)
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
+  const notificationIcon = (type: string) => {
+    if (type === TeacherNotificationType.WRITING_STUDIO_READY) return '✍️'
+    if (type === TeacherNotificationType.GENRE_MASTERED) return '🏆'
+    if (type === TeacherNotificationType.PARAGRAPH_BUILDER_UNLOCKED) return '📝'
+    if (type === TeacherNotificationType.MASTERY_GATE_PASSED) return '⭐'
+    return '🔔'
+  }
+
+  return (
+    <div className="space-y-6 max-w-2xl" data-testid="notifications-tab">
+      <div>
+        <h2
+          className="text-lg font-semibold"
+          style={{ color: 'var(--color-text)' }}
+          data-tts="Notifications"
+        >
+          Notifications
+        </h2>
+        <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+          Actions you need to take and recent updates from your pupils.
+        </p>
+      </div>
+
+      {/* Action required */}
+      {pending.length > 0 && (
+        <section data-testid="notifications-action-required">
+          <h3
+            className="text-sm font-semibold uppercase tracking-wider mb-3"
+            style={{ color: '#DC2626' }}
+          >
+            Action Required ({pending.length})
+          </h3>
+          <div className="space-y-3">
+            {pending.map((n) => (
+              <div
+                key={n.id}
+                className="rounded-xl p-4"
+                style={{
+                  backgroundColor: 'var(--color-surface)',
+                  border: '2px solid #F5A623',
+                }}
+                data-testid={`notification-${n.id}`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-xl flex-shrink-0" aria-hidden="true">
+                    {notificationIcon(n.notification_type)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="text-sm font-semibold"
+                      style={{ color: 'var(--color-text)' }}
+                      data-tts={n.title}
+                    >
+                      {n.title}
+                    </p>
+                    {n.body && (
+                      <p
+                        className="text-xs mt-1 whitespace-pre-line"
+                        style={{ color: 'var(--color-text-muted)' }}
+                        data-tts={n.body}
+                      >
+                        {n.body}
+                      </p>
+                    )}
+                    <p className="text-xs mt-2" style={{ color: 'var(--color-text-muted)' }}>
+                      {formatDate(n.created_at)}
+                    </p>
+                  </div>
+                </div>
+
+                {n.notification_type === TeacherNotificationType.WRITING_STUDIO_READY && (
+                  <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
+                    <p className="text-xs mb-2" style={{ color: 'var(--color-text-muted)' }}>
+                      Confirming will unlock Writing Studio for {n.pupil_name ?? 'this pupil'}. This cannot be undone.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleConfirmWritingStudio(n)}
+                      disabled={confirmingId === n.id}
+                      className="px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity"
+                      style={{
+                        backgroundColor: confirmingId === n.id ? 'var(--color-border)' : 'var(--color-brand-secondary)',
+                        cursor: confirmingId === n.id ? 'not-allowed' : 'pointer',
+                        opacity: confirmingId === n.id ? 0.7 : 1,
+                      }}
+                      data-testid={`confirm-writing-studio-${n.id}`}
+                      data-tts={`Unlock Writing Studio for ${n.pupil_name ?? 'pupil'}`}
+                    >
+                      {confirmingId === n.id ? 'Confirming…' : `✓ Unlock Writing Studio for ${n.pupil_name ?? 'Pupil'}`}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* No pending actions */}
+      {pending.length === 0 && (
+        <div
+          className="rounded-xl p-6 text-center"
+          style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+        >
+          <p className="text-2xl mb-2" aria-hidden="true">✅</p>
+          <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+            No actions required right now.
+          </p>
+        </div>
+      )}
+
+      {/* Recent informational notifications */}
+      {actioned.length > 0 && (
+        <section data-testid="notifications-history">
+          <h3
+            className="text-sm font-semibold uppercase tracking-wider mb-3"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            Recent Updates
+          </h3>
+          <div className="space-y-2">
+            {actioned.map((n) => (
+              <div
+                key={n.id}
+                className="rounded-xl p-3 flex items-start gap-3"
+                style={{
+                  backgroundColor: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
+                  opacity: n.actioned_at || confirmedIds.has(n.id) ? 0.75 : 1,
+                }}
+                data-testid={`notification-history-${n.id}`}
+              >
+                <span className="text-lg flex-shrink-0" aria-hidden="true">
+                  {notificationIcon(n.notification_type)}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="text-sm font-medium"
+                    style={{ color: 'var(--color-text)' }}
+                    data-tts={n.title}
+                  >
+                    {n.title}
+                    {(n.actioned_at || confirmedIds.has(n.id)) && n.action_required && (
+                      <span
+                        className="ml-2 text-xs px-1.5 py-0.5 rounded font-semibold"
+                        style={{ backgroundColor: '#D1FAE5', color: '#065F46' }}
+                      >
+                        Actioned
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    {formatDate(n.created_at)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {notifications.length === 0 && !loading && (
+        <div className="text-center py-16" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-lg">No notifications yet.</p>
+        </div>
+      )}
     </div>
   )
 }
