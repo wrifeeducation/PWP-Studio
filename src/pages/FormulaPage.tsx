@@ -390,9 +390,23 @@ export default function FormulaPage() {
       if (!isReviewMode && shouldAdvance(masteryPayload)) {
         newLevelNum = nextLevel(data.level.id, masteryPayload)
         const newLevelsMastered = (progress?.levels_mastered_count ?? 0) + 1
+
+        // Phase 4: pass actual gate_passed (criterion B) instead of hardcoded true.
+        // checkParagraphMasteryUnlock now enforces all three §4.2 criteria:
+        //   A — newLevelNum >= 4
+        //   B — masteryPayload.gate_passed (pupil demonstrated mastery on this level)
+        //   C — newLevelsMastered >= 2 (has pattern variety across 2 structures)
+        const alreadyHadParagraph = progress?.current_formula_level != null &&
+          (progress.current_formula_level >= 4)
         const paragraphNowUnlocked =
-          didUnlockParagraph(data.level.id, newLevelNum) ||
-          checkParagraphMasteryUnlock(newLevelNum, true, newLevelsMastered)
+          !alreadyHadParagraph && (
+            didUnlockParagraph(data.level.id, newLevelNum) ||
+            checkParagraphMasteryUnlock(
+              newLevelNum,
+              masteryPayload.gate_passed,
+              newLevelsMastered
+            )
+          )
         const writingUnlocked = newLevelNum >= 35 || (progress?.writing_studio_unlocked ?? false)
 
         progressionUpdates = {
@@ -409,6 +423,51 @@ export default function FormulaPage() {
           xpSummary: { formulaXP: levelXp, streakBonus, total: totalXpEarned },
           didUnlockParagraph: paragraphNowUnlocked,
         })
+
+        // Phase 4: write paragraph_unlocked mastery_event + teacher notification
+        if (paragraphNowUnlocked) {
+          await supabase.from('mastery_events').insert({
+            pupil_id: user.id,
+            event_type: 'paragraph_unlocked',
+            level_id: newLevelNum,
+            triggered_by: 'system',
+            evidence: {
+              levels_mastered: newLevelsMastered,
+              gate_passed: masteryPayload.gate_passed,
+            },
+          })
+
+          // Notify teacher (non-critical — failures are swallowed)
+          try {
+            const { data: pupilProfile } = await supabase
+              .from('profiles')
+              .select('class_id, first_name')
+              .eq('id', user.id)
+              .single()
+
+            if (pupilProfile?.class_id) {
+              const { data: classRow } = await supabase
+                .from('classes')
+                .select('teacher_id')
+                .eq('id', pupilProfile.class_id)
+                .single()
+
+              if (classRow?.teacher_id) {
+                await supabase.from('teacher_notifications').insert({
+                  teacher_id: classRow.teacher_id,
+                  pupil_id: user.id,
+                  notification_type: 'paragraph_builder_unlocked',
+                  title: `${pupilProfile.first_name} unlocked Paragraph Builder!`,
+                  body: `${pupilProfile.first_name} has mastered ${newLevelsMastered} formula levels and can now practise writing full paragraphs.`,
+                  data: { level_id: newLevelNum, levels_mastered: newLevelsMastered },
+                  action_required: false,
+                })
+              }
+            }
+          } catch {
+            // Non-critical — don't surface to pupil
+          }
+        }
 
         // WF-013: insert intervention log if consolidation required
         if (masteryPayload.consolidation_required) {

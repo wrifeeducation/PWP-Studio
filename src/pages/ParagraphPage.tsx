@@ -1,22 +1,31 @@
 /**
  * WF-011: Paragraph Builder page at /paragraph.
  * Stage 3B of the formula session — follows formula practice when
- * formula_level.paragraph_active = true (L8+).
+ * formula_level.paragraph_active = true (L4+).
+ *
+ * Phase 4: Genre gating — genres unlock in sequence per §4.3 of
+ * docs/adaptive-progression-plan.md. Mastery events + teacher
+ * notifications are written when a genre is mastered.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
 import { assessParagraph } from '../lib/assessParagraph'
 import type { RawParagraphAssessment } from '../lib/assessParagraph'
 import { ParagraphFrame } from '../components/paragraph/ParagraphFrame'
 import { ParagraphFeedback } from '../components/paragraph/ParagraphFeedback'
-import { Genre, Phase } from '../types/index'
+import { Genre, Phase, TeacherNotificationType, MasteryEventType } from '../types/index'
 import paragraphStartersJson from '../../content/paragraph-starters.json'
 import { sanitizeText } from '../lib/sanitize'
-// WF-050: Paragraph Builder is now open to all tiers — stars model gates free users via mistake cost
+import { supabase } from '../lib/supabase'
+import {
+  useParagraphProgress,
+  checkSingleGenreMastery,
+  COMPOSITE_THRESHOLD,
+} from '../hooks/useParagraphProgress'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,7 +55,15 @@ const GENRE_ICONS: Record<Genre, string> = {
   [Genre.POETRY]: '🌸',
 }
 
-const GENRES = [Genre.NARRATIVE, Genre.NON_FICTION, Genre.PERSUASIVE, Genre.POETRY]
+/** Human-readable description of how to unlock each genre */
+const GENRE_UNLOCK_HINT: Record<Genre, string> = {
+  [Genre.NARRATIVE]: '',
+  [Genre.NON_FICTION]: 'Master Narrative first',
+  [Genre.PERSUASIVE]: 'Master Non-fiction first',
+  [Genre.POETRY]: 'Master Persuasive first',
+}
+
+const ALL_GENRES = [Genre.NARRATIVE, Genre.NON_FICTION, Genre.PERSUASIVE, Genre.POETRY]
 
 const wordCount = (text: string): number =>
   text.trim().split(/\s+/).filter(Boolean).length
@@ -58,25 +75,125 @@ const getStarters = (
   phase: Phase
 ): { support_1: string[]; support_2: string[]; close: string[] } => {
   const allStarters = paragraphStartersJson as StarterEntry[]
-
-  // Normalise genre string (JSON uses 'non-fiction', type uses 'non_fiction')
   const genreNorm = genre.replace('_', '-')
-
   const filtered = allStarters.filter(
     (s) => s.genre === genreNorm && s.phase === phase
   )
-
   const pick = (slotType: string) =>
     filtered
       .filter((s) => s.slot_type === slotType)
       .slice(0, 6)
       .map((s) => s.starter_text)
-
   return {
     support_1: pick('support_1'),
     support_2: pick('support_2'),
     close: pick('close'),
   }
+}
+
+// ─── Genre mastery DB helpers ──────────────────────────────────────────────────
+
+interface SessionRowForCheck {
+  composite_paragraph_score: number | null
+  genre_match_score: number | null
+  scaffold_used: boolean
+  genre: Genre
+}
+
+/**
+ * After a paragraph session is saved, fetch recent sessions for the submitted
+ * genre and check whether mastery criteria are now met. If so:
+ *  1. Update pupil_progress.paragraph_genres_mastered
+ *  2. Write mastery_event of type genre_mastered
+ *  3. Notify the pupil's teacher
+ *
+ * Returns true if the genre was just mastered (newly, not previously).
+ */
+async function handleGenreMasteryCheck(
+  pupilId: string,
+  genre: Genre
+): Promise<boolean> {
+  // Fetch existing mastered genres
+  const { data: progressRow } = await supabase
+    .from('pupil_progress')
+    .select('paragraph_genres_mastered')
+    .eq('pupil_id', pupilId)
+    .single()
+
+  const alreadyMastered = (
+    (progressRow?.paragraph_genres_mastered ?? []) as Genre[]
+  ).includes(genre)
+
+  if (alreadyMastered) return false
+
+  // Fetch recent sessions for this genre to check criteria
+  const { data: sessions } = await supabase
+    .from('paragraph_sessions')
+    .select('genre, composite_paragraph_score, genre_match_score, scaffold_used')
+    .eq('pupil_id', pupilId)
+    .eq('genre', genre)
+    .order('created_at', { ascending: false })
+    .limit(20)
+
+  const justMastered = checkSingleGenreMastery(
+    genre,
+    (sessions ?? []) as SessionRowForCheck[]
+  )
+
+  if (!justMastered) return false
+
+  // ── Write mastery to DB ────────────────────────────────────────────────────
+  const currentMastered = (progressRow?.paragraph_genres_mastered ?? []) as Genre[]
+  const updatedMastered = [...currentMastered, genre]
+
+  await supabase
+    .from('pupil_progress')
+    .update({ paragraph_genres_mastered: updatedMastered })
+    .eq('pupil_id', pupilId)
+
+  await supabase.from('mastery_events').insert({
+    pupil_id: pupilId,
+    event_type: MasteryEventType.GENRE_MASTERED,
+    genre,
+    triggered_by: 'system',
+    evidence: {
+      sessions_checked: sessions?.length ?? 0,
+      composite_threshold: COMPOSITE_THRESHOLD,
+    },
+  })
+
+  // ── Notify teacher ─────────────────────────────────────────────────────────
+  try {
+    const { data: pupilProfile } = await supabase
+      .from('profiles')
+      .select('class_id, first_name')
+      .eq('id', pupilId)
+      .single()
+
+    if (pupilProfile?.class_id) {
+      const { data: classRow } = await supabase
+        .from('classes')
+        .select('teacher_id')
+        .eq('id', pupilProfile.class_id)
+        .single()
+
+      if (classRow?.teacher_id) {
+        await supabase.from('teacher_notifications').insert({
+          teacher_id: classRow.teacher_id,
+          pupil_id: pupilId,
+          notification_type: TeacherNotificationType.GENRE_MASTERED,
+          title: `${pupilProfile.first_name} mastered ${GENRE_LABELS[genre]}!`,
+          body: `${pupilProfile.first_name} has met the mastery criteria for ${GENRE_LABELS[genre]} in Paragraph Builder and has unlocked the next genre.`,
+          data: { genre, sessions_qualifying: sessions?.length ?? 0 },
+          action_required: false,
+        })
+      }
+    }
+  } catch {
+    // Teacher notification failure is non-critical — swallow silently
+  }
+
+  return true
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -86,7 +203,6 @@ export default function ParagraphPage() {
   const location = useLocation()
   const queryClient = useQueryClient()
   const { user, profile } = useAuthStore()
-  // WF-050: No tier gate here — all pupils can access Paragraph Builder
 
   // Props passed from FormulaPage via router state
   const state = location.state as {
@@ -100,11 +216,18 @@ export default function ParagraphPage() {
   const levelId = state?.levelId ?? 8
   const formulaScore = state?.formulaScore ?? 0
   const phase: Phase = state?.phase ?? Phase.A
-  const genreRotation = state?.genreRotation ?? GENRES
   const leadSentence = state?.leadSentence ?? ''
 
-  // Default genre: first in rotation
-  const [selectedGenre, setSelectedGenre] = useState<Genre>(genreRotation[0] ?? Genre.NARRATIVE)
+  // Phase 4: fetch genre progress from hook
+  const { data: paragraphProgress } = useParagraphProgress(user?.id)
+  const unlockedGenres = paragraphProgress?.unlockedGenres ?? [Genre.NARRATIVE]
+
+  // Default genre: first unlocked genre from the rotation (or narrative fallback)
+  const genreRotation = state?.genreRotation ?? ALL_GENRES
+  const defaultGenre =
+    genreRotation.find((g) => unlockedGenres.includes(g)) ?? Genre.NARRATIVE
+
+  const [selectedGenre, setSelectedGenre] = useState<Genre>(defaultGenre)
   const [support1, setSupport1] = useState('')
   const [support2, setSupport2] = useState('')
   const [closeSentence, setCloseSentence] = useState('')
@@ -114,9 +237,17 @@ export default function ParagraphPage() {
   const [compositeScore, setCompositeScore] = useState(0)
   const [xpEarned, setXpEarned] = useState(0)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [genreJustMastered, setGenreJustMastered] = useState<Genre | null>(null)
 
   const yearGroup = profile?.year_group ?? 4
   const starters = getStarters(selectedGenre, phase)
+
+  // If the selected genre becomes locked after a progress refresh, reset to first unlocked
+  useEffect(() => {
+    if (!unlockedGenres.includes(selectedGenre)) {
+      setSelectedGenre(defaultGenre)
+    }
+  }, [unlockedGenres, selectedGenre, defaultGenre])
 
   // Check all slots have enough words
   const allReady =
@@ -128,10 +259,9 @@ export default function ParagraphPage() {
     if (!user?.id || !allReady) return
     setIsAssessing(true)
     setSubmitError(null)
+    setGenreJustMastered(null)
 
     try {
-      // WF-043: pass paragraph_model for KS3 (L51+)
-      // WF-055: sanitize text before saving
       const isPEEL = levelId >= 51
       const result = await assessParagraph({
         pupilId: user.id,
@@ -150,7 +280,16 @@ export default function ParagraphPage() {
       setAssessResult(result.raw)
       setCompositeScore(result.compositeScore)
       setXpEarned(result.xpEarned)
-      queryClient.invalidateQueries({ queryKey: ['pupil_progress', user?.id] })
+
+      // Phase 4: check if this session triggered genre mastery
+      const justMastered = await handleGenreMasteryCheck(user.id, selectedGenre)
+      if (justMastered) {
+        setGenreJustMastered(selectedGenre)
+        // Invalidate paragraph_progress so genre unlock chain updates immediately
+        queryClient.invalidateQueries({ queryKey: ['paragraph_progress', user.id] })
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['pupil_progress', user.id] })
       setScreen('feedback')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong'
@@ -166,6 +305,7 @@ export default function ParagraphPage() {
     setCloseSentence('')
     setAssessResult(null)
     setSubmitError(null)
+    setGenreJustMastered(null)
     setScreen('compose')
   }
 
@@ -247,27 +387,69 @@ export default function ParagraphPage() {
                 Genre
               </h2>
               <div className="flex gap-2 flex-wrap">
-                {genreRotation.map((g) => {
+                {ALL_GENRES.map((g) => {
                   const active = g === selectedGenre
+                  const isUnlocked = unlockedGenres.includes(g)
+                  const progress = paragraphProgress?.genreProgress[g]
+                  const progressText = progress && !isUnlocked
+                    ? `${progress.sessionsQualifying}/${progress.sessionsNeeded}`
+                    : null
+
                   return (
                     <button
                       key={g}
-                      onClick={() => setSelectedGenre(g)}
+                      onClick={() => isUnlocked && setSelectedGenre(g)}
+                      disabled={!isUnlocked}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all"
                       style={{
-                        backgroundColor: active ? 'var(--color-adjective)' : 'var(--color-surface)',
-                        color: active ? '#FFFFFF' : 'var(--color-text)',
-                        border: `2px solid ${active ? 'var(--color-adjective)' : 'var(--color-border)'}`,
+                        backgroundColor: active
+                          ? 'var(--color-adjective)'
+                          : isUnlocked
+                          ? 'var(--color-surface)'
+                          : 'var(--color-border)',
+                        color: active
+                          ? '#FFFFFF'
+                          : isUnlocked
+                          ? 'var(--color-text)'
+                          : 'var(--color-text-muted)',
+                        border: `2px solid ${active ? 'var(--color-adjective)' : isUnlocked ? 'var(--color-border)' : 'transparent'}`,
+                        cursor: isUnlocked ? 'pointer' : 'not-allowed',
+                        opacity: isUnlocked ? 1 : 0.65,
                       }}
                       data-testid={`genre-tab-${g}`}
-                      data-tts={GENRE_LABELS[g]}
+                      data-tts={isUnlocked ? GENRE_LABELS[g] : `${GENRE_LABELS[g]} — ${GENRE_UNLOCK_HINT[g]}`}
+                      title={isUnlocked ? GENRE_LABELS[g] : GENRE_UNLOCK_HINT[g]}
+                      aria-disabled={!isUnlocked}
                     >
-                      <span aria-hidden="true">{GENRE_ICONS[g]}</span>
+                      <span aria-hidden="true">
+                        {isUnlocked ? GENRE_ICONS[g] : '🔒'}
+                      </span>
                       {GENRE_LABELS[g]}
+                      {/* Progress counter for locked genres */}
+                      {!isUnlocked && progressText && (
+                        <span
+                          className="ml-1 text-xs"
+                          style={{ color: 'var(--color-text-muted)' }}
+                          aria-label={`${progressText} sessions completed`}
+                        >
+                          {progressText}
+                        </span>
+                      )}
                     </button>
                   )
                 })}
               </div>
+
+              {/* Unlock hint for locked genres on hover/focus */}
+              {!unlockedGenres.includes(selectedGenre) && (
+                <p
+                  className="mt-1.5 text-xs"
+                  style={{ color: 'var(--color-text-muted)' }}
+                  data-tts={GENRE_UNLOCK_HINT[selectedGenre]}
+                >
+                  {GENRE_UNLOCK_HINT[selectedGenre]}
+                </p>
+              )}
             </section>
 
             {/* Paragraph frame */}
@@ -340,13 +522,45 @@ export default function ParagraphPage() {
         )}
 
         {screen === 'feedback' && assessResult && (
-          <ParagraphFeedback
-            result={assessResult}
-            compositeScore={compositeScore}
-            xpEarned={xpEarned}
-            onRetry={handleRetry}
-            onContinue={() => navigate('/dashboard')}
-          />
+          <>
+            {/* Genre mastery celebration banner */}
+            <AnimatePresence>
+              {genreJustMastered && (
+                <motion.div
+                  initial={{ opacity: 0, y: -12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="rounded-2xl p-4 text-center"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--color-adjective) 0%, var(--color-brand-primary) 100%)',
+                    color: '#FFFFFF',
+                  }}
+                  data-testid="genre-mastered-banner"
+                  data-tts={`You mastered ${GENRE_LABELS[genreJustMastered]}!`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  <p className="text-2xl mb-1" aria-hidden="true">🏆</p>
+                  <p className="font-bold text-lg">
+                    {GENRE_LABELS[genreJustMastered]} mastered!
+                  </p>
+                  <p className="text-sm opacity-90 mt-1">
+                    {genreJustMastered !== Genre.POETRY
+                      ? `${GENRE_LABELS[ALL_GENRES[ALL_GENRES.indexOf(genreJustMastered) + 1]]} is now unlocked`
+                      : 'You\'ve mastered all four genres!'}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <ParagraphFeedback
+              result={assessResult}
+              compositeScore={compositeScore}
+              xpEarned={xpEarned}
+              onRetry={handleRetry}
+              onContinue={() => navigate('/dashboard')}
+            />
+          </>
         )}
       </main>
     </div>
