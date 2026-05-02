@@ -49,6 +49,7 @@ import { OutOfStars } from '../components/formula/OutOfStars'
 import { SessionIntro } from '../components/formula/SessionIntro'
 import { sfx } from '../lib/sfx'
 import { FullscreenButton } from '../components/ui/FullscreenButton'
+import { useSessionContent } from '../hooks/useSessionContent'
 
 // ─── Screen states ────────────────────────────────────────────────────────────
 
@@ -81,6 +82,15 @@ export default function FormulaPage() {
 
   // Phase 2: mastery state for current level
   const masteryState = useMasteryState(user?.id, data?.level.id)
+
+  // Phase 3: session content (subject rotation + AI context sentence + curated word bank)
+  const { content: sessionContent } = useSessionContent({
+    pupilId: user?.id ?? null,
+    levelId: data?.level.id,
+    scaffoldStage: masteryState.scaffoldStage,
+    fallbackWordBanks: data?.level.word_banks as Record<string, string[]> | undefined,
+    fallbackSubject: data?.todaysSubject,
+  })
 
   // Track whether we've already notified the teacher about being stuck this level
   const stuckNotifiedRef = useRef(false)
@@ -262,6 +272,12 @@ export default function FormulaPage() {
         scaffoldStage: masteryState.scaffoldStage,
         hintsUsed: hintsUsed.map(String),
         sessionNumberOnLevel: (masteryState.sessionsOnLevel ?? 0) + 1,
+        // Phase 3: session content for formula_sessions record
+        contextSentence: sessionContent?.contextSentence ?? null,
+        subjectUsed: sessionContent?.subject ?? null,
+        distractorWordsUsed: sessionContent?.distractorWords && Object.keys(sessionContent.distractorWords).length > 0
+          ? sessionContent.distractorWords
+          : null,
       })
 
       setAssessmentResult(raw)
@@ -946,7 +962,7 @@ export default function FormulaPage() {
         {screen === 'intro' && data && (
           <SessionIntro
             level={data.level}
-            todaysSubject={data.todaysSubject}
+            todaysSubject={sessionContent?.subject ?? data.todaysSubject}
             isReturning={(masteryState.sessionsOnLevel ?? 0) > 0}
             onReady={() => setScreen('concepts')}
             onSkip={() => setScreen('practice')}
@@ -962,7 +978,7 @@ export default function FormulaPage() {
           >
             <ConceptCardSequence
               formulaElements={data.level.formula_elements}
-              wordBanks={data.level.word_banks as Record<string, string[]>}
+              wordBanks={sessionContent?.wordBankSubset ?? (data.level.word_banks as Record<string, string[]>)}
               scaffoldStage={masteryState.scaffoldStage}
               currentLevelId={data.level.id}
               onComplete={() => setScreen('practice')}
@@ -986,11 +1002,13 @@ export default function FormulaPage() {
             ) : (
               <FormulaBuilder
                 level={data.level}
-                todaysSubject={data.todaysSubject}
+                todaysSubject={sessionContent?.subject ?? data.todaysSubject}
                 onSubmit={handleSubmit}
                 isSubmitting={isAssessing}
                 scaffoldStage={masteryState.scaffoldStage}
                 currentLevelId={data.level.id}
+                sessionWordBanks={sessionContent?.wordBankSubset}
+                contextSentence={sessionContent?.contextSentence}
               />
             )}
           </motion.div>

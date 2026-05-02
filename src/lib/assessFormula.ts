@@ -79,6 +79,12 @@ export interface AssessFormulaParams {
   hintsUsed?: string[]
   /** Session number on this level (Phase 2) */
   sessionNumberOnLevel?: number
+  /** Phase 3: AI-generated context sentence shown during session */
+  contextSentence?: string | null
+  /** Phase 3: subject used in this session (from rotation) */
+  subjectUsed?: string | null
+  /** Phase 3: distractor words used (wrong-class words added to word bank) */
+  distractorWordsUsed?: Record<string, string[]> | null
 }
 
 export const assessFormula = async (
@@ -90,6 +96,9 @@ export const assessFormula = async (
     scaffoldStage = 1,
     hintsUsed = [],
     sessionNumberOnLevel,
+    contextSentence = null,
+    subjectUsed = null,
+    distractorWordsUsed = null,
   } = params
 
   // Build input per Edge Function contract
@@ -151,9 +160,9 @@ export const assessFormula = async (
       semantic_effect_score: null,
       session_number_on_level: sessionNumberOnLevel ?? null,
       scaffold_stage: scaffoldStage,
-      context_sentence: null, // Phase 3: AI-generated context
-      subject_used: null,     // Phase 3: from subject rotation
-      distractor_words_used: null, // Phase 3
+      context_sentence: contextSentence,       // Phase 3
+      subject_used: subjectUsed,               // Phase 3
+      distractor_words_used: distractorWordsUsed, // Phase 3
       ai_mastery_check: null,      // Phase 7
     })
     .select('id')

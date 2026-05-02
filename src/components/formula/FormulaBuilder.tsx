@@ -32,6 +32,14 @@ interface FormulaBuilderProps {
   scaffoldStage?: number
   /** Current level ID — used to show in-session reference card for new word classes */
   currentLevelId?: number
+  /**
+   * Phase 3: session-specific word bank override from generate-session-content.
+   * When provided, replaces level.word_banks for this session (subject-rotated,
+   * curated subset, with optional distractor words already merged in).
+   */
+  sessionWordBanks?: Record<string, string[]>
+  /** Phase 3: AI-generated context sentence to display as session inspiration */
+  contextSentence?: string | null
 }
 
 export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
@@ -41,6 +49,8 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
   isSubmitting,
   scaffoldStage = 1,
   currentLevelId,
+  sessionWordBanks,
+  contextSentence,
 }) => {
   const {
     slotSelections,
@@ -159,10 +169,16 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
       .map((el) => slotSelections[el.position])
       .filter((w): w is string => !!w)
 
+  // Phase 3: prefer session-specific word banks (subject-rotated, with distractors)
+  // falling back to level.word_banks when not yet available.
+  const activeWordBanks: Record<string, string[]> =
+    sessionWordBanks && Object.keys(sessionWordBanks).length > 0
+      ? sessionWordBanks
+      : (level.word_banks as Record<string, string[]>)
+
   // Build word bank entries: { id, word, wordClass }
-  // We shuffle words per word class entry in level.word_banks
   const wordBankEntries = level.formula_elements.flatMap((el) => {
-    const words: string[] = level.word_banks[el.word_class as WordClass] ?? []
+    const words: string[] = activeWordBanks[el.word_class as WordClass] ?? []
     return words.slice(0, 8).map((w, i) => ({
       id: `${el.word_class}-${w}-${i}`,
       word: w,
@@ -205,6 +221,26 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
             data-testid="subject-badge"
           >
             📚 Today's subject: <strong>{todaysSubject}</strong>
+          </div>
+        )}
+
+        {/* ── Context sentence (Phase 3 AI-generated inspiration) ── */}
+        {contextSentence && (
+          <div
+            className="rounded-xl px-4 py-3 flex items-start gap-3"
+            style={{ backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0' }}
+            data-tts={`Inspiration sentence: ${contextSentence}`}
+            data-testid="context-sentence"
+          >
+            <span className="text-xl leading-none mt-0.5" aria-hidden="true">💡</span>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: '#065F46' }}>
+                Inspiration sentence
+              </p>
+              <p className="text-base font-semibold leading-snug" style={{ color: '#065F46' }}>
+                {contextSentence}
+              </p>
+            </div>
           </div>
         )}
 
@@ -329,7 +365,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
               instruction={el.instruction}
               example={el.example}
               scaffoldStage={scaffoldStage}
-              wordBankExamples={(level.word_banks[el.word_class as WordClass] ?? []).slice(0, 4)}
+              wordBankExamples={(activeWordBanks[el.word_class as WordClass] ?? []).slice(0, 4)}
               onClear={() => {
                 const wordId = Object.keys(slotSelections)
                   .map((k) => ({
