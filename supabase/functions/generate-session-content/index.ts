@@ -13,6 +13,14 @@
  *   context_sentence  string   — AI-generated model sentence using today's subject + formula
  *   word_bank_subset  object   — { [wordClass]: string[] } curated word bank for this session
  *   distractor_words  object   — { [wordClass]: string[] } wrong-class words (stage 3+)
+ *
+ * Word bank morphology guarantees (prevents unfair assessment penalties):
+ *   verb        — 3 base forms expanded to [base, 3rd-person-singular] pairs (6 tiles total)
+ *                 so pupils always have the correct agreement form available
+ *   determiner  — "a" and "an" are always included together if both exist in the level bank
+ *                 so pupils are never forced into "a" before a vowel-starting word
+ *   pronoun     — subject/object counterparts are always paired (he/him, she/her, etc.)
+ *                 so pupils always have both forms available for any pronoun they choose
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -54,6 +62,71 @@ interface SessionContent {
   distractor_words: Record<string, string[]>;
 }
 
+// ─── Verb inflection ──────────────────────────────────────────────────────────
+
+/**
+ * Small table of irregular third-person singular present tense forms.
+ * All other verbs follow the regular rules below.
+ */
+const IRREGULAR_VERB_SINGULAR: Record<string, string> = {
+  be: "is",
+  have: "has",
+  do: "does",
+  go: "goes",
+  say: "says",
+  make: "makes",
+  know: "knows",
+};
+
+/**
+ * Returns the third-person singular present tense of a verb (he/she/it ___s).
+ * Rules applied in order:
+ *   1. Irregular table
+ *   2. Ends in ss/sh/ch/x/z → add "es"  (watch→watches, mix→mixes)
+ *   3. Ends in consonant + y → drop y, add "ies"  (fly→flies, carry→carries)
+ *   4. Default → add "s"  (dance→dances, run→runs)
+ */
+function inflectVerbSingular(base: string): string {
+  if (base in IRREGULAR_VERB_SINGULAR) return IRREGULAR_VERB_SINGULAR[base];
+  if (/(?:ss|sh|ch|x|z)$/.test(base)) return base + "es";
+  if (/[^aeiou]y$/.test(base)) return base.slice(0, -1) + "ies";
+  return base + "s";
+}
+
+// ─── Pronoun subject/object pairing ──────────────────────────────────────────
+
+/**
+ * Maps each pronoun to its subject/object counterpart.
+ * "you" and "it" are invariant — no counterpart needed.
+ */
+const PRONOUN_COUNTERPART: Record<string, string> = {
+  // subject → object
+  i: "me",
+  he: "him",
+  she: "her",
+  we: "us",
+  they: "them",
+  // object → subject
+  me: "i",
+  him: "he",
+  her: "she",
+  us: "we",
+  them: "they",
+};
+
+/**
+ * Expands a pronoun list to include subject/object counterparts.
+ * Ensures pupils always have both forms available when a pronoun slot is present.
+ */
+function expandPronounBank(pronouns: string[]): string[] {
+  const set = new Set<string>(pronouns.map((p) => p.toLowerCase()));
+  for (const p of pronouns) {
+    const counterpart = PRONOUN_COUNTERPART[p.toLowerCase()];
+    if (counterpart) set.add(counterpart);
+  }
+  return Array.from(set);
+}
+
 // ─── Subject rotation ─────────────────────────────────────────────────────────
 
 /**
@@ -61,27 +134,31 @@ interface SessionContent {
  * If all subjects have been used recently, pick the least-recently-used.
  */
 function pickSubject(bank: string[], recentSubjects: string[]): string {
-  // Prefer subjects not used in the last 5 sessions
   const fresh = bank.filter((s) => !recentSubjects.includes(s));
   if (fresh.length > 0) {
     return fresh[Math.floor(Math.random() * fresh.length)];
   }
-  // All used recently — pick one not in the most recent 3
   const mostRecent3 = new Set(recentSubjects.slice(0, 3));
   const leastRecent = bank.filter((s) => !mostRecent3.has(s));
   if (leastRecent.length > 0) {
     return leastRecent[Math.floor(Math.random() * leastRecent.length)];
   }
-  // Total fallback
   return bank[Math.floor(Math.random() * bank.length)];
 }
 
 // ─── Word bank subset ─────────────────────────────────────────────────────────
 
 /**
- * Build a curated word bank for this session:
- * - Noun slot: ensures the chosen subject is always included
- * - All slots: capped at 6 words, shuffled
+ * Build a curated word bank for this session with morphology guarantees:
+ *
+ * noun        — chosen subject guaranteed in slot; capped at 6, shuffled
+ * verb        — 3 base forms picked, each expanded to [base, singular] = 6 tiles
+ *               e.g. ["dance","dances","run","runs","sleep","sleeps"] (then shuffled)
+ * determiner  — "a" and "an" always paired together if both in level bank;
+ *               remaining slots filled from the rest; capped at 6
+ * pronoun     — each pronoun's subject/object counterpart added automatically;
+ *               capped at 6, shuffled
+ * all others  — random shuffle, capped at 6
  */
 function buildWordBankSubset(
   wordBanks: Record<string, string[]>,
@@ -90,19 +167,47 @@ function buildWordBankSubset(
   const subset: Record<string, string[]> = {};
 
   for (const [wordClass, words] of Object.entries(wordBanks)) {
-    let pool = [...words];
+    let result: string[];
 
     if (wordClass === "noun") {
-      // Guarantee the chosen subject is present
-      pool = [subject, ...pool.filter((w) => w !== subject)];
-      // Shuffle the non-subject words, keep subject first
-      const rest = pool.slice(1).sort(() => Math.random() - 0.5);
-      pool = [subject, ...rest];
+      // Guarantee the chosen subject is present; shuffle the rest
+      const rest = words
+        .filter((w) => w !== subject)
+        .sort(() => Math.random() - 0.5);
+      result = [subject, ...rest].slice(0, 6);
+
+    } else if (wordClass === "verb") {
+      // Pick 3 base forms, expand each to [base, 3rd-person-singular] → 6 tiles
+      // Shuffle the pool first so we get different bases each session
+      const pool = [...words].sort(() => Math.random() - 0.5);
+      const bases = pool.slice(0, 3);
+      const pairs = bases.flatMap((base) => [base, inflectVerbSingular(base)]);
+      // Shuffle so base and singular aren't always adjacent
+      result = pairs.sort(() => Math.random() - 0.5);
+
+    } else if (wordClass === "determiner") {
+      // Always include both "a" and "an" as a protected pair if both are in the
+      // level's bank — prevents pupils being forced into "a" before vowel words
+      const guaranteed: string[] = [];
+      if (words.includes("a")) guaranteed.push("a");
+      if (words.includes("an")) guaranteed.push("an");
+      const rest = words
+        .filter((w) => w !== "a" && w !== "an")
+        .sort(() => Math.random() - 0.5);
+      result = [...guaranteed, ...rest].slice(0, 6);
+
+    } else if (wordClass === "pronoun") {
+      // Expand to include subject/object counterparts, then cap at 6
+      const expanded = expandPronounBank(words).sort(
+        () => Math.random() - 0.5
+      );
+      result = expanded.slice(0, 6);
+
     } else {
-      pool = pool.sort(() => Math.random() - 0.5);
+      result = [...words].sort(() => Math.random() - 0.5).slice(0, 6);
     }
 
-    subset[wordClass] = pool.slice(0, 6);
+    subset[wordClass] = result;
   }
 
   return subset;
@@ -126,7 +231,6 @@ function buildDistractors(
     const otherClasses = allClasses.filter((k) => k !== wc);
     if (otherClasses.length === 0) continue;
 
-    // Pick a random different word class
     const sourceClass =
       otherClasses[Math.floor(Math.random() * otherClasses.length)];
     const bank = wordBanks[sourceClass];
@@ -199,7 +303,10 @@ Deno.serve(async (req: Request) => {
     if (!pupil_id || !level_id) {
       return new Response(
         JSON.stringify({ error: "pupil_id and level_id are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
       );
     }
 
@@ -217,17 +324,20 @@ Deno.serve(async (req: Request) => {
       .single<FormulaLevel>();
 
     if (levelError || !level) {
-      return new Response(
-        JSON.stringify({ error: "Level not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Level not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const bank = level.subject_rotation_bank ?? [];
     if (bank.length === 0) {
       return new Response(
         JSON.stringify({ error: "No subjects in rotation bank" }),
-        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
       );
     }
 
@@ -248,7 +358,7 @@ Deno.serve(async (req: Request) => {
     // Pick the subject for this session
     const subject = pickSubject(bank, recentSubjects);
 
-    // Build word bank subset (curated, with subject guaranteed in noun slot)
+    // Build word bank subset with morphology guarantees
     const wordBanks = level.word_banks as Record<string, string[]>;
     const wordBankSubset = buildWordBankSubset(wordBanks, subject);
 
@@ -292,9 +402,9 @@ Deno.serve(async (req: Request) => {
     });
   } catch (err) {
     console.error("generate-session-content error:", err);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

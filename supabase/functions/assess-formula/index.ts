@@ -132,7 +132,13 @@ RULE: If the pupil's verb exactly matches a verb listed in the available verb wo
 - Do not mention agreement in feedback_short or feedback_detail
 - Do not set common_error_type to "subject_agreement" if the mismatch is solely due to using a base form from the bank
 
-This rule takes precedence over the subject_agreement entry in the COMMON ERROR DETECTION TABLE for word-bank-constrained sessions. Only flag subject_agreement if the pupil typed a word that was NOT in the available bank AND it still fails to agree.`;
+This rule takes precedence over the subject_agreement entry in the COMMON ERROR DETECTION TABLE for word-bank-constrained sessions. Only flag subject_agreement if the pupil typed a word that was NOT in the available bank AND it still fails to agree.
+
+**WORD BANK CONSTRAINT — DETERMINERS**
+When \`available_word_banks\` is provided, check whether "an" appears in the determiner bank. If "an" is absent, do NOT penalise a pupil who writes "a" before a word beginning with a vowel sound (e.g. "a ancient", "a enormous"). The pupil had no access to "an". Award the same element score as if the correct article had been used, and do not mention article choice in feedback.
+
+**WORD BANK CONSTRAINT — PRONOUNS**
+When \`available_word_banks\` is provided and the pronoun bank contains only subject-form pronouns (he, she, they, we, I), do NOT penalise a pupil who uses a subject-form pronoun in an object position (e.g. after a preposition). Similarly, if only object forms (him, her, them, us, me) are available, do not penalise their use in a subject position. Award the same score as the correct form would receive, and do not mention pronoun case in feedback. This rule only applies when the mismatch is directly caused by the available bank not containing the correct form.`;
 
   const levelSpecific: Record<string, string> = {
     L1: `
