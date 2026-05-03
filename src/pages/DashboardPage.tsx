@@ -867,6 +867,93 @@ const ContinueCard: React.FC<ContinueCardProps> = ({ currentLevel, onContinue })
   )
 }
 
+// ─── Daily Practice card ──────────────────────────────────────────────────────
+
+interface DailyPracticeCardProps {
+  completedToday: boolean
+  currentLevel: number
+  onStart: () => void
+}
+
+const DailyPracticeCard: React.FC<DailyPracticeCardProps> = ({ completedToday, currentLevel, onStart }) => (
+  <motion.button
+    onClick={completedToday ? undefined : onStart}
+    whileTap={completedToday ? {} : { scale: 0.97 }}
+    initial={{ opacity: 0, y: -8 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.35, delay: 0.1 }}
+    data-testid="daily-practice-card"
+    data-tts={completedToday ? 'Daily Chain Practice — done for today!' : 'Start Daily Chain Practice'}
+    style={{
+      width: '100%',
+      background: completedToday
+        ? 'linear-gradient(135deg, #27AE60ee, #1e8449bb)'
+        : 'linear-gradient(135deg, #8B5CF6ee, #6C5CE7bb)',
+      border: completedToday
+        ? '2px solid #1e844966'
+        : '2px solid #8B5CF666',
+      borderRadius: 18,
+      padding: '14px 20px',
+      marginBottom: 12,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 14,
+      cursor: completedToday ? 'default' : 'pointer',
+      textAlign: 'left',
+      boxShadow: completedToday
+        ? '0 4px 20px rgba(39,174,96,0.25)'
+        : '0 4px 20px rgba(108,92,231,0.3)',
+    }}
+  >
+    {/* Icon badge */}
+    <div style={{
+      width: 50,
+      height: 50,
+      borderRadius: '50%',
+      background: 'rgba(255,255,255,0.22)',
+      border: '2px solid rgba(255,255,255,0.55)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      fontSize: 22,
+    }}>
+      {completedToday ? '✓' : '🔗'}
+    </div>
+
+    {/* Text */}
+    <div style={{ flex: 1 }}>
+      <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', marginBottom: 2 }}>
+        {completedToday ? 'Chain Practice — Done! ✓' : 'Daily Chain Practice'}
+      </div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', fontWeight: 600 }}>
+        {completedToday
+          ? 'Great work — come back tomorrow!'
+          : `Build your L1–L${currentLevel} sentence chain`}
+      </div>
+    </div>
+
+    {/* Arrow / tick */}
+    {!completedToday && (
+      <div style={{
+        width: 34,
+        height: 34,
+        borderRadius: '50%',
+        background: 'rgba(255,255,255,0.22)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 16,
+        color: '#fff',
+        flexShrink: 0,
+      }} aria-hidden="true">
+        ▶
+      </div>
+    )}
+  </motion.button>
+)
+
 // ─── Learning path (1 node per level) ────────────────────────────────────────
 
 interface LearningPathProps {
@@ -1157,6 +1244,27 @@ export default function DashboardPage() {
     staleTime: 1000 * 60 * 2,
   })
 
+  // ── fetch today's chain session (to show "Done" state) ────────────────────
+  const today = new Date().toISOString().split('T')[0]
+  const classId = (profile as (typeof profile & { class_id?: string }) | null)?.class_id ?? null
+  const { data: chainToday } = useQuery({
+    queryKey: ['pwp_chain_today', pupilId, today],
+    queryFn: async () => {
+      if (!pupilId || !classId) return null
+      const { data, error } = await supabase
+        .from('pwp_chain_sessions')
+        .select('id')
+        .eq('pupil_id', pupilId)
+        .eq('session_date', today)
+        .maybeSingle()
+      if (error) throw error
+      return data
+    },
+    enabled: !!pupilId && !!classId,
+    staleTime: 1000 * 60 * 5,
+  })
+  const chainDoneToday = !!chainToday
+
   // ── logout ──────────────────────────────────────────────────────────────────
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -1333,6 +1441,11 @@ export default function DashboardPage() {
           <ContinueCard
             currentLevel={currentLevel}
             onContinue={() => navigate('/practice')}
+          />
+          <DailyPracticeCard
+            completedToday={chainDoneToday}
+            currentLevel={currentLevel}
+            onStart={() => navigate('/daily-practice')}
           />
           <LearningPath
             currentLevel={currentLevel}
