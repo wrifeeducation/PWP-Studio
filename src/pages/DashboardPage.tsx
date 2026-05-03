@@ -873,85 +873,165 @@ interface DailyPracticeCardProps {
   completedToday: boolean
   currentLevel: number
   onStart: () => void
+  masterySignal?: boolean
+  masteryPoints?: number
 }
 
-const DailyPracticeCard: React.FC<DailyPracticeCardProps> = ({ completedToday, currentLevel, onStart }) => (
-  <motion.button
-    onClick={completedToday ? undefined : onStart}
-    whileTap={completedToday ? {} : { scale: 0.97 }}
-    initial={{ opacity: 0, y: -8 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.35, delay: 0.1 }}
-    data-testid="daily-practice-card"
-    data-tts={completedToday ? 'Daily Chain Practice — done for today!' : 'Start Daily Chain Practice'}
-    style={{
-      width: '100%',
-      background: completedToday
-        ? 'linear-gradient(135deg, #27AE60ee, #1e8449bb)'
-        : 'linear-gradient(135deg, #8B5CF6ee, #6C5CE7bb)',
-      border: completedToday
-        ? '2px solid #1e844966'
-        : '2px solid #8B5CF666',
-      borderRadius: 18,
-      padding: '14px 20px',
-      marginBottom: 12,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 14,
-      cursor: completedToday ? 'default' : 'pointer',
-      textAlign: 'left',
-      boxShadow: completedToday
-        ? '0 4px 20px rgba(39,174,96,0.25)'
-        : '0 4px 20px rgba(108,92,231,0.3)',
-    }}
-  >
-    {/* Icon badge */}
-    <div style={{
-      width: 50,
-      height: 50,
-      borderRadius: '50%',
-      background: 'rgba(255,255,255,0.22)',
-      border: '2px solid rgba(255,255,255,0.55)',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-      fontSize: 22,
-    }}>
-      {completedToday ? '✓' : '🔗'}
-    </div>
-
-    {/* Text */}
-    <div style={{ flex: 1 }}>
-      <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', marginBottom: 2 }}>
-        {completedToday ? 'Chain Practice — Done! ✓' : 'Daily Chain Practice'}
-      </div>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', fontWeight: 600 }}>
-        {completedToday
-          ? 'Great work — come back tomorrow!'
-          : `Build your L1–L${currentLevel} sentence chain`}
-      </div>
-    </div>
-
-    {/* Arrow / tick */}
-    {!completedToday && (
-      <div style={{
-        width: 34,
-        height: 34,
-        borderRadius: '50%',
-        background: 'rgba(255,255,255,0.22)',
+const DailyPracticeCard: React.FC<DailyPracticeCardProps> = ({
+  completedToday,
+  currentLevel,
+  onStart,
+  masterySignal = false,
+  masteryPoints = 0,
+}) => (
+  <div style={{ marginBottom: 12 }}>
+    <motion.button
+      onClick={completedToday ? undefined : onStart}
+      whileTap={completedToday ? {} : { scale: 0.97 }}
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: 0.1 }}
+      data-testid="daily-practice-card"
+      data-tts={completedToday ? 'Daily Chain Practice — done for today!' : 'Start Daily Chain Practice'}
+      style={{
+        width: '100%',
+        background: completedToday
+          ? 'linear-gradient(135deg, #27AE60ee, #1e8449bb)'
+          : 'linear-gradient(135deg, #8B5CF6ee, #6C5CE7bb)',
+        border: completedToday
+          ? '2px solid #1e844966'
+          : '2px solid #8B5CF666',
+        borderRadius: masterySignal ? '18px 18px 0 0' : 18,
+        padding: '14px 20px',
         display: 'flex',
         alignItems: 'center',
+        gap: 14,
+        cursor: completedToday ? 'default' : 'pointer',
+        textAlign: 'left',
+        boxShadow: completedToday
+          ? '0 4px 20px rgba(39,174,96,0.25)'
+          : '0 4px 20px rgba(108,92,231,0.3)',
+      }}
+    >
+      {/* Icon badge */}
+      <div style={{
+        width: 50,
+        height: 50,
+        borderRadius: '50%',
+        background: 'rgba(255,255,255,0.22)',
+        border: '2px solid rgba(255,255,255,0.55)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
         justifyContent: 'center',
-        fontSize: 16,
-        color: '#fff',
         flexShrink: 0,
-      }} aria-hidden="true">
-        ▶
+        fontSize: 22,
+      }}>
+        {completedToday ? '✓' : '🔗'}
+      </div>
+
+      {/* Text */}
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', marginBottom: 2 }}>
+          {completedToday ? 'Chain Practice — Done! ✓' : 'Daily Chain Practice'}
+        </div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', fontWeight: 600 }}>
+          {completedToday
+            ? 'Great work — come back tomorrow!'
+            : `Build your L1–L${currentLevel} sentence chain`}
+        </div>
+      </div>
+
+      {/* Arrow / tick */}
+      {!completedToday && (
+        <div style={{
+          width: 34,
+          height: 34,
+          borderRadius: '50%',
+          background: 'rgba(255,255,255,0.22)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 16,
+          color: '#fff',
+          flexShrink: 0,
+        }} aria-hidden="true">
+          ▶
+        </div>
+      )}
+    </motion.button>
+
+    {/* Mastery signal banner — shown below the card when pupil is ready to level up */}
+    {masterySignal ? (
+      <motion.div
+        initial={{ opacity: 0, y: -4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+        data-testid="mastery-signal-banner"
+        data-tts="Ready to level up! Your teacher can advance you to the next level."
+        style={{
+          background: 'linear-gradient(135deg, #F5A623ee, #F39C12bb)',
+          border: '2px solid #F5A62366',
+          borderTop: 'none',
+          borderRadius: '0 0 18px 18px',
+          padding: '8px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          boxShadow: '0 4px 16px rgba(245,166,35,0.25)',
+        }}
+      >
+        <span style={{ fontSize: 16 }}>🌟</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', lineHeight: 1.3 }}>
+            Ready to level up!
+          </div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
+            Your teacher can advance you to L{currentLevel + 1}
+          </div>
+        </div>
+      </motion.div>
+    ) : (
+      /* Progress bar — shown when not yet at mastery threshold */
+      <div
+        data-testid="mastery-progress-bar"
+        data-tts={`Level progress: ${masteryPoints} out of 12 mastery points`}
+        style={{
+          background: 'rgba(108,92,231,0.08)',
+          border: '2px solid rgba(108,92,231,0.18)',
+          borderTop: 'none',
+          borderRadius: '0 0 18px 18px',
+          padding: '6px 16px 8px',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <span style={{ fontSize: 10, color: 'var(--color-text)', fontWeight: 700, opacity: 0.6 }}>
+            Level progress
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--color-brand-primary)', fontWeight: 800 }}>
+            {masteryPoints}/12
+          </span>
+        </div>
+        <div style={{
+          height: 5,
+          borderRadius: 3,
+          background: 'rgba(108,92,231,0.15)',
+          overflow: 'hidden',
+        }}>
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${Math.min((masteryPoints / 12) * 100, 100)}%` }}
+            transition={{ duration: 0.7, delay: 0.3, ease: 'easeOut' }}
+            style={{
+              height: '100%',
+              borderRadius: 3,
+              background: 'linear-gradient(90deg, var(--color-brand-primary), #8B5CF6)',
+            }}
+          />
+        </div>
       </div>
     )}
-  </motion.button>
+  </div>
 )
 
 // ─── Learning path (1 node per level) ────────────────────────────────────────
@@ -1244,6 +1324,23 @@ export default function DashboardPage() {
     staleTime: 1000 * 60 * 2,
   })
 
+  // ── fetch chain level + mastery signal ─────────────────────────────────
+  const { data: chainLevelData } = useQuery({
+    queryKey: ['pwp_chain_level', pupilId],
+    queryFn: async () => {
+      if (!pupilId) return null
+      const { data, error } = await supabase
+        .from('pwp_pupil_levels')
+        .select('current_level, mastery_points, mastery_signal')
+        .eq('pupil_id', pupilId)
+        .maybeSingle()
+      if (error) throw error
+      return data as { current_level: number; mastery_points: number; mastery_signal: boolean } | null
+    },
+    enabled: !!pupilId,
+    staleTime: 1000 * 30,
+  })
+
   // ── fetch today's chain session (to show "Done" state) ────────────────────
   const today = new Date().toISOString().split('T')[0]
   // profiles.class_id is null for pupils — fall back to class_members lookup.
@@ -1464,6 +1561,8 @@ export default function DashboardPage() {
             completedToday={chainDoneToday}
             currentLevel={currentLevel}
             onStart={() => navigate('/daily-practice')}
+            masterySignal={chainLevelData?.mastery_signal ?? false}
+            masteryPoints={chainLevelData?.mastery_points ?? 0}
           />
           <LearningPath
             currentLevel={currentLevel}

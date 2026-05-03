@@ -114,7 +114,10 @@ export function validateChainSentence(
   const tokens: TokenResult[] = parsed.map((p, i) => {
     const expected = pattern[i]
     const assigned = p.wordClass
-    const correct = assigned === expected
+    // A position is correct if it matches the primary expected class OR any
+    // of the explicitly listed alternatives for that position.
+    const alts = formula.alternatives?.[i] ?? []
+    const correct = assigned === expected || alts.includes(assigned)
     return { word: p.token.raw, assigned, expected, correct }
   })
 

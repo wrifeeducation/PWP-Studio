@@ -75,6 +75,8 @@ const COMMON_VERBS = new Set([
   'buy', 'wait', 'serve', 'die', 'send', 'build', 'stay', 'fall', 'cut',
   'reach', 'kill', 'remain', 'suggest', 'raise', 'pass', 'sell', 'require',
   'report', 'decide', 'pull', 'break', 'represent', 'pick', 'carry', 'throw',
+  // Modal / auxiliary verbs (needed for L11 future tense: "will soar", "shall rise")
+  'will', 'shall', 'would', 'could', 'should', 'might', 'must', 'may', 'can',
   // L1–L10 DB word bank verbs
   'ran', 'sat', 'flew', 'swam', 'barked', 'slept', 'jumped', 'walked',
   'fell', 'grew', 'shone', 'stood',
@@ -99,6 +101,18 @@ const COMMON_VERBS = new Set([
   'glistened', 'shimmered', 'collapsed', 'emerged', 'plunged', 'drifted',
   'surged', 'trembled', 'vanished',
   'chased', 'shattered',
+  // L11–L30 DB word bank verbs (irregular / not caught by -ed/-ing rules)
+  'shook', 'shakes', 'shake',
+  'howl', 'howls', 'howled',
+  'swoop', 'swoops', 'swooped',
+  'march', 'marches', 'marched',
+  'ruled', 'rules', 'rule',
+  'glided', 'constructed', 'constructs', 'construct',
+  'believed', 'believes', 'believe',
+  'worked', 'works',
+  'followed', 'follows',
+  'invented', 'invented',
+  'flew', 'fallen',
   // present-tense third-person -s forms from DB
   'soars', 'whispers', 'thunders', 'collapses', 'emerges', 'plunges',
   'drifts', 'glides', 'surges', 'trembles', 'vanishes',
@@ -126,6 +140,9 @@ const COMMON_ADJECTIVES = new Set([
   'deep', 'shallow', 'thick', 'thin', 'heavy', 'light', 'clear', 'cloudy',
   'golden', 'silver', 'grey', 'white', 'black', 'purple', 'orange',
   'proud', 'angry', 'scared', 'tired', 'hungry', 'wild', 'calm', 'sharp',
+  // L11–L30 additional adjectives
+  'hidden', 'fearless', 'vast', 'torn', 'brave', 'swift', 'wise',
+  'mysterious', 'towering', 'magnificent', 'ancient', 'gleaming', 'glowing',
 ])
 
 // ─── Common adverbs (besides -ly words) ──────────────────────────────────────
@@ -140,6 +157,8 @@ const COMMON_ADVERBS = new Set([
   'bravely', 'carefully', 'quickly', 'slowly', 'quietly', 'loudly',
   'eagerly', 'gently', 'boldly', 'silently', 'swiftly', 'fiercely',
   'gracefully', 'suddenly', 'brilliantly', 'cautiously',
+  // L11–L30 additional adverbs
+  'mysteriously', 'powerfully', 'endlessly', 'magnificently',
 ])
 
 // ─── Tokeniser ────────────────────────────────────────────────────────────────
