@@ -23,6 +23,7 @@ import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import FormulaPage from './pages/FormulaPage'
 import ParagraphPage from './pages/ParagraphPage'
+import DailyPracticePage from './pages/DailyPracticePage'
 
 // WF-040: Heavy pages — lazy loaded to reduce initial bundle
 const WritingStudioPage = lazy(() => import('./pages/WritingStudioPage'))
@@ -175,6 +176,16 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={[Role.PUPIL]}>
                   <FormulaPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* PWP Daily Chain Practice — pupils only */}
+            <Route
+              path="/daily-practice"
+              element={
+                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
+                  <DailyPracticePage />
                 </ProtectedRoute>
               }
             />

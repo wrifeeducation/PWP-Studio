@@ -1078,6 +1078,62 @@ export const WORD_CLASS_COUNT = 8;
 export const UK_YEAR_GROUPS = Array.from({ length: 13 }, (_, i) => i + 1);
 export const SCHOOL_DAYS_PER_YEAR = 190;
 
+// ─── PWP Daily Chain Practice types ──────────────────────────────────────────
+
+/** One level row in the daily chain UI */
+export interface ChainRowState {
+  /** Formula level number (1–67) */
+  level: number
+  /** Status of this row in the current session */
+  status: 'pending' | 'active' | 'accepted' | 'error'
+  /** The sentence the pupil typed (empty until attempted) */
+  sentence: string
+  /** Number of attempts made at this row */
+  attempts: number
+  /** The last validation result, if any */
+  lastError: string | null
+}
+
+/** Data saved to pwp_chain_sessions on completion */
+export interface ChainSessionSave {
+  pupil_id: string
+  class_id: string
+  session_date: string        // ISO date string (YYYY-MM-DD)
+  subject_noun: string
+  level_reached: number
+  chain_complete: boolean
+  total_attempts: number
+  new_formula_attempts: number
+  duration_seconds: number
+  xp_earned: number
+}
+
+/** Data saved to pwp_chain_sentences (one row per accepted sentence) */
+export interface ChainSentenceSave {
+  session_id: string
+  formula_level: number
+  sentence: string
+  attempt_number: number
+  accepted: true
+  validation_result: {
+    word_classes: string[]   // e.g. ['noun', 'verb']
+    errors: string[]         // empty on accepted
+  }
+}
+
+/** Pupil's current level record from pwp_pupil_levels */
+export interface PupilChainLevel {
+  id: string
+  pupil_id: string
+  class_id: string
+  current_level: number
+  mastery_points: number
+  mastery_signal: boolean
+  advanced_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export const DIMENSIONS = {
   WRITING: [
     WritingDimension.COMPOSITION,
