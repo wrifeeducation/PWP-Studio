@@ -1246,7 +1246,25 @@ export default function DashboardPage() {
 
   // ── fetch today's chain session (to show "Done" state) ────────────────────
   const today = new Date().toISOString().split('T')[0]
-  const classId = (profile as (typeof profile & { class_id?: string }) | null)?.class_id ?? null
+  // profiles.class_id is null for pupils — fall back to class_members lookup.
+  const { data: classMemberData } = useQuery({
+    queryKey: ['class_member', pupilId],
+    queryFn: async () => {
+      if (!pupilId) return null
+      const { data, error } = await supabase
+        .from('class_members')
+        .select('class_id')
+        .eq('pupil_id', pupilId)
+        .maybeSingle()
+      if (error) throw error
+      return data
+    },
+    enabled: !!pupilId,
+  })
+  const classId =
+    (profile as (typeof profile & { class_id?: string }) | null)?.class_id ??
+    classMemberData?.class_id ??
+    null
   const { data: chainToday } = useQuery({
     queryKey: ['pwp_chain_today', pupilId, today],
     queryFn: async () => {

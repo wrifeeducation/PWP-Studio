@@ -51,7 +51,25 @@ const DailyPracticePage: React.FC = () => {
 
   // ── Fetch pupil's current chain level ───────────────────────────────────────
   const pupilId = user?.id ?? null
-  const classId = profile?.class_id ?? null
+
+  // profiles.class_id is null for pupils (set on teacher profiles only).
+  // Fall back to class_members to find the pupil's class.
+  const { data: classMemberData } = useQuery({
+    queryKey: ['class_member', pupilId],
+    queryFn: async () => {
+      if (!pupilId) return null
+      const { data, error } = await supabase
+        .from('class_members')
+        .select('class_id')
+        .eq('pupil_id', pupilId)
+        .maybeSingle()
+      if (error) throw error
+      return data
+    },
+    enabled: !!pupilId,
+  })
+
+  const classId = profile?.class_id ?? classMemberData?.class_id ?? null
 
   const { data: levelData } = useQuery({
     queryKey: ['pwp_pupil_level', pupilId, classId],
