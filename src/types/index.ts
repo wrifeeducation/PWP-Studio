@@ -1121,6 +1121,18 @@ export interface ChainSentenceSave {
   }
 }
 
+/** Data saved to pwp_free_practice_sentences (one row per sentence) */
+export interface FreePracticeSentenceSave {
+  pupil_id: string
+  class_id: string
+  level: number
+  subject_noun: string
+  sentence: string
+  accepted: boolean
+  attempts: number
+  xp_earned: number
+}
+
 /** Pupil's current level record from pwp_pupil_levels */
 export interface PupilChainLevel {
   id: string

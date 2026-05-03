@@ -1564,6 +1564,48 @@ export default function DashboardPage() {
             masterySignal={chainLevelData?.mastery_signal ?? false}
             masteryPoints={chainLevelData?.mastery_points ?? 0}
           />
+
+          {/* Free Practice entry — always available */}
+          <motion.button
+            onClick={() => navigate('/free-practice')}
+            whileTap={{ scale: 0.97 }}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.15 }}
+            data-testid="free-practice-card"
+            data-tts="Free Practice — practise anytime with colour-coded help"
+            style={{
+              width: '100%',
+              background: 'linear-gradient(135deg, #F5A623cc, #F39C12aa)',
+              border: '2px solid #F5A62355',
+              borderRadius: 18,
+              padding: '10px 20px',
+              marginBottom: 16,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              cursor: 'pointer',
+              textAlign: 'left',
+              boxShadow: '0 2px 12px rgba(245,166,35,0.2)',
+            }}
+          >
+            <span style={{ fontSize: 20 }}>🎨</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 1 }}>
+                Free Practice
+              </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.88)', fontWeight: 600 }}>
+                Colour-band help on · 5 XP/sentence · anytime
+              </div>
+            </div>
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.22)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 13, color: '#fff', flexShrink: 0,
+            }} aria-hidden="true">▶</div>
+          </motion.button>
+
           <LearningPath
             currentLevel={currentLevel}
             avatarVariant={avatarId}

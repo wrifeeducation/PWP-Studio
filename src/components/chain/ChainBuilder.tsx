@@ -31,12 +31,18 @@ interface ChainBuilderProps {
   currentLevel: number
   /** Called when all rows are accepted */
   onChainComplete: (payload: ChainCompletePayload) => void
+  /**
+   * Help mode — shows word-class colour bands on each active row.
+   * Enabled in Free Practice; disabled in Daily Practice.
+   */
+  helpMode?: boolean
 }
 
 export const ChainBuilder: React.FC<ChainBuilderProps> = ({
   subjectNoun,
   currentLevel,
   onChainComplete,
+  helpMode = false,
 }) => {
   const formulas = getChainForLevel(currentLevel)
 
@@ -204,6 +210,7 @@ export const ChainBuilder: React.FC<ChainBuilderProps> = ({
             subjectNoun={subjectNoun}
             onSubmit={(sentence) => handleSubmit(i, sentence)}
             autoFocus={row.status === 'active'}
+            helpMode={helpMode}
           />
         )
       })}

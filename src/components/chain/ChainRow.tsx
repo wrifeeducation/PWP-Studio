@@ -14,8 +14,33 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { WordClass } from '../../types/index'
 import type { ChainRowState } from '../../types/index'
 import type { ChainFormulaDefinition } from '../../lib/chain/formulaDefinitions'
+
+// ─── Word-class colour map (used in help mode) ────────────────────────────────
+
+const WC_COLOUR: Record<WordClass, string> = {
+  [WordClass.DETERMINER]:  '#9B59B6',
+  [WordClass.ADJECTIVE]:   '#27AE60',
+  [WordClass.NOUN]:        '#3498DB',
+  [WordClass.VERB]:        '#E74C3C',
+  [WordClass.ADVERB]:      '#F39C12',
+  [WordClass.PREPOSITION]: '#8B4513',
+  [WordClass.PRONOUN]:     '#E91E63',
+  [WordClass.CONJUNCTION]: '#B7A200', // darkened from yellow for legibility
+}
+
+const WC_LABEL: Record<WordClass, string> = {
+  [WordClass.DETERMINER]:  'DET',
+  [WordClass.ADJECTIVE]:   'ADJ',
+  [WordClass.NOUN]:        'NOUN',
+  [WordClass.VERB]:        'VERB',
+  [WordClass.ADVERB]:      'ADV',
+  [WordClass.PREPOSITION]: 'PREP',
+  [WordClass.PRONOUN]:     'PRON',
+  [WordClass.CONJUNCTION]: 'CONJ',
+}
 
 interface ChainRowProps {
   rowState: ChainRowState
@@ -24,6 +49,12 @@ interface ChainRowProps {
   onSubmit: (sentence: string) => void
   /** Whether this row's input should receive focus */
   autoFocus?: boolean
+  /**
+   * Help mode — shows word-class colour bands above the input so pupils
+   * can see exactly what word class each position requires.
+   * Used in Free Practice; hidden in Daily Practice to maintain challenge.
+   */
+  helpMode?: boolean
 }
 
 export const ChainRow: React.FC<ChainRowProps> = ({
@@ -32,6 +63,7 @@ export const ChainRow: React.FC<ChainRowProps> = ({
   subjectNoun,
   onSubmit,
   autoFocus = false,
+  helpMode = false,
 }) => {
   const [draft, setDraft] = useState(rowState.sentence)
   const [hintOpen, setHintOpen] = useState(false)
@@ -178,6 +210,25 @@ export const ChainRow: React.FC<ChainRowProps> = ({
       {/* Active input */}
       {isActive && (
         <>
+          {/* Help mode: word-class colour band */}
+          {helpMode && (
+            <div
+              className="flex flex-wrap gap-1 mb-2"
+              data-testid={`help-band-l${formula.level}`}
+              data-tts={`Formula pattern: ${formula.pattern.map((wc) => WC_LABEL[wc]).join(', ')}`}
+            >
+              {formula.pattern.map((wc, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-white text-xs font-bold"
+                  style={{ backgroundColor: WC_COLOUR[wc] }}
+                  title={wc}
+                >
+                  {WC_LABEL[wc]}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="flex gap-2">
             <input
               ref={inputRef}
