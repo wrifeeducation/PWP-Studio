@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { Role } from '../types/index'
@@ -61,11 +62,19 @@ export default function HomePage() {
   const navigate = useNavigate()
   const { session, profile, isInitialised } = useAuthStore()
 
-  // While auth initialises, show nothing (prevents flash)
-  if (!isInitialised) return null
+  // Auto-redirect authenticated users to their dashboard (handles SSO arrivals)
+  useEffect(() => {
+    if (isInitialised && session && profile) {
+      navigate(getDashboardRoute(profile.role), { replace: true })
+    }
+  }, [isInitialised, session, profile, navigate])
 
-  const isLoggedIn = !!(session && profile)
-  const dashboardRoute = isLoggedIn ? getDashboardRoute(profile!.role) : '/'
+  // While auth initialises (or redirecting), show nothing (prevents flash)
+  if (!isInitialised) return null
+  if (session && profile) return null  // redirect in flight
+
+  const isLoggedIn = false
+  const dashboardRoute = '/'
 
   return (
     <div style={{ fontFamily: "'Nunito', sans-serif", background: C.cream, color: C.dark, minHeight: '100vh' }}>
