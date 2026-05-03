@@ -84,6 +84,27 @@ const FreePracticePage: React.FC = () => {
     enabled: !!pupilId && !!classId,
   })
 
+  // ── Fetch weekly theme ────────────────────────────────────────────────────────
+  const { data: themeData } = useQuery({
+    queryKey: ['pwp_theme', classId],
+    queryFn: async () => {
+      if (!classId) return null
+      const today = new Date()
+      const monday = new Date(today)
+      monday.setDate(today.getDate() - ((today.getDay() + 6) % 7))
+      const weekStart = monday.toISOString().split('T')[0]
+      const { data, error } = await supabase
+        .from('pwp_class_themes')
+        .select('theme, suggestions')
+        .eq('class_id', classId)
+        .eq('week_start', weekStart)
+        .maybeSingle()
+      if (error) throw error
+      return data
+    },
+    enabled: !!classId,
+  })
+
   const currentLevel   = levelData?.current_level ?? 1
   const challengeLevel = currentLevel + 1
 
@@ -231,8 +252,8 @@ const FreePracticePage: React.FC = () => {
             value={subjectNoun}
             onChange={setSubjectNoun}
             onConfirm={handleSubjectConfirm}
-            weeklyTheme={null}
-            themeSuggestions={[]}
+            weeklyTheme={themeData?.theme ?? null}
+            themeSuggestions={themeData?.suggestions ?? []}
           />
         )}
 

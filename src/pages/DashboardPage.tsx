@@ -867,6 +867,38 @@ const ContinueCard: React.FC<ContinueCardProps> = ({ currentLevel, onContinue })
   )
 }
 
+// ─── Chain streak calculator (client-side, derived from session dates) ────────
+
+/**
+ * Given an array of ISO date strings (YYYY-MM-DD) from pwp_chain_sessions,
+ * returns the number of consecutive calendar days ending today (or yesterday
+ * if the pupil hasn't completed today yet).
+ */
+function computeChainStreak(dates: string[]): number {
+  if (!dates.length) return 0
+  const unique = [...new Set(dates)].sort().reverse() // ISO strings sort lexically
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const todayStr = today.toISOString().split('T')[0]
+
+  // If today not yet complete, start counting from yesterday
+  const cursor = new Date(today)
+  if (!unique.includes(todayStr)) cursor.setDate(cursor.getDate() - 1)
+
+  let streak = 0
+  for (const dateStr of unique) {
+    const expected = cursor.toISOString().split('T')[0]
+    if (dateStr === expected) {
+      streak++
+      cursor.setDate(cursor.getDate() - 1)
+    } else if (dateStr < expected) {
+      break
+    }
+  }
+  return streak
+}
+
 // ─── Daily Practice card ──────────────────────────────────────────────────────
 
 interface DailyPracticeCardProps {
@@ -875,6 +907,7 @@ interface DailyPracticeCardProps {
   onStart: () => void
   masterySignal?: boolean
   masteryPoints?: number
+  chainStreak?: number
 }
 
 const DailyPracticeCard: React.FC<DailyPracticeCardProps> = ({
@@ -883,6 +916,7 @@ const DailyPracticeCard: React.FC<DailyPracticeCardProps> = ({
   onStart,
   masterySignal = false,
   masteryPoints = 0,
+  chainStreak = 0,
 }) => (
   <div style={{ marginBottom: 12 }}>
     <motion.button
@@ -935,10 +969,29 @@ const DailyPracticeCard: React.FC<DailyPracticeCardProps> = ({
         <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', marginBottom: 2 }}>
           {completedToday ? 'Chain Practice — Done! ✓' : 'Daily Chain Practice'}
         </div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', fontWeight: 600 }}>
-          {completedToday
-            ? 'Great work — come back tomorrow!'
-            : `Build your L1–L${currentLevel} sentence chain`}
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span>
+            {completedToday
+              ? 'Great work — come back tomorrow!'
+              : `Build your L1–L${currentLevel} sentence chain`}
+          </span>
+          {chainStreak > 1 && (
+            <span
+              data-tts={`${chainStreak}-day chain streak`}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+                background: 'rgba(255,255,255,0.22)',
+                border: '1px solid rgba(255,255,255,0.35)',
+                borderRadius: 10,
+                padding: '1px 7px',
+                fontSize: 10,
+                fontWeight: 800,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              🔗 {chainStreak}d streak
+            </span>
+          )}
         </div>
       </div>
 
@@ -1341,7 +1394,7 @@ export default function DashboardPage() {
     staleTime: 1000 * 30,
   })
 
-  // ── fetch today's chain session (to show "Done" state) ────────────────────
+  // ── fetch chain session dates (to compute streak) ────────────────────────
   const today = new Date().toISOString().split('T')[0]
   // profiles.class_id is null for pupils — fall back to class_members lookup.
   const { data: classMemberData } = useQuery({
@@ -1379,6 +1432,26 @@ export default function DashboardPage() {
     staleTime: 1000 * 60 * 5,
   })
   const chainDoneToday = !!chainToday
+
+  // ── fetch chain session dates for streak computation ──────────────────────
+  const { data: chainDatesData } = useQuery({
+    queryKey: ['pwp_chain_dates', pupilId, classId],
+    queryFn: async () => {
+      if (!pupilId || !classId) return []
+      const { data, error } = await supabase
+        .from('pwp_chain_sessions')
+        .select('session_date')
+        .eq('pupil_id', pupilId)
+        .eq('class_id', classId)
+        .order('session_date', { ascending: false })
+        .limit(60)
+      if (error) throw error
+      return (data ?? []).map((r) => r.session_date as string)
+    },
+    enabled: !!pupilId && !!classId,
+    staleTime: 1000 * 60 * 5,
+  })
+  const chainStreak = computeChainStreak(chainDatesData ?? [])
 
   // ── logout ──────────────────────────────────────────────────────────────────
   const handleLogout = async () => {
@@ -1563,6 +1636,7 @@ export default function DashboardPage() {
             onStart={() => navigate('/daily-practice')}
             masterySignal={chainLevelData?.mastery_signal ?? false}
             masteryPoints={chainLevelData?.mastery_points ?? 0}
+            chainStreak={chainStreak}
           />
 
           {/* Free Practice entry — always available */}
