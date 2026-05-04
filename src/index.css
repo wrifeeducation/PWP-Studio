@@ -16,22 +16,22 @@
   --color-pronoun:     #DB2777;
   --color-conjunction: #CA8A04;
 
-  /* Brand — updated to match approved graphics */
-  --color-brand-primary:    #F5841F;  /* warm orange — CTAs, primary buttons */
-  --color-brand-secondary:  #4A9BD4;  /* friendly blue — headers, nav */
-  --color-brand-accent:     #F7C948;  /* warm yellow — stars, highlights */
+  /* Brand — Chromatic Momentum palette (aligned with wrife.co.uk + IP app) */
+  --color-brand-primary:    #6C5CE7;  /* WriFe purple — nav, headers, CTAs  */
+  --color-brand-secondary:  #F5A623;  /* WriFe orange — primary action buttons */
+  --color-brand-accent:     #F5C500;  /* gold — stars, XP highlights */
   --color-brand-success:    #6BC46D;  /* green — completed, positive */
-  --color-brand-dark:       #1A3A5C;  /* dark navy — headings */
+  --color-brand-dark:       #2D3436;  /* near-black — headings */
 
   /* Surfaces */
-  --color-background:  #D4EBF8;  /* sky blue page background */
+  --color-background:  #FDF8EE;  /* warm cream — main page background */
   --color-surface:     #FFFFFF;  /* white cards */
-  --color-surface-alt: #EBF5FF;  /* slightly tinted surface for nested panels */
-  --color-border:      #B8D9F0;  /* light blue border */
+  --color-surface-alt: #F0EEFF;  /* purple-tinted surface for nested panels */
+  --color-border:      #E8E0D5;  /* warm grey border */
 
   /* Text */
-  --color-text:        #1A3A5C;  /* dark navy */
-  --color-text-muted:  #5A7A9C;  /* medium blue-grey */
+  --color-text:        #2D3436;  /* near-black — WriFe body text */
+  --color-text-muted:  #636E72;  /* muted grey */
   --color-text-light:  #FFFFFF;  /* white text on coloured backgrounds */
 
   /* XP / Gamification */
@@ -54,10 +54,10 @@
      The dark-mode block below overrides these for dark themes.
      NOTE: prefer the --color-* tokens above for all new code. */
   --heading:  'Nunito', 'Quicksand', system-ui, sans-serif;
-  --text-h:   #1A3A5C;   /* same as --color-brand-dark */
+  --text-h:   #2D3436;   /* same as --color-brand-dark */
   --mono:     'Menlo', 'Consolas', 'Liberation Mono', monospace;
-  --code-bg:  #EBF5FF;   /* same as --color-surface-alt */
-  --border:   #B8D9F0;   /* same as --color-border */
+  --code-bg:  #F0EEFF;   /* same as --color-surface-alt */
+  --border:   #E8E0D5;   /* same as --color-border */
 
   font-family: 'Nunito', 'Quicksand', system-ui, sans-serif;
   font-synthesis: none;

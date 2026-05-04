@@ -219,21 +219,62 @@ const FreePracticePage: React.FC = () => {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen px-4 py-8" style={{ backgroundColor: 'var(--color-background)' }}>
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background)' }}>
 
-        {/* Back link */}
+      {/* Branded nav bar */}
+      <div
+        data-testid="practice-nav-bar"
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 30,
+          background: 'linear-gradient(135deg, #7C6FF7 0%, var(--color-brand-primary) 100%)',
+          boxShadow: '0 2px 12px rgba(108,92,231,0.35)',
+          padding: '10px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+        }}
+      >
         {phase !== 'complete' && (
           <button
             type="button"
             onClick={() => phase === 'picking' ? navigate('/dashboard') : setPhase('picking')}
-            className="mb-6 text-sm font-semibold flex items-center gap-1 hover:opacity-70 transition"
-            style={{ color: 'var(--color-brand-primary)' }}
             data-testid="back-btn"
+            style={{
+              background: 'rgba(255,255,255,0.18)',
+              border: '1.5px solid rgba(255,255,255,0.35)',
+              borderRadius: '8px',
+              color: '#fff',
+              fontSize: '14px',
+              fontWeight: 600,
+              padding: '6px 12px',
+              cursor: 'pointer',
+              minHeight: '36px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
           >
-            ← {phase === 'picking' ? 'Back to dashboard' : 'Change subject'}
+            ← {phase === 'picking' ? 'Dashboard' : 'Change subject'}
           </button>
         )}
+        <div style={{ flex: 1, textAlign: 'center' }}>
+          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.65)', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+            PWP Studio
+          </div>
+          <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>
+            Free Practice 🎨
+          </div>
+        </div>
+        {/* Help mode indicator in nav */}
+        {(phase === 'chaining' || phase === 'challenge') && (
+          <span style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.85)', flexShrink: 0 }}>
+            🎨 Help on
+          </span>
+        )}
+      </div>
+
+      <div className="max-w-2xl mx-auto px-4 py-8">
 
         {/* Help mode badge */}
         {(phase === 'chaining' || phase === 'challenge') && (
