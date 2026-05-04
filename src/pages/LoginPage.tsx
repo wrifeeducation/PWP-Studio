@@ -17,6 +17,8 @@ type ParentStep = 'auth' | 'child-profile'
 interface FormErrors {
   email?: string
   password?: string
+  classCode?: string
+  username?: string
   pin?: string
   childName?: string
   general?: string
@@ -85,6 +87,8 @@ export default function LoginPage() {
   const [firstName, setFirstName] = useState('')
 
   // Pupil fields
+  const [classCode, setClassCode] = useState('')
+  const [pupilUsername, setPupilUsername] = useState('')
   const [pin, setPin] = useState('')
   const [loginAvatar] = useState<AvatarVariantId>('wizard')
 
@@ -200,12 +204,56 @@ export default function LoginPage() {
   const handlePupilPinLogin = async (e: FormEvent) => {
     e.preventDefault()
     clearErrors()
-    if (!pin || pin.length < 4 || pin.length > 6) return setErrors({ pin: 'PIN must be 4–6 digits' })
+
+    // Validate all three fields
+    const newErrors: FormErrors = {}
+    if (!classCode.trim()) newErrors.classCode = 'Enter your class code'
+    if (!pupilUsername.trim()) newErrors.username = 'Enter your username'
+    if (!pin || pin.length !== 4) newErrors.pin = 'PIN must be 4 digits'
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return }
+
     setIsLoading(true)
     try {
-      const pupilEmail = `pupil-${pin}@wrife.school`
-      const { error } = await supabase.auth.signInWithPassword({ email: pupilEmail, password: pin })
-      if (error) { setErrors({ pin: 'Invalid PIN. Please check with your teacher.' }); return }
+      // Call the Platform pupil-login Edge Function
+      const { data, error } = await supabase.functions.invoke('pupil-login', {
+        body: {
+          classCode: classCode.trim().toUpperCase(),
+          username: pupilUsername.trim().toLowerCase(),
+          pin: pin.trim(),
+        },
+      })
+
+      if (error) {
+        setErrors({ general: 'Could not connect. Please try again.' })
+        return
+      }
+
+      if (data?.error) {
+        // Map specific errors to the relevant field
+        const msg: string = data.error as string
+        if (msg.toLowerCase().includes('class')) {
+          setErrors({ classCode: msg })
+        } else if (msg.toLowerCase().includes('name') || msg.toLowerCase().includes('username')) {
+          setErrors({ username: msg })
+        } else if (msg.toLowerCase().includes('pin') || msg.toLowerCase().includes('incorrect')) {
+          setErrors({ pin: msg })
+        } else {
+          setErrors({ general: msg })
+        }
+        return
+      }
+
+      // Establish Supabase auth session from the returned tokens
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: data.access_token as string,
+        refresh_token: data.refresh_token as string,
+      })
+
+      if (sessionError) {
+        setErrors({ general: 'Login succeeded but session could not be established. Please try again.' })
+        return
+      }
+
       navigate('/dashboard', { replace: true })
     } catch {
       setErrors({ general: 'An unexpected error occurred. Please try again.' })
@@ -801,16 +849,16 @@ export default function LoginPage() {
                       <h2
                         className="text-xl font-bold mb-1"
                         style={{ color: 'var(--color-text)' }}
-                        data-tts="Enter your PIN"
+                        data-tts="Log in to your classroom"
                       >
-                        Hey there! Enter Your PIN
+                        Hey there! Log In
                       </h2>
                       <p
                         className="text-sm"
                         style={{ color: 'var(--color-text-muted)' }}
-                        data-tts="Your teacher will give you a 4 to 6 digit PIN"
+                        data-tts="Use the details your teacher gave you"
                       >
-                        Your teacher will give you a 4–6 digit PIN
+                        Use the details your teacher gave you
                       </p>
                     </div>
 
@@ -825,15 +873,85 @@ export default function LoginPage() {
                       </div>
                     )}
 
-                    <form onSubmit={handlePupilPinLogin} className="space-y-6" data-testid="pupil-form" noValidate>
+                    <form onSubmit={handlePupilPinLogin} className="space-y-4" data-testid="pupil-form" noValidate>
+                      {/* Class Code */}
                       <div>
-                        <label htmlFor="pin" className="sr-only">PIN Code</label>
+                        <label htmlFor="classCode" className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text)' }}
+                          data-tts="Class code">
+                          Class Code
+                        </label>
+                        <input
+                          id="classCode"
+                          type="text"
+                          autoComplete="off"
+                          value={classCode}
+                          onChange={(e) => setClassCode(e.target.value.toUpperCase())}
+                          placeholder="e.g. SIL42"
+                          className="w-full text-center text-lg font-bold tracking-widest px-4 py-3 rounded-xl outline-none transition-all uppercase"
+                          style={{
+                            backgroundColor: 'var(--color-background)',
+                            border: `2px solid ${errors.classCode ? 'var(--color-verb)' : 'var(--color-border)'}`,
+                            color: 'var(--color-text)',
+                          }}
+                          onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--color-brand-primary)')}
+                          onBlur={(e) => (e.currentTarget.style.borderColor = errors.classCode ? 'var(--color-verb)' : 'var(--color-border)')}
+                          data-testid="input-class-code"
+                          aria-describedby={errors.classCode ? 'class-code-error' : undefined}
+                          aria-invalid={!!errors.classCode}
+                          data-tts="Class code field"
+                        />
+                        {errors.classCode && (
+                          <p id="class-code-error" className="mt-1 text-xs text-center" style={{ color: 'var(--color-verb)' }} data-tts={errors.classCode}>
+                            {errors.classCode}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Username */}
+                      <div>
+                        <label htmlFor="pupilUsername" className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text)' }}
+                          data-tts="Username">
+                          Username
+                        </label>
+                        <input
+                          id="pupilUsername"
+                          type="text"
+                          autoComplete="username"
+                          value={pupilUsername}
+                          onChange={(e) => setPupilUsername(e.target.value)}
+                          placeholder="Your username"
+                          className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
+                          style={{
+                            backgroundColor: 'var(--color-background)',
+                            border: `2px solid ${errors.username ? 'var(--color-verb)' : 'var(--color-border)'}`,
+                            color: 'var(--color-text)',
+                          }}
+                          onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--color-brand-primary)')}
+                          onBlur={(e) => (e.currentTarget.style.borderColor = errors.username ? 'var(--color-verb)' : 'var(--color-border)')}
+                          data-testid="input-username"
+                          aria-describedby={errors.username ? 'username-error' : undefined}
+                          aria-invalid={!!errors.username}
+                          data-tts="Username field"
+                        />
+                        {errors.username && (
+                          <p id="username-error" className="mt-1 text-xs" style={{ color: 'var(--color-verb)' }} data-tts={errors.username}>
+                            {errors.username}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* PIN */}
+                      <div>
+                        <label htmlFor="pin" className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text)' }}
+                          data-tts="Four digit PIN">
+                          PIN
+                        </label>
                         <input
                           id="pin"
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
-                          maxLength={6}
+                          maxLength={4}
                           value={pin}
                           onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
                           placeholder="0 0 0 0"
@@ -852,7 +970,7 @@ export default function LoginPage() {
                           data-tts="PIN entry field"
                         />
                         {errors.pin && (
-                          <p id="pin-error" className="mt-2 text-sm text-center" style={{ color: 'var(--color-verb)' }} data-tts={errors.pin}>
+                          <p id="pin-error" className="mt-1 text-xs text-center" style={{ color: 'var(--color-verb)' }} data-tts={errors.pin}>
                             {errors.pin}
                           </p>
                         )}
@@ -860,7 +978,7 @@ export default function LoginPage() {
 
                       <button
                         type="submit"
-                        disabled={isLoading || pin.length < 4}
+                        disabled={isLoading || pin.length < 4 || !classCode.trim() || !pupilUsername.trim()}
                         className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-60"
                         style={{ backgroundColor: 'var(--color-brand-secondary)' }}
                         data-testid="submit-pin"
