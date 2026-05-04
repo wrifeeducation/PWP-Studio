@@ -61,7 +61,7 @@ export function useStars(): StarsState {
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
     supabase
-      .from('pupil_progress')
+      .from('formula_progress')
       .select('stars_remaining, stars_last_replenished, star_shield_active')
       .eq('pupil_id', profile.id)
       .single()
@@ -70,7 +70,7 @@ export function useStars(): StarsState {
         // Create a full default row so subsequent deductStar/awardStar writes succeed.
         if (!data && (error as { code?: string } | null)?.code === 'PGRST116') {
           await supabase
-            .from('pupil_progress')
+            .from('formula_progress')
             .upsert(
               {
                 pupil_id: profile.id,
@@ -105,7 +105,7 @@ export function useStars(): StarsState {
         if (needsReplenish) {
           // New day — reset stars to 3
           await supabase
-            .from('pupil_progress')
+            .from('formula_progress')
             .update({
               stars_remaining: DAILY_STAR_MAX,
               stars_last_replenished: today,
@@ -131,7 +131,7 @@ export function useStars(): StarsState {
     // Shield absorbs the hit
     if (shieldActive) {
       await supabase
-        .from('pupil_progress')
+        .from('formula_progress')
         .update({ star_shield_active: false })
         .eq('pupil_id', profile.id)
       setShieldActive(false)
@@ -142,7 +142,7 @@ export function useStars(): StarsState {
     setStarsRemaining(newStars)
 
     await supabase
-      .from('pupil_progress')
+      .from('formula_progress')
       .update({ stars_remaining: newStars })
       .eq('pupil_id', profile.id)
   }, [isPro, profile?.id, shieldActive, starsRemaining])
@@ -157,7 +157,7 @@ export function useStars(): StarsState {
     setStarsRemaining(newStars)
 
     await supabase
-      .from('pupil_progress')
+      .from('formula_progress')
       .update({ stars_remaining: newStars })
       .eq('pupil_id', profile.id)
   }, [isPro, profile?.id, starsRemaining])

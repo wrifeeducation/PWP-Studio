@@ -119,7 +119,7 @@ async function handleGenreMasteryCheck(
 ): Promise<boolean> {
   // Fetch existing mastered genres
   const { data: progressRow } = await supabase
-    .from('pupil_progress')
+    .from('formula_progress')
     .select('paragraph_genres_mastered')
     .eq('pupil_id', pupilId)
     .single()
@@ -151,7 +151,7 @@ async function handleGenreMasteryCheck(
   const updatedMastered = [...currentMastered, genre]
 
   await supabase
-    .from('pupil_progress')
+    .from('formula_progress')
     .update({ paragraph_genres_mastered: updatedMastered })
     .eq('pupil_id', pupilId)
 
@@ -296,7 +296,7 @@ export default function ParagraphPage() {
       // Phase 5: Writing Studio readiness check — only if not already suggested
       try {
         const { data: progressSnap } = await supabase
-          .from('pupil_progress')
+          .from('formula_progress')
           .select('writing_studio_suggested_at, writing_studio_unlocked')
           .eq('pupil_id', user.id)
           .single()
@@ -309,14 +309,14 @@ export default function ParagraphPage() {
           if (readiness.ready) {
             await triggerWritingStudioSuggestion(user.id, readiness.evidence)
             // Invalidate so the dashboard reflects the new suggested_at state
-            queryClient.invalidateQueries({ queryKey: ['pupil_progress', user.id] })
+            queryClient.invalidateQueries({ queryKey: ['formula_progress', user.id] })
           }
         }
       } catch {
         // Readiness check failure is non-critical — swallow silently
       }
 
-      queryClient.invalidateQueries({ queryKey: ['pupil_progress', user.id] })
+      queryClient.invalidateQueries({ queryKey: ['formula_progress', user.id] })
       setScreen('feedback')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong'

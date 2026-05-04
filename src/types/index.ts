@@ -557,7 +557,7 @@ export interface Database {
         Insert: Omit<Badge, 'id' | 'created_at'>;
         Update: DeepPartial<Omit<Badge, 'id' | 'created_at'>>;
       };
-      pupil_progress: {
+      formula_progress: {
         Row: PupilProgress;
         Insert: Omit<PupilProgress, 'id' | 'created_at' | 'updated_at'>;
         Update: DeepPartial<Omit<PupilProgress, 'id' | 'created_at'>>;

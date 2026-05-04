@@ -51,7 +51,7 @@ async function checkBreadth(
 ): Promise<{ met: boolean; levelsMastered: number; phases: string[] }> {
   // Step 1: get levels_mastered_count from pupil_progress (fast — single row)
   const { data: progress } = await supabase
-    .from('pupil_progress')
+    .from('formula_progress')
     .select('levels_mastered_count')
     .eq('pupil_id', pupilId)
     .single()
@@ -194,7 +194,7 @@ export async function triggerWritingStudioSuggestion(
 
   // 1. Stamp writing_studio_suggested_at on pupil_progress
   await supabase
-    .from('pupil_progress')
+    .from('formula_progress')
     .update({ writing_studio_suggested_at: now })
     .eq('pupil_id', pupilId)
 

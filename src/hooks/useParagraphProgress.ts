@@ -208,7 +208,7 @@ export const useParagraphProgress = (pupilId: string | null | undefined) => {
 
       // Fetch genres already confirmed as mastered in pupil_progress
       const { data: progressRow, error: progressError } = await supabase
-        .from('pupil_progress')
+        .from('formula_progress')
         .select('paragraph_genres_mastered')
         .eq('pupil_id', pupilId!)
         .single()

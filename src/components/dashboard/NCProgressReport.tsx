@@ -89,7 +89,7 @@ export function NCProgressReport() {
         const pupilIds = profileData.map((p) => p.id)
 
         const { data: progressData } = await supabase
-          .from('pupil_progress')
+          .from('formula_progress')
           .select('pupil_id, current_formula_level, total_xp, current_streak')
           .in('pupil_id', pupilIds)
 

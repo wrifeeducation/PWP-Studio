@@ -174,13 +174,13 @@ export const assessParagraph = async (
 
   // Update pupil_progress: total_xp
   const { data: progressData } = await supabase
-    .from('pupil_progress')
+    .from('formula_progress')
     .select('total_xp')
     .eq('pupil_id', pupilId)
     .single()
 
   await supabase
-    .from('pupil_progress')
+    .from('formula_progress')
     .update({
       total_xp: (progressData?.total_xp ?? 0) + xpEarned,
       last_session_date: new Date().toISOString().split('T')[0],

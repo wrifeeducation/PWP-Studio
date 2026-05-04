@@ -52,7 +52,7 @@ export function OverviewTab({ schoolId }: { schoolId: string }) {
         supabase.from('profiles').select('id, role').eq('school_id', schoolId),
         supabase.from('classes').select('id').eq('school_id', schoolId),
         supabase
-          .from('pupil_progress')
+          .from('formula_progress')
           .select('pupil_id, current_formula_level, writing_studio_unlocked')
           .in(
             'pupil_id',

@@ -45,7 +45,7 @@ export function PupilWelcomeModal({ pupilId, firstName, onComplete }: PupilWelco
     setStarting(true)
     try {
       // Create pupil_progress row with defaults (ignore if already exists)
-      await supabase.from('pupil_progress').upsert(
+      await supabase.from('formula_progress').upsert(
         {
           pupil_id: pupilId,
           current_formula_level: 1,

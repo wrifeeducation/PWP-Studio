@@ -925,7 +925,7 @@ export type Database = {
           },
         ]
       }
-      pupil_progress: {
+      formula_progress: {
         Row: {
           coins: number
           consecutive_mastery_sessions: number
@@ -1012,14 +1012,14 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "pupil_progress_pupil_id_fkey"
+            foreignKeyName: "formula_progress_pupil_id_fkey"
             columns: ["pupil_id"]
             isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pupil_progress_pupil_id_fkey"
+            foreignKeyName: "formula_progress_pupil_id_fkey"
             columns: ["pupil_id"]
             isOneToOne: true
             referencedRelation: "v_class_formula_progress"
@@ -1635,14 +1635,14 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pupil_progress_pupil_id_fkey"
+            foreignKeyName: "formula_progress_pupil_id_fkey"
             columns: ["pupil_id"]
             isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pupil_progress_pupil_id_fkey"
+            foreignKeyName: "formula_progress_pupil_id_fkey"
             columns: ["pupil_id"]
             isOneToOne: true
             referencedRelation: "v_class_formula_progress"

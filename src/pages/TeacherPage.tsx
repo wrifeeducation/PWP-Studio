@@ -1595,7 +1595,7 @@ function NotificationsTab({ teacherId, onActionTaken }: NotificationsTabProps) {
       const now = new Date().toISOString()
 
       await supabase
-        .from('pupil_progress')
+        .from('formula_progress')
         .update({
           writing_studio_unlocked: true,
           writing_studio_confirmed_at: now,

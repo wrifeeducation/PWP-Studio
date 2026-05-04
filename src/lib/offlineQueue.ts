@@ -90,7 +90,7 @@ async function saveItem(supabase: SupabaseClient, item: OfflineQueueItem): Promi
   if (type === 'progress_update') {
     const { pupil_id, ...rest } = item.data as { pupil_id: string } & Record<string, unknown>
     const { error } = await supabase
-      .from('pupil_progress')
+      .from('formula_progress')
       .update(rest as never)
       .eq('pupil_id', pupil_id)
     if (error) throw new Error(error.message)

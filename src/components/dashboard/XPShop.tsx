@@ -69,7 +69,7 @@ export const XPShop: React.FC<XPShopProps> = ({ progress, onPurchase }) => {
       }
 
       const { error } = await supabase
-        .from('pupil_progress')
+        .from('formula_progress')
         .update(updates)
         .eq('pupil_id', progress.pupil_id)
 

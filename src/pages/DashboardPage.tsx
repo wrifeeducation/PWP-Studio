@@ -1347,10 +1347,10 @@ export default function DashboardPage() {
 
   // ── fetch progress ──────────────────────────────────────────────────────────
   const { data: progress, isLoading: progressLoading } = useQuery<PupilProgressRow>({
-    queryKey: ['pupil_progress', pupilId],
+    queryKey: ['formula_progress', pupilId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('pupil_progress')
+        .from('formula_progress')
         .select('*')
         .eq('pupil_id', pupilId)
         .single()

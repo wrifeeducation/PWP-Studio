@@ -91,7 +91,7 @@ export default function WritingStudioPage() {
   useEffect(() => {
     if (!profile) return
     supabase
-      .from('pupil_progress')
+      .from('formula_progress')
       .select('writing_studio_unlocked')
       .eq('pupil_id', profile.id)
       .single()
@@ -231,13 +231,13 @@ export default function WritingStudioPage() {
       // WF-018: Award XP
       const xp = calcWritingXP(result.overall_band)
       const { data: progressRow } = await supabase
-        .from('pupil_progress')
+        .from('formula_progress')
         .select('total_xp')
         .eq('pupil_id', profile.id)
         .single()
       if (progressRow) {
         await supabase
-          .from('pupil_progress')
+          .from('formula_progress')
           .update({ total_xp: progressRow.total_xp + xp })
           .eq('pupil_id', profile.id)
       }

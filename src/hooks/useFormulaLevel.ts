@@ -54,11 +54,11 @@ export const useFormulaLevel = (overrideLevelId?: number) => {
 
   // Step 1: always fetch pupil_progress (needed for XP, streak, and progression)
   const progressQuery = useQuery({
-    queryKey: ['pupil_progress', pupilId],
+    queryKey: ['formula_progress', pupilId],
     queryFn: async (): Promise<PupilProgress> => {
       if (!pupilId) throw new Error('Not authenticated')
       const { data, error } = await supabase
-        .from('pupil_progress')
+        .from('formula_progress')
         .select('*')
         .eq('pupil_id', pupilId)
         .single()

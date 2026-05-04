@@ -162,7 +162,7 @@ export default function FormulaPage() {
   const flushQueue = useCallback(async () => {
     const { synced } = await flush(supabase)
     if (synced > 0) {
-      queryClient.invalidateQueries({ queryKey: ['pupil_progress', user?.id] })
+      queryClient.invalidateQueries({ queryKey: ['formula_progress', user?.id] })
     }
   }, [user?.id, queryClient])
 
@@ -337,7 +337,7 @@ export default function FormulaPage() {
 
       // WF-009: XP + streak update
       const { data: progressRow } = await supabase
-        .from('pupil_progress')
+        .from('formula_progress')
         .select('*')
         .eq('pupil_id', user.id)
         .single()
@@ -484,7 +484,7 @@ export default function FormulaPage() {
       }
 
       // Persist progress update
-      await supabase.from('pupil_progress').update(progressionUpdates).eq('pupil_id', user.id)
+      await supabase.from('formula_progress').update(progressionUpdates).eq('pupil_id', user.id)
 
       // WF-010: evaluate badges
       const { data: allBadges } = await supabase.from('badges').select('*')
@@ -536,7 +536,7 @@ export default function FormulaPage() {
       }
 
       // Invalidate React Query cache so dashboard refreshes
-      queryClient.invalidateQueries({ queryKey: ['pupil_progress', user.id] })
+      queryClient.invalidateQueries({ queryKey: ['formula_progress', user.id] })
 
       if (didLevelUp) {
         setShowLevelUp(true)
@@ -615,7 +615,7 @@ export default function FormulaPage() {
 
       // WF-009: XP + streak update
       const { data: progressRow } = await supabase
-        .from('pupil_progress')
+        .from('formula_progress')
         .select('*')
         .eq('pupil_id', user.id)
         .single()
@@ -641,7 +641,7 @@ export default function FormulaPage() {
         ...streakUpdate,
       }
 
-      await supabase.from('pupil_progress').update(progressionUpdates).eq('pupil_id', user.id)
+      await supabase.from('formula_progress').update(progressionUpdates).eq('pupil_id', user.id)
 
       // WF-010: evaluate badges
       const { data: allBadges } = await supabase.from('badges').select('*')
@@ -690,7 +690,7 @@ export default function FormulaPage() {
         setNewBadge(badge)
       }
 
-      queryClient.invalidateQueries({ queryKey: ['pupil_progress', user.id] })
+      queryClient.invalidateQueries({ queryKey: ['formula_progress', user.id] })
 
       setAssessmentResult(syntheticResult)
       setScreen('feedback')

@@ -525,7 +525,7 @@ export default function ParentPage() {
       const enriched = await Promise.all(
         profiles.map(async (p) => {
           const [progressRes, badgesRes, writingRes] = await Promise.all([
-            supabase.from('pupil_progress').select('*').eq('pupil_id', p.id).single(),
+            supabase.from('formula_progress').select('*').eq('pupil_id', p.id).single(),
             supabase
               .from('pupil_badges')
               .select('badge_id, awarded_at, badges(name, icon_key)')
