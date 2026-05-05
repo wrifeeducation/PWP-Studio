@@ -1,53 +1,33 @@
-import { useState, useEffect, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import type { Profile } from '../types/index'
 
 export default function AdminLoginPage() {
   const navigate = useNavigate()
-  const { session, profile, isLoading } = useAuthStore()
+  const { setProfile, setSession } = useAuthStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [awaitingAuth, setAwaitingAuth] = useState(false)
 
-  // After sign-in: wait for onAuthStateChange to populate session + profile, then navigate.
-  useEffect(() => {
-    if (!awaitingAuth) return
-
-    // Step 1: wait for session to appear in the store (onAuthStateChange hasn't fired yet)
-    if (!session) return
-
-    // Step 2: wait for profile fetch to complete
-    if (isLoading) return
-
-    // Step 3: profile loaded — check role
-    if (profile?.role === 'admin') {
-      navigate('/admin', { replace: true })
-      return
-    }
-
-    if (profile) {
-      // Authenticated but not an admin
-      supabase.auth.signOut()
-      setError('Your account does not have admin privileges.')
-    } else {
-      // Profile fetch failed
-      supabase.auth.signOut()
-      setError('Could not load account profile. Please try again.')
-    }
-
-    setAwaitingAuth(false)
-    setLoading(false)
-  }, [awaitingAuth, session, profile, isLoading, navigate])
-
+  /**
+   * BUG-006 fix (admin): Admin login is self-sufficient — it does not rely on
+   * onAuthStateChange to populate the profile. This avoids the Web Lock contention
+   * that occurs when the SIGNED_IN event handler races with signInWithPassword's
+   * own lock acquisition to store the auth token.
+   *
+   * After signInWithPassword resolves (and releases the lock), we wait 200ms then
+   * fetch the profile directly. This gives the auth lock time to fully release
+   * before the PostgREST query needs to read the session token.
+   */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
-
     setLoading(true)
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     })
@@ -58,8 +38,35 @@ export default function AdminLoginPage() {
       return
     }
 
-    // Auth succeeded — useEffect watches session + profile and navigates when ready
-    setAwaitingAuth(true)
+    // Wait for the auth token lock to fully release before querying the DB
+    await new Promise(resolve => setTimeout(resolve, 250))
+
+    // Fetch profile directly — do not depend on onAuthStateChange
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user.id)
+      .single()
+
+    if (profileError || !profileData) {
+      console.error('[AdminLogin] profile fetch failed:', profileError)
+      await supabase.auth.signOut()
+      setError('Could not load account profile. Please try again.')
+      setLoading(false)
+      return
+    }
+
+    if ((profileData as Profile).role !== 'admin') {
+      await supabase.auth.signOut()
+      setError('Your account does not have admin privileges.')
+      setLoading(false)
+      return
+    }
+
+    // Hydrate Zustand store so ProtectedRoute passes immediately
+    setSession(data.session)
+    setProfile(profileData as Profile)
+    navigate('/admin', { replace: true })
   }
 
   return (

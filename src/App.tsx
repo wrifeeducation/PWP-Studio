@@ -115,27 +115,36 @@ function AuthInitialiser() {
 
   useEffect(() => {
     /**
-     * BUG-006 fix: use a single onAuthStateChange subscription instead of
-     * calling getSession() separately.
+     * BUG-006 fix (v2): keep the onAuthStateChange callback SYNCHRONOUS.
      *
-     * Root cause: getSession() + onAuthStateChange() both acquire the Supabase
-     * auth token Web Lock simultaneously. When signInWithPassword() is also
-     * called, all three compete for the same lock → "Lock was released because
-     * another request stole it" → fetchProfileWithTimeout runs without a JWT
-     * → PostgREST returns an RLS error → profile is null → login fails.
+     * Root cause (revised): The Supabase JS client uses the browser Web Locks API
+     * (lock key: "sb-{project-ref}-auth-token") for all token reads/writes.
+     * signInWithPassword() holds this lock while persisting the new tokens.
+     * If the onAuthStateChange callback is async, Supabase fires it without
+     * awaiting — meaning INITIAL_SESSION and SIGNED_IN handlers run concurrently,
+     * both racing to acquire the same lock → "Lock was released because another
+     * request stole it" → fetchProfileWithTimeout throws (caught → null) → login
+     * fails with "Could not load account profile".
      *
-     * Fix: onAuthStateChange fires immediately on subscription with event
-     * INITIAL_SESSION (and the current session), making getSession() redundant.
-     * Using only one lock-holder eliminates the contention entirely.
+     * Fix: Make the callback synchronous per Supabase docs. Kick all async work
+     * off outside the callback (via Promise chains). For SIGNED_IN events add a
+     * 300ms delay to let signInWithPassword fully release the lock before the
+     * profile query needs to read the session token.
+     *
+     * Admin login has its own self-sufficient profile fetch (AdminLoginPage.tsx)
+     * and does not depend on this handler for navigation.
      */
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      // ── Synchronous: update session in store immediately ──────────────────
       setSession(session)
 
       if (session?.user) {
+        const userId = session.user.id
+
         if (event === 'INITIAL_SESSION') {
-          // ── Stale-while-revalidate (page reload / direct URL) ──────────────
+          // ── Stale-while-revalidate (page reload / direct URL) ─────────────
           // 1. Hydrate from cache immediately so ProtectedRoute never flashes
           const cached = readCachedProfile()
           if (cached) {
@@ -144,28 +153,33 @@ function AuthInitialiser() {
             setInitialised(true)
           }
 
-          // 2. Fetch fresh profile (background if cached, blocking if first visit)
-          const fresh = await fetchProfileWithTimeout(session.user.id)
-          if (fresh) {
-            setProfile(fresh)
-            saveCachedProfile(fresh)
-          }
-
-          // 3. First-ever visit path — mark ready now
-          if (!cached) {
-            setLoading(false)
-            setInitialised(true)
-          }
+          // 2. Fetch fresh profile async — no await inside callback
+          fetchProfileWithTimeout(userId).then(fresh => {
+            if (fresh) {
+              setProfile(fresh)
+              saveCachedProfile(fresh)
+            }
+            // 3. First-ever visit: mark ready after fetch completes
+            if (!cached) {
+              setLoading(false)
+              setInitialised(true)
+            }
+          })
         } else {
           // SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED, etc.
+          // Delay 300ms so signInWithPassword's auth-token lock fully releases
+          // before the profile query tries to read the session token.
           setLoading(true)
-          const profile = await fetchProfileWithTimeout(session.user.id)
-          if (profile) {
-            setProfile(profile)
-            saveCachedProfile(profile)
-          }
-          setLoading(false)
-          setInitialised(true)
+          setTimeout(() => {
+            fetchProfileWithTimeout(userId).then(profile => {
+              if (profile) {
+                setProfile(profile)
+                saveCachedProfile(profile)
+              }
+              setLoading(false)
+              setInitialised(true)
+            })
+          }, 300)
         }
       } else {
         // SIGNED_OUT or no session
