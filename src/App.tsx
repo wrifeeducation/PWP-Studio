@@ -114,63 +114,64 @@ function AuthInitialiser() {
   const { setSession, setProfile, setLoading, setInitialised, clearAuth } = useAuthStore()
 
   useEffect(() => {
-    // Fetch initial session on mount
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session)
-
-      if (session?.user) {
-        // ── Stale-while-revalidate ──────────────────────────────────────────
-        // 1. Immediately hydrate from cache → prevents redirect flash on reload
-        const cached = readCachedProfile()
-        if (cached) {
-          setProfile(cached)
-          setLoading(false)
-          setInitialised(true)   // unblock ProtectedRoute with cached data
-        }
-
-        // 2. Fetch fresh profile in background (or blocking if no cache)
-        const fresh = await fetchProfileWithTimeout(session.user.id)
-        if (fresh) {
-          setProfile(fresh)
-          saveCachedProfile(fresh)   // keep cache current for next reload
-        }
-
-        // 3. If there was no cache, mark ready now (first-ever visit path)
-        if (!cached) {
-          setInitialised(true)
-          setLoading(false)
-        }
-      } else {
-        // No session — clear cache so stale profile doesn't survive logout
-        clearCachedProfile()
-        clearAuth()
-      }
-    }).catch(() => {
-      // getSession itself failed — mark as initialised so the app doesn't hang
-      clearCachedProfile()
-      clearAuth()
-    })
-
-    // Subscribe to future auth state changes (sign-in, sign-out, token refresh)
+    /**
+     * BUG-006 fix: use a single onAuthStateChange subscription instead of
+     * calling getSession() separately.
+     *
+     * Root cause: getSession() + onAuthStateChange() both acquire the Supabase
+     * auth token Web Lock simultaneously. When signInWithPassword() is also
+     * called, all three compete for the same lock → "Lock was released because
+     * another request stole it" → fetchProfileWithTimeout runs without a JWT
+     * → PostgREST returns an RLS error → profile is null → login fails.
+     *
+     * Fix: onAuthStateChange fires immediately on subscription with event
+     * INITIAL_SESSION (and the current session), making getSession() redundant.
+     * Using only one lock-holder eliminates the contention entirely.
+     */
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session)
+
       if (session?.user) {
-        // Mark as loading while we fetch the profile so ProtectedRoute
-        // shows the spinner instead of bouncing to /login mid-fetch.
-        setLoading(true)
-        const profile = await fetchProfileWithTimeout(session.user.id)
-        if (profile) {
-          setProfile(profile)
-          saveCachedProfile(profile)
+        if (event === 'INITIAL_SESSION') {
+          // ── Stale-while-revalidate (page reload / direct URL) ──────────────
+          // 1. Hydrate from cache immediately so ProtectedRoute never flashes
+          const cached = readCachedProfile()
+          if (cached) {
+            setProfile(cached)
+            setLoading(false)
+            setInitialised(true)
+          }
+
+          // 2. Fetch fresh profile (background if cached, blocking if first visit)
+          const fresh = await fetchProfileWithTimeout(session.user.id)
+          if (fresh) {
+            setProfile(fresh)
+            saveCachedProfile(fresh)
+          }
+
+          // 3. First-ever visit path — mark ready now
+          if (!cached) {
+            setLoading(false)
+            setInitialised(true)
+          }
+        } else {
+          // SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED, etc.
+          setLoading(true)
+          const profile = await fetchProfileWithTimeout(session.user.id)
+          if (profile) {
+            setProfile(profile)
+            saveCachedProfile(profile)
+          }
+          setLoading(false)
+          setInitialised(true)
         }
       } else {
+        // SIGNED_OUT or no session
         clearCachedProfile()
         clearAuth()
       }
-      setLoading(false)
-      setInitialised(true)
     })
 
     return () => {
