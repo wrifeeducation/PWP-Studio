@@ -10,6 +10,11 @@
 
 import React, { useEffect, useRef } from 'react'
 
+/** Controls what kind of subject the pupil should choose.
+ *  Set by the teacher per session; defaults to 'thing' to avoid
+ *  person-centred writing (WriFe PWP Dev Spec §3.3). */
+export type SubjectType = 'person' | 'place' | 'thing'
+
 interface SubjectPickerProps {
   value: string
   onChange: (value: string) => void
@@ -18,8 +23,32 @@ interface SubjectPickerProps {
   weeklyTheme?: string | null
   /** Optional: word suggestions from pwp_class_themes.suggestions */
   themeSuggestions?: string[]
+  /** Controls the subject guidance shown. Defaults to 'thing'. */
+  subjectType?: SubjectType
   disabled?: boolean
 }
+
+// ─── Subject type guidance ────────────────────────────────────────────────────
+
+const SUBJECT_GUIDANCE: Record<SubjectType, { subtitle: string; placeholder: string; tts: string }> = {
+  thing: {
+    subtitle: 'Choose a place or thing — avoid using a person\'s name.',
+    placeholder: 'e.g. robots, the park, buses, a market…',
+    tts: 'Choose a place or thing — avoid using a person\'s name.',
+  },
+  place: {
+    subtitle: 'Choose a place — a location your subject can travel to or from.',
+    placeholder: 'e.g. the park, a station, the market, school…',
+    tts: 'Choose a place — a location your subject can travel to or from.',
+  },
+  person: {
+    subtitle: 'Choose a person — use a name or a role (e.g. Ben, doctor, astronaut).',
+    placeholder: 'e.g. Ben, a doctor, the astronaut…',
+    tts: 'Choose a person — use a name or a role such as doctor or astronaut.',
+  },
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export const SubjectPicker: React.FC<SubjectPickerProps> = ({
   value,
@@ -27,8 +56,10 @@ export const SubjectPicker: React.FC<SubjectPickerProps> = ({
   onConfirm,
   weeklyTheme,
   themeSuggestions = [],
+  subjectType = 'thing',
   disabled = false,
 }) => {
+  const guidance = SUBJECT_GUIDANCE[subjectType]
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -67,9 +98,9 @@ export const SubjectPicker: React.FC<SubjectPickerProps> = ({
       <p
         className="text-center text-base mb-6"
         style={{ color: 'var(--color-text-muted)' }}
-        data-tts="Choose a noun — the thing or creature your sentences will be about"
+        data-tts={guidance.tts}
       >
-        Choose a noun — the thing or creature your sentences will be about.
+        {guidance.subtitle}
       </p>
 
       {/* Theme hint */}
@@ -95,7 +126,7 @@ export const SubjectPicker: React.FC<SubjectPickerProps> = ({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="e.g. dolphins, volcanoes, robots…"
+        placeholder={guidance.placeholder}
         disabled={disabled}
         maxLength={40}
         autoComplete="off"

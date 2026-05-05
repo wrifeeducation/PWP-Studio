@@ -1,29 +1,35 @@
 /**
  * PWP Daily Chain Practice — Client-Side Sentence Validator
  *
- * Validates a pupil's typed sentence against the expected formula pattern.
+ * Validates a pupil's typed sentence against the expected CL formula.
  * Returns a result indicating acceptance, which token(s) are wrong, and
- * a plain-English hint to show in the ValidationFeedback component.
+ * a plain-English hint naming the missing or extra word class.
  *
- * Design principles (from spec section 7):
- * - Strict matching: every position in the pattern must match
- * - Contractions are flagged as a hint (not a hard error) at early levels
- * - Plural subjects are valid: "Dolphins swim" = noun(plural) + verb = ✓
- * - Proper nouns are valid: "London stands" = noun + verb = ✓
+ * Design principles (WriFe PWP Dev Spec §3.3):
+ * - Check WORD CLASS COUNT, not raw word count
+ *   "is walking" = one VERB slot (parseSentence merges it before we see it)
+ * - Error messages name the missing/extra class:
+ *   "Your sentence has 4 word classes. This formula needs 6:
+ *    determiner · adjective · noun · verb · adverb · preposition."
+ * - Strict positional matching: every slot must match
+ * - Contractions flagged as soft warning (not hard error) at early levels
+ * - Plural/proper nouns valid in NOUN slots
+ * - CL11 (freeArrangement) passes any valid sentence — no pattern check
  */
 
 import { WordClass } from '../../types/index'
 import type { ChainFormulaDefinition } from './formulaDefinitions'
+import { patternToNames } from './formulaDefinitions'
 import { parseSentence } from './parseSentence'
 
 // ─── Result types ─────────────────────────────────────────────────────────────
 
 export interface TokenResult {
-  /** The pupil's word as typed */
+  /** The pupil's word(s) as typed (may be a merged phrase e.g. "is walking") */
   word: string
   /** What the tagger assigned */
   assigned: WordClass
-  /** What the formula expected */
+  /** What the formula expected at this position */
   expected: WordClass
   /** Whether this position matched */
   correct: boolean
@@ -32,7 +38,7 @@ export interface TokenResult {
 export interface ChainValidationResult {
   /** True = sentence accepted and matches the formula */
   accepted: boolean
-  /** One result per token position (may be shorter/longer than pattern) */
+  /** One result per word-class slot (after verb-phrase merging) */
   tokens: TokenResult[]
   /** Human-readable error for the pupil, or null if accepted */
   errorMessage: string | null
@@ -56,7 +62,7 @@ const WC_NAMES: Record<WordClass, string> = {
 // ─── Main validator ───────────────────────────────────────────────────────────
 
 /**
- * Validate a pupil's sentence against a formula pattern.
+ * Validate a pupil's sentence against a CL formula.
  *
  * @param sentence     The pupil's typed sentence (may include punctuation)
  * @param formula      The chain formula definition for this level
@@ -79,23 +85,41 @@ export function validateChainSentence(
     }
   }
 
+  // ── CL11 free-arrangement: accept any non-empty sentence ────────────────────
+  if (formula.freeArrangement) {
+    const hasContraction = /'\w+/.test(trimmed)
+    return {
+      accepted: true,
+      tokens: [],
+      errorMessage: null,
+      warning: hasContraction
+        ? "Try to avoid contractions (like \"don't\" or \"it's\") — write the words out in full."
+        : null,
+    }
+  }
+
   // ── Soft warning: contractions ───────────────────────────────────────────────
   const hasContraction = /'\w+/.test(trimmed)
   const warning = hasContraction
-    ? "Try to avoid contractions (like \"don't\" or \"it's\") in your formula sentences — write the words out in full."
+    ? "Try to avoid contractions (like \"don't\" or \"it's\") — write the words out in full."
     : null
 
-  // ── Parse the sentence ───────────────────────────────────────────────────────
+  // ── Parse the sentence (verb phrases already merged into single VERB slots) ──
   const parsed = parseSentence(trimmed, subjectNoun)
   const pattern = formula.pattern
+  const requiredCount = formula.wordClassCount
 
-  // ── Guard: wrong number of words ─────────────────────────────────────────────
-  if (parsed.length !== pattern.length) {
-    const diff = parsed.length - pattern.length
+  // ── Guard: wrong word-class count ───────────────────────────────────────────
+  // Compare slot count (post-merge) against the formula's required count.
+  // "is walking" counts as 1, not 2.
+  if (parsed.length !== requiredCount) {
+    const diff = parsed.length - requiredCount
+    const direction = diff > 0 ? 'too many' : 'too few'
+    const abs = Math.abs(diff)
     const msg =
-      diff > 0
-        ? `Your sentence has ${parsed.length} words but the L${formula.level} formula needs exactly ${pattern.length}. Try removing ${diff} word${diff > 1 ? 's' : ''}.`
-        : `Your sentence has ${parsed.length} words but the L${formula.level} formula needs ${pattern.length}. Try adding ${Math.abs(diff)} more word${Math.abs(diff) > 1 ? 's' : ''}.`
+      `Your sentence has ${parsed.length} word class${parsed.length !== 1 ? 'es' : ''}. ` +
+      `CL${formula.level} needs exactly ${requiredCount}: ${patternToNames(pattern)}. ` +
+      `You have ${direction} — try ${diff > 0 ? 'removing' : 'adding'} ${abs} word class${abs !== 1 ? 'es' : ''}.`
 
     return {
       accepted: false,
@@ -114,8 +138,7 @@ export function validateChainSentence(
   const tokens: TokenResult[] = parsed.map((p, i) => {
     const expected = pattern[i]
     const assigned = p.wordClass
-    // A position is correct if it matches the primary expected class OR any
-    // of the explicitly listed alternatives for that position.
+    // Correct if it matches the primary expected class OR any listed alternative
     const alts = formula.alternatives?.[i] ?? []
     const correct = assigned === expected || alts.includes(assigned)
     return { word: p.token.raw, assigned, expected, correct }
@@ -127,12 +150,12 @@ export function validateChainSentence(
     return { accepted: true, tokens, errorMessage: null, warning }
   }
 
-  // ── Build a helpful error message ────────────────────────────────────────────
+  // ── Build a named error message ──────────────────────────────────────────────
   const wrongPos = tokens.indexOf(firstWrong) + 1 // 1-based for pupil
   const errorMessage =
-    `"${firstWrong.word}" looks like a ${WC_NAMES[firstWrong.assigned]}, ` +
-    `but position ${wrongPos} in the L${formula.level} formula needs a ${WC_NAMES[firstWrong.expected]}. ` +
-    `Formula: ${formula.name}.`
+    `Slot ${wrongPos}: "${firstWrong.word}" looks like a ${WC_NAMES[firstWrong.assigned]}, ` +
+    `but CL${formula.level} needs a ${WC_NAMES[firstWrong.expected]} here. ` +
+    `Full pattern: ${patternToNames(pattern)}.`
 
   return { accepted: false, tokens, errorMessage, warning }
 }
@@ -140,8 +163,8 @@ export function validateChainSentence(
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Returns true if the sentence is trivially a contraction-free version of
- * another sentence (used to prevent pupils resubmitting without changes).
+ * Returns true if the two sentences are effectively the same
+ * (used to prevent pupils resubmitting without changes).
  */
 export function sentencesAreSame(a: string, b: string): boolean {
   const normalise = (s: string) =>

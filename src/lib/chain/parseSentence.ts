@@ -2,7 +2,7 @@
  * PWP Daily Chain Practice — Rule-Based POS Tagger
  *
  * Tags each token in a pupil's sentence with a WordClass.
- * Designed for L1–L10 patterns. Uses:
+ * Designed for CL1–CL11 patterns. Uses:
  *   1. Closed-class word lists (determiners, prepositions, conjunctions, pronouns)
  *   2. A broad common-verb lookup including inflected forms
  *   3. Morphological rules (-ly adverbs, -ed/-ing/-s verb suffixes)
@@ -13,7 +13,12 @@
  * open-class word pupils use in early sentences).
  *
  * Not a full NLP system — designed to handle the specific vocabulary range
- * at L1–L10 with high accuracy.
+ * at CL1–CL11 with high accuracy.
+ *
+ * CL8/CL10 verb phrase rule:
+ * "is walking", "are walking", "was running", "will run" etc. are treated as
+ * a SINGLE VERB slot. parseSentence merges auxiliary+main-verb bigrams before
+ * returning, so the array length matches the word-class count in the formula.
  */
 
 import { WordClass } from '../../types/index'
@@ -145,6 +150,17 @@ const COMMON_ADJECTIVES = new Set([
   'mysterious', 'towering', 'magnificent', 'ancient', 'gleaming', 'glowing',
 ])
 
+// ─── Auxiliary verbs — used for verb-phrase detection ─────────────────────────
+// These are the words that begin a continuous/future verb phrase.
+// When followed by a main verb (-ing form or base form), they merge into 1 slot.
+
+const AUXILIARIES = new Set([
+  'is', 'are', 'was', 'were', 'am',         // continuous/passive
+  'will', 'shall', 'would', 'could', 'should', 'might', 'must', 'may', 'can',
+  'have', 'has', 'had', 'do', 'does', 'did', // perfect/emphatic
+  'been', 'being',
+])
+
 // ─── Common adverbs (besides -ly words) ──────────────────────────────────────
 
 const COMMON_ADVERBS = new Set([
@@ -243,6 +259,7 @@ export function tagToken(
 
 /**
  * POS-tag an entire sentence, returning a WordClass for each token.
+ * Verb phrases (auxiliary + main verb) are merged into a single VERB token.
  *
  * @param sentence     The pupil's typed sentence
  * @param subjectNoun  Optional: the session subject noun (aids classification)
@@ -252,9 +269,42 @@ export function parseSentence(
   sentence: string,
   subjectNoun?: string,
 ): Array<{ token: Token; wordClass: WordClass }> {
-  const tokens = tokenise(sentence)
-  return tokens.map((token, i) => ({
+  const rawTokens = tokenise(sentence)
+  const tagged = rawTokens.map((token, i) => ({
     token,
     wordClass: tagToken(token, i, subjectNoun),
   }))
+
+  // ── Verb-phrase merging ──────────────────────────────────────────────────────
+  // Scan for [AUXILIARY, VERB] bigrams and merge into a single VERB slot.
+  // The merged token's `raw` value is "aux main" (e.g. "is walking").
+  // This ensures word-class count matches the formula's slot count for CL8/CL10.
+  const merged: Array<{ token: Token; wordClass: WordClass }> = []
+  let i = 0
+  while (i < tagged.length) {
+    const current = tagged[i]
+    const next = tagged[i + 1]
+
+    // Detect auxiliary + main-verb bigram
+    if (
+      current.wordClass === WordClass.VERB &&
+      AUXILIARIES.has(current.token.lower) &&
+      next &&
+      next.wordClass === WordClass.VERB &&
+      !AUXILIARIES.has(next.token.lower)
+    ) {
+      // Merge into a single VERB token
+      const mergedToken: Token = {
+        raw: `${current.token.raw} ${next.token.raw}`,
+        lower: `${current.token.lower} ${next.token.lower}`,
+      }
+      merged.push({ token: mergedToken, wordClass: WordClass.VERB })
+      i += 2 // skip both tokens
+    } else {
+      merged.push(current)
+      i++
+    }
+  }
+
+  return merged
 }

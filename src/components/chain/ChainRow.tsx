@@ -139,6 +139,20 @@ export const ChainRow: React.FC<ChainRowProps> = ({
           {formula.name}
         </span>
 
+        {/* Diff badge — new element introduced at this level */}
+        <span
+          className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold"
+          style={{
+            backgroundColor: 'var(--color-success-light)',
+            color: 'var(--color-success-dark)',
+            border: '1px solid var(--color-success)',
+          }}
+          data-tts={`New this level: ${formula.newElement}`}
+          title={`New at this level: ${formula.newElement}`}
+        >
+          {formula.newElement}
+        </span>
+
         {/* Tick on accepted */}
         {isAccepted && (
           <motion.span

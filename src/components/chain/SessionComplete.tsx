@@ -14,6 +14,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import type { ChainRowState } from '../../types/index'
+import { getChainForLevel } from '../../lib/chain/formulaDefinitions'
 
 const CHAIN_XP = 25
 
@@ -37,6 +38,11 @@ export const SessionComplete: React.FC<SessionCompleteProps> = ({
   const accepted = rows.filter((r) => r.status === 'accepted')
   const totalAttempts = rows.reduce((sum, r) => sum + r.attempts + 1, 0)
   const perfectSession = totalAttempts === accepted.length
+
+  // Derive formula definitions to show newElement labels in the summary
+  const maxLevel = accepted.length > 0 ? Math.max(...accepted.map((r) => r.level)) : 1
+  const allFormulas = getChainForLevel(maxLevel)
+  const formulaMap = new Map(allFormulas.map((f) => [f.level, f]))
 
   return (
     <motion.div
@@ -151,29 +157,48 @@ export const SessionComplete: React.FC<SessionCompleteProps> = ({
             color: 'var(--color-brand-primary)',
           }}
         >
-          Your chain today
+          🌱 How your chain grew
         </div>
-        {accepted.map((row) => (
-          <div
-            key={row.level}
-            className="flex items-start gap-3 px-4 py-3 border-b last:border-b-0"
-            style={{ borderColor: 'var(--color-border)' }}
-          >
-            <span
-              className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold text-white mt-0.5"
-              style={{ backgroundColor: 'var(--color-success)' }}
+        {accepted.map((row) => {
+          const formula = formulaMap.get(row.level)
+          return (
+            <div
+              key={row.level}
+              className="flex items-start gap-3 px-4 py-3 border-b last:border-b-0"
+              style={{ borderColor: 'var(--color-border)' }}
             >
-              L{row.level}
-            </span>
-            <p
-              className="text-sm flex-1"
-              style={{ color: 'var(--color-text)' }}
-              data-tts={row.sentence}
-            >
-              {row.sentence}
-            </p>
-          </div>
-        ))}
+              <div className="flex flex-col items-center gap-1 shrink-0 mt-0.5">
+                <span
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold text-white"
+                  style={{ backgroundColor: 'var(--color-success)' }}
+                >
+                  L{row.level}
+                </span>
+                {formula && (
+                  <span
+                    className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold"
+                    style={{
+                      backgroundColor: 'var(--color-success-light)',
+                      color: 'var(--color-success-dark)',
+                      border: '1px solid var(--color-success)',
+                      whiteSpace: 'nowrap',
+                    }}
+                    data-tts={`New element: ${formula.newElement}`}
+                  >
+                    {formula.newElement}
+                  </span>
+                )}
+              </div>
+              <p
+                className="text-sm flex-1"
+                style={{ color: 'var(--color-text)' }}
+                data-tts={row.sentence}
+              >
+                {row.sentence}
+              </p>
+            </div>
+          )
+        })}
       </div>
 
       {/* Done button */}
