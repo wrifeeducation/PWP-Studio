@@ -56,32 +56,23 @@ export const isParagraphUnlocked = (level: number): boolean => {
 }
 
 /**
- * Paragraph Builder unlock check — enforces ALL THREE criteria from §4.2:
+ * Paragraph Builder unlock check — Phase A model (no score gate).
  *
- * Criterion A — Structural richness:
- *   currentLevel >= PARAGRAPH_UNLOCK_LEVEL (L4+). L4 is the first formula
- *   with ≥4 elements including a qualifier, producing a sentence rich enough
- *   to extend into an LSC paragraph.
+ * Criterion A only — Structural richness:
+ *   currentLevel >= PARAGRAPH_UNLOCK_LEVEL (L4+).
  *
- * Criterion B — Formula mastery gate:
- *   gatePassed = true. The pupil has achieved the mastery gate score on their
- *   current (or most-recent) level — they can produce the structure independently.
- *
- * Criterion C — Pattern variety:
- *   levelsMasteredCount >= 2. The pupil has advanced through at least 2 formula
- *   levels, giving them a second sentence structure for LSC Support sentences.
- *
- * All three must be true for Paragraph Builder to unlock.
+ * Under Phase A (Progressive Depth), pupils auto-advance after
+ * MIN_SESSIONS_TO_ADVANCE sessions regardless of score. Criteria B
+ * (gatePassed) and C (levelsMasteredCount) are intentionally removed —
+ * the mastery gate model has been replaced. gatePassed and levelsMasteredCount
+ * are kept as parameters for backward compatibility but are ignored.
  */
 export const checkParagraphMasteryUnlock = (
   currentLevel: number,
-  gatePassed: boolean,
-  levelsMasteredCount: number
+  _gatePassed: boolean,
+  _levelsMasteredCount: number
 ): boolean => {
-  const criterionA = currentLevel >= PARAGRAPH_UNLOCK_LEVEL
-  const criterionB = gatePassed
-  const criterionC = levelsMasteredCount >= 2
-  return criterionA && criterionB && criterionC
+  return currentLevel >= PARAGRAPH_UNLOCK_LEVEL
 }
 
 /**

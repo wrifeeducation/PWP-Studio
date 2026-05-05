@@ -57,11 +57,38 @@ const queryClient = new QueryClient({
 /**
  * AuthInitialiser — sets up Supabase auth listener and populates Zustand store.
  * Renders nothing; used at root so auth is ready before routes render.
+ *
+ * BUG-001 fix: stale-while-revalidate pattern.
+ * Profile is written to localStorage on every successful fetch.
+ * On cold-start (page reload / direct URL), the cached profile is loaded
+ * immediately so ProtectedRoute never sees a null profile mid-session-check.
+ * The fresh DB fetch then updates the cache silently in the background.
  */
 
-/** Fetch a user profile, but give up after 5 s to avoid an infinite spinner. */
+const PROFILE_CACHE_KEY = 'wrife_profile_v1'
+
+function readCachedProfile(): Profile | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY)
+    return raw ? (JSON.parse(raw) as Profile) : null
+  } catch {
+    return null
+  }
+}
+
+function saveCachedProfile(profile: Profile): void {
+  try {
+    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile))
+  } catch { /* quota exceeded — silently ignore */ }
+}
+
+function clearCachedProfile(): void {
+  try { localStorage.removeItem(PROFILE_CACHE_KEY) } catch { /* ignore */ }
+}
+
+/** Fetch a user profile; give up after 8 s (extended from 5 s for slow connections). */
 async function fetchProfileWithTimeout(userId: string): Promise<Profile | null> {
-  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
+  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000))
   const fetch = Promise.resolve(
     supabase
       .from('profiles')
@@ -81,20 +108,41 @@ function AuthInitialiser() {
     // Fetch initial session on mount
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
+
       if (session?.user) {
-        const profile = await fetchProfileWithTimeout(session.user.id)
-        if (profile) setProfile(profile)
+        // ── Stale-while-revalidate ──────────────────────────────────────────
+        // 1. Immediately hydrate from cache → prevents redirect flash on reload
+        const cached = readCachedProfile()
+        if (cached) {
+          setProfile(cached)
+          setLoading(false)
+          setInitialised(true)   // unblock ProtectedRoute with cached data
+        }
+
+        // 2. Fetch fresh profile in background (or blocking if no cache)
+        const fresh = await fetchProfileWithTimeout(session.user.id)
+        if (fresh) {
+          setProfile(fresh)
+          saveCachedProfile(fresh)   // keep cache current for next reload
+        }
+
+        // 3. If there was no cache, mark ready now (first-ever visit path)
+        if (!cached) {
+          setInitialised(true)
+          setLoading(false)
+        }
       } else {
+        // No session — clear cache so stale profile doesn't survive logout
+        clearCachedProfile()
         clearAuth()
       }
-      setInitialised(true)
-      setLoading(false)
     }).catch(() => {
       // getSession itself failed — mark as initialised so the app doesn't hang
+      clearCachedProfile()
       clearAuth()
     })
 
-    // Subscribe to future auth state changes
+    // Subscribe to future auth state changes (sign-in, sign-out, token refresh)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -104,8 +152,12 @@ function AuthInitialiser() {
         // shows the spinner instead of bouncing to /login mid-fetch.
         setLoading(true)
         const profile = await fetchProfileWithTimeout(session.user.id)
-        if (profile) setProfile(profile)
+        if (profile) {
+          setProfile(profile)
+          saveCachedProfile(profile)
+        }
       } else {
+        clearCachedProfile()
         clearAuth()
       }
       setLoading(false)
