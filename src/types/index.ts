@@ -1121,6 +1121,48 @@ export interface ChainSentenceSave {
   }
 }
 
+// ─── Compound / Complex Sentence Builder types ───────────────────────────────
+
+/** Discriminates which set of conjunctions the pupil used */
+export type ConjunctionType =
+  | 'coordinating'           // and · but · or · so  (always available at CL9+)
+  | 'subordinating_basic'    // because · when · if  (teacher-enabled at L30 milestone)
+  | 'subordinating_extended' // although · since · after · before · while · unless (teacher L22+L30)
+
+/** Result from validateCompoundSentence */
+export interface CompoundValidationResult {
+  /** True = compound sentence accepted */
+  accepted: boolean
+  /** The full joined compound sentence if accepted, else null */
+  compoundSentence: string | null
+  /** Which conjunction type was used */
+  conjunctionType: ConjunctionType | null
+  /** The actual conjunction word chosen (e.g. "and", "because") — null if not parsed */
+  conjunction: string | null
+  /** Pupil-facing error message, or null if accepted */
+  errorMessage: string | null
+  /**
+   * Soft punctuation warning shown even when accepted.
+   * Hard error (not soft) when strictPunctuation = true (W4+).
+   */
+  warning: string | null
+}
+
+/** Data saved to pwp_compound_sessions on completion */
+export interface CompoundSessionSave {
+  pupil_id: string
+  class_id: string
+  session_date: string           // ISO date (YYYY-MM-DD)
+  anchor_sentence: string
+  conjunction: string
+  second_clause: string
+  conjunction_type: ConjunctionType
+  full_compound_sentence: string
+  accepted: boolean
+  attempts: number
+  xp_earned: number
+}
+
 /** Data saved to pwp_free_practice_sentences (one row per sentence) */
 export interface FreePracticeSentenceSave {
   pupil_id: string

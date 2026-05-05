@@ -21,10 +21,11 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { SubjectPicker } from '../components/chain/SubjectPicker'
 import { ChainBuilder } from '../components/chain/ChainBuilder'
+import { CompoundBuilder } from '../components/chain/CompoundBuilder'
 import { SessionComplete } from '../components/chain/SessionComplete'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
-import type { ChainRowState, ChainSessionSave } from '../types/index'
+import type { ChainRowState, ChainSessionSave, CompoundValidationResult } from '../types/index'
 
 // ─── Mastery points calculation (mirrors server-side spec) ────────────────────
 
@@ -36,7 +37,10 @@ function calculateMasteryPoints(newFormulaAttempts: number, allFirstAttempt: boo
 
 // ─── Page component ───────────────────────────────────────────────────────────
 
-type PagePhase = 'picking' | 'chaining' | 'complete'
+// CL9+ pupils get the compound builder between chaining and the complete screen
+const COMPOUND_BUILDER_MIN_LEVEL = 9
+
+type PagePhase = 'picking' | 'chaining' | 'compounding' | 'complete'
 
 const DailyPracticePage: React.FC = () => {
   const navigate = useNavigate()
@@ -46,6 +50,7 @@ const DailyPracticePage: React.FC = () => {
   const [phase, setPhase] = useState<PagePhase>('picking')
   const [subjectNoun, setSubjectNoun] = useState('')
   const [completedRows, setCompletedRows] = useState<ChainRowState[]>([])
+  const [compoundResult, setCompoundResult] = useState<CompoundValidationResult | null>(null)
   const [masterySignal, setMasterySignal] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -147,10 +152,21 @@ const DailyPracticePage: React.FC = () => {
       const newTotal = existingPoints + points
       setMasterySignal(newTotal >= 12)
 
-      setPhase('complete')
+      // CL9+ pupils extend their anchor sentence; others skip straight to complete
+      setPhase(currentLevel >= COMPOUND_BUILDER_MIN_LEVEL ? 'compounding' : 'complete')
     },
-    [levelData],
+    [levelData, currentLevel],
   )
+
+  const handleCompoundAccepted = useCallback((result: CompoundValidationResult) => {
+    setCompoundResult(result)
+    setPhase('complete')
+  }, [])
+
+  const handleCompoundSkip = useCallback(() => {
+    setCompoundResult(null)
+    setPhase('complete')
+  }, [])
 
   const handleSaveAndDone = useCallback(async () => {
     if (!pupilId || !classId) {
@@ -222,6 +238,25 @@ const DailyPracticePage: React.FC = () => {
         { onConflict: 'pupil_id,class_id' },
       )
 
+      // Save compound session (if pupil attempted / accepted)
+      const anchorSentence = completedRows[completedRows.length - 1]?.sentence ?? ''
+      if (currentLevel >= COMPOUND_BUILDER_MIN_LEVEL && anchorSentence) {
+        const { error: compoundErr } = await supabase.from('pwp_compound_sessions').insert({
+          pupil_id: pupilId,
+          class_id: classId,
+          session_date: today,
+          anchor_sentence: anchorSentence,
+          conjunction: compoundResult?.conjunction ?? '',
+          second_clause: '',
+          conjunction_type: compoundResult?.conjunctionType ?? null,
+          full_compound_sentence: compoundResult?.compoundSentence ?? '',
+          accepted: compoundResult?.accepted ?? false,
+          attempts: 0,
+          xp_earned: compoundResult?.accepted ? 5 : 0,
+        })
+        if (compoundErr) console.warn('Compound session save failed (non-fatal):', compoundErr)
+      }
+
       navigate('/dashboard')
     } catch (err) {
       console.error('Failed to save chain session:', err)
@@ -230,7 +265,7 @@ const DailyPracticePage: React.FC = () => {
     } finally {
       setSaving(false)
     }
-  }, [pupilId, classId, subjectNoun, currentLevel, completedRows, levelData, navigate])
+  }, [pupilId, classId, subjectNoun, currentLevel, completedRows, compoundResult, levelData, navigate])
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -257,7 +292,11 @@ const DailyPracticePage: React.FC = () => {
         {phase !== 'complete' && (
           <button
             type="button"
-            onClick={() => (phase === 'picking' ? navigate('/dashboard') : setPhase('picking'))}
+            onClick={() => {
+              if (phase === 'picking') navigate('/dashboard')
+              else if (phase === 'compounding') setPhase('chaining')
+              else setPhase('picking')
+            }}
             data-testid="back-btn"
             style={{
               background: 'rgba(255,255,255,0.18)',
@@ -273,7 +312,7 @@ const DailyPracticePage: React.FC = () => {
               flexShrink: 0,
             }}
           >
-            ← {phase === 'picking' ? 'Dashboard' : 'Change subject'}
+            ← {phase === 'picking' ? 'Dashboard' : phase === 'compounding' ? 'Back to chain' : 'Change subject'}
           </button>
         )}
         <div style={{ flex: 1, textAlign: 'center' }}>
@@ -308,6 +347,16 @@ const DailyPracticePage: React.FC = () => {
             subjectNoun={subjectNoun}
             currentLevel={currentLevel}
             onChainComplete={handleChainComplete}
+          />
+        )}
+
+        {phase === 'compounding' && (
+          <CompoundBuilder
+            anchorSentence={completedRows[completedRows.length - 1]?.sentence ?? ''}
+            allowedTypes={['coordinating']}
+            strictPunctuation={false}
+            onAccepted={handleCompoundAccepted}
+            onSkip={handleCompoundSkip}
           />
         )}
 
