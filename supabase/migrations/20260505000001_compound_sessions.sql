@@ -70,7 +70,7 @@ CREATE POLICY "Teachers read compound sessions for their classes"
   USING (
     EXISTS (
       SELECT 1
-      FROM public.class_memberships cm
+      FROM public.class_members cm
       JOIN public.classes c ON c.id = cm.class_id
       WHERE cm.pupil_id  = pwp_compound_sessions.pupil_id
         AND c.teacher_id = auth.uid()
@@ -78,7 +78,13 @@ CREATE POLICY "Teachers read compound sessions for their classes"
   );
 
 -- School admins: read all sessions in their school
+-- Note: WriFe Platform uses school_admins table (no is_school_admin() function)
 CREATE POLICY "School admins read all compound sessions in their school"
   ON public.pwp_compound_sessions
   FOR SELECT
-  USING (public.is_school_admin());
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.school_admins
+      WHERE user_id = auth.uid()
+    )
+  );

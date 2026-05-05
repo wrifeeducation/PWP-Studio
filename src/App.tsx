@@ -97,8 +97,16 @@ async function fetchProfileWithTimeout(userId: string): Promise<Profile | null> 
       .eq('id', userId)
       .single()
   )
-    .then(({ data, error }) => (data && !error ? (data as Profile) : null))
-    .catch(() => null)
+    .then(({ data, error }) => {
+      if (error) {
+        console.error('[AuthInitialiser] fetchProfileWithTimeout error:', error)
+      }
+      return data && !error ? (data as Profile) : null
+    })
+    .catch((err) => {
+      console.error('[AuthInitialiser] fetchProfileWithTimeout exception:', err)
+      return null
+    })
   return Promise.race([fetch, timeout])
 }
 
