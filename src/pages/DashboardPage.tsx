@@ -1202,6 +1202,28 @@ const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWa
     alignItems: 'center',
     gap: 12,
   }}>
+    {/* Back to WriFe main site */}
+    <a
+      href="https://wrife.co.uk"
+      data-tts="Back to WriFe main site"
+      aria-label="Back to wrife.co.uk"
+      style={{
+        fontSize: 11,
+        fontWeight: 700,
+        color: 'rgba(255,255,255,0.85)',
+        background: 'rgba(255,255,255,0.15)',
+        border: '1px solid rgba(255,255,255,0.35)',
+        borderRadius: 12,
+        padding: '4px 9px',
+        textDecoration: 'none',
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+        letterSpacing: '0.02em',
+      }}
+    >
+      ← WriFe
+    </a>
+
     {/* Avatar button — white circle so Writz is visible */}
     <button
       onClick={onOpenWardrobe}

@@ -1837,6 +1837,15 @@ export default function AdminPage() {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>{userEmail}</span>
+          <a
+            href="https://wrife.co.uk"
+            className="text-sm px-3 py-1.5 rounded-lg transition-opacity hover:opacity-70"
+            style={{ color: 'var(--color-brand-primary)', border: '1px solid var(--color-brand-primary)', textDecoration: 'none', fontWeight: 600 }}
+            data-tts="Back to WriFe main site"
+            aria-label="Back to wrife.co.uk"
+          >
+            ← wrife.co.uk
+          </a>
           <PrimaryBtn size="sm" variant="ghost" onClick={handleSignOut}>Sign out</PrimaryBtn>
         </div>
       </header>
