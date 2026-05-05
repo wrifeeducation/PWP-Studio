@@ -259,13 +259,13 @@ const DailyPracticePage: React.FC = () => {
       }
 
       // Save compound session (if pupil attempted / accepted)
-      const anchorSentence = completedRows[completedRows.length - 1]?.sentence ?? ''
-      if (currentLevel >= COMPOUND_BUILDER_MIN_LEVEL && anchorSentence) {
+      const lastSentence = completedRows[completedRows.length - 1]?.sentence ?? ''
+      if (currentLevel >= COMPOUND_BUILDER_MIN_LEVEL && lastSentence) {
         const { error: compoundErr } = await supabase.from('pwp_compound_sessions').insert({
           pupil_id: pupilId,
           class_id: classId,
           session_date: today,
-          anchor_sentence: anchorSentence,
+          anchor_sentence: lastSentence,
           conjunction: compoundResult?.conjunction ?? '',
           second_clause: '',
           conjunction_type: compoundResult?.conjunctionType ?? null,
@@ -277,11 +277,13 @@ const DailyPracticePage: React.FC = () => {
         if (compoundErr) console.warn('Compound session save failed (non-fatal):', compoundErr)
       }
 
-      navigate('/dashboard')
+      // Navigate to Connect Grid with the anchor sentence
+      navigate('/connect-grid', { state: { anchorSentence: lastSentence, classId } })
     } catch (err) {
       console.error('Failed to save chain session:', err)
-      // Navigate anyway — don't strand the pupil
-      navigate('/dashboard')
+      // Navigate to Connect Grid anyway — don't strand the pupil
+      const lastSentenceFallback = completedRows[completedRows.length - 1]?.sentence ?? ''
+      navigate('/connect-grid', { state: { anchorSentence: lastSentenceFallback, classId } })
     } finally {
       setSaving(false)
     }

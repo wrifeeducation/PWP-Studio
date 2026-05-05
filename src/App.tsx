@@ -25,6 +25,7 @@ import FormulaPage from './pages/FormulaPage'
 import ParagraphPage from './pages/ParagraphPage'
 import DailyPracticePage from './pages/DailyPracticePage'
 import FreePracticePage from './pages/FreePracticePage'
+import ConnectGridPage from './pages/ConnectGridPage'
 
 // WF-040: Heavy pages — lazy loaded to reduce initial bundle
 const WritingStudioPage = lazy(() => import('./pages/WritingStudioPage'))
@@ -239,6 +240,16 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={[Role.PUPIL]}>
                   <DailyPracticePage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Connect Grid Planner — between chain and paragraph */}
+            <Route
+              path="/connect-grid"
+              element={
+                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
+                  <ConnectGridPage />
                 </ProtectedRoute>
               }
             />

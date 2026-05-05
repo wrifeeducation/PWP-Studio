@@ -1163,6 +1163,104 @@ export interface CompoundSessionSave {
   xp_earned: number
 }
 
+// ─── Connect Grid types ───────────────────────────────────────────────────────
+
+/**
+ * The five story-stage rows the Connect Grid always has.
+ * The *labels* shown in col 1 change per genre; the *stageIndex* is fixed.
+ */
+export type GridStageIndex = 0 | 1 | 2 | 3 | 4
+
+/** Per-row state inside the Connect Grid */
+export interface GridRowState {
+  stageIndex: GridStageIndex
+  /** Col 1: structural label + topic sentence — anchor sentence pre-fills the chosen row */
+  col1: string
+  /** Col 2: theme / Mc plot thread — teacher-provided at W1–W4, pupil-written at W5–W6 */
+  col2: string
+  /** Col 3: events / facts / details — partly pre-filled at W1–W4, blank at W5–W6 */
+  col3: string
+  /** Whether this row has been marked ready (pupil taps "Done" on the row) */
+  ready: boolean
+  /** The row that holds the locked anchor sentence (only one per session) */
+  isAnchorRow: boolean
+}
+
+/** Full grid session state */
+export interface GridSessionState {
+  genre: Genre
+  /** W-level for this session (1–6). Defaults to 2 if class has no override. */
+  wLevel: 1 | 2 | 3 | 4 | 5 | 6
+  /** The anchor sentence carried in from the formula chain */
+  anchorSentence: string
+  rows: GridRowState[]
+}
+
+/** Row-label sets by genre — 5 entries per genre, indexed 0–4 */
+export const GRID_ROW_LABELS: Record<Genre, readonly [string, string, string, string, string]> = {
+  [Genre.NARRATIVE]: [
+    'Opening – Introduction',
+    'Build-up – Main body',
+    'Climax – Main body',
+    'Resolution – Main body',
+    'Ending – Conclusion',
+  ],
+  [Genre.NON_FICTION]: [
+    'Introduction',
+    'Key fact 1',
+    'Key fact 2',
+    'Example or counter-point',
+    'Conclusion',
+  ],
+  [Genre.PERSUASIVE]: [
+    'Hook / Opening claim',
+    'Argument 1',
+    'Argument 2',
+    'Counter-argument / Concession',
+    'Call to action',
+  ],
+  [Genre.POETRY]: [
+    'Opening image',
+    'Development / Elaboration',
+    'Turn / Volta',
+    'Resolution / Reflection',
+    'Closing image / Coda',
+  ],
+} as const
+
+/** Number of active rows per W-level (spec §5.4) */
+export const GRID_ROW_COUNT_BY_W_LEVEL: Record<number, number> = {
+  1: 1,
+  2: 1,
+  3: 2,
+  4: 3,
+  5: 5,
+  6: 5,
+}
+
+/** Data saved to grid_sessions on completion */
+export interface GridSessionSave {
+  pupil_id: string
+  class_id: string | null         // null for home learners
+  session_date: string            // ISO date YYYY-MM-DD
+  anchor_sentence: string
+  genre: Genre
+  w_level: number
+  rows: GridRowState[]            // stored as JSONB
+  xp_earned: number
+}
+
+/** Teacher-configured Column 2 content (stored in grid_templates) */
+export interface GridTemplate {
+  id: string
+  class_id: string | null         // null = global default
+  genre: Genre
+  w_level: number
+  /** 5-element array — one Col 2 string per stage */
+  col2_defaults: [string, string, string, string, string]
+  col3_hints: [string, string, string, string, string]
+}
+
 /** Data saved to pwp_free_practice_sentences (one row per sentence) */
 export interface FreePracticeSentenceSave {
   pupil_id: string
