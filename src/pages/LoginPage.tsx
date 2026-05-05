@@ -86,11 +86,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [firstName, setFirstName] = useState('')
 
-  // Pupil fields
+  // Pupil fields — school mode
   const [classCode, setClassCode] = useState('')
   const [pupilUsername, setPupilUsername] = useState('')
   const [pin, setPin] = useState('')
   const [loginAvatar] = useState<AvatarVariantId>('wizard')
+  // Pupil fields — home learner mode
+  const [pupilMode, setPupilMode] = useState<'school' | 'home'>('school')
+  const [homeCode, setHomeCode] = useState('')
 
   const [errors, setErrors] = useState<FormErrors>({})
   const [isLoading, setIsLoading] = useState(false)
@@ -255,6 +258,33 @@ export default function LoginPage() {
       }
 
       navigate('/dashboard', { replace: true })
+    } catch {
+      setErrors({ general: 'An unexpected error occurred. Please try again.' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // ── Home learner handler ──────────────────────────────────────────────────
+
+  const handleHomeLearnerLogin = async (e: FormEvent) => {
+    e.preventDefault()
+    clearErrors()
+    if (!homeCode || homeCode.length !== 6) {
+      setErrors({ pin: 'Home code must be 6 digits' })
+      return
+    }
+    setIsLoading(true)
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: `home-${homeCode}@wrife.school`,
+        password: homeCode,
+      })
+      if (error) {
+        setErrors({ general: 'Incorrect home code. Ask your parent to check the code in their WriFe account.' })
+        return
+      }
+      if (data.user) navigate('/dashboard', { replace: true })
     } catch {
       setErrors({ general: 'An unexpected error occurred. Please try again.' })
     } finally {
@@ -825,41 +855,59 @@ export default function LoginPage() {
                 {/* ══════════════════════════════════════════════════════════ */}
                 {loginMode === 'pupil' && (
                   <>
-                    <div className="text-center mb-6">
+                    <div className="text-center mb-5">
                       <motion.div
                         initial={{ scale: 0, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         transition={{ type: 'spring', stiffness: 280, damping: 18 }}
-                        className="flex justify-center mb-4"
+                        className="flex justify-center mb-3"
                       >
                         <div
                           style={{
                             background: '#EDE7F6',
                             border: '3px solid #6C5CE7',
                             borderRadius: '50%',
-                            width: 90, height: 90,
+                            width: 80, height: 80,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                           }}
                           aria-hidden="true"
                         >
-                          <WritzAvatar variant={loginAvatar} size={66} animated />
+                          <WritzAvatar variant={loginAvatar} size={60} animated />
                         </div>
                       </motion.div>
 
                       <h2
                         className="text-xl font-bold mb-1"
                         style={{ color: 'var(--color-text)' }}
-                        data-tts="Log in to your classroom"
+                        data-tts="Log in"
                       >
                         Hey there! Log In
                       </h2>
-                      <p
-                        className="text-sm"
-                        style={{ color: 'var(--color-text-muted)' }}
-                        data-tts="Use the details your teacher gave you"
-                      >
-                        Use the details your teacher gave you
-                      </p>
+                    </div>
+
+                    {/* School / Home toggle */}
+                    <div
+                      className="flex gap-1 p-1 rounded-xl mb-5"
+                      style={{ backgroundColor: 'var(--color-background)' }}
+                      role="group"
+                      aria-label="Choose how you practise"
+                    >
+                      {(['school', 'home'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => { setPupilMode(mode); clearErrors() }}
+                          className="flex-1 py-2 rounded-lg text-xs font-semibold transition-all"
+                          style={{
+                            backgroundColor: pupilMode === mode ? '#F5A623' : 'transparent',
+                            color: pupilMode === mode ? '#fff' : 'var(--color-text-muted)',
+                          }}
+                          data-testid={`pupil-mode-${mode}`}
+                          data-tts={mode === 'school' ? 'School pupil' : 'Home learner'}
+                        >
+                          {mode === 'school' ? '🏫 School' : '🏠 Home learner'}
+                        </button>
+                      ))}
                     </div>
 
                     {errors.general && (
@@ -873,6 +921,67 @@ export default function LoginPage() {
                       </div>
                     )}
 
+                    {/* ── Home learner form ── */}
+                    {pupilMode === 'home' && (
+                      <form onSubmit={handleHomeLearnerLogin} className="space-y-4" data-testid="home-learner-form" noValidate>
+                        <div>
+                          <label
+                            htmlFor="homeCode"
+                            className="block text-sm font-medium mb-1"
+                            style={{ color: 'var(--color-text)' }}
+                            data-tts="Home code — six digits"
+                          >
+                            Home Code
+                          </label>
+                          <input
+                            id="homeCode"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={6}
+                            value={homeCode}
+                            onChange={(e) => setHomeCode(e.target.value.replace(/\D/g, ''))}
+                            placeholder="0 0 0 0 0 0"
+                            className="w-full text-center text-3xl font-bold px-4 py-4 rounded-xl outline-none transition-all"
+                            style={{
+                              backgroundColor: 'var(--color-background)',
+                              border: `2px solid ${errors.pin ? 'var(--color-verb)' : 'var(--color-brand-primary)'}`,
+                              color: 'var(--color-text)',
+                              letterSpacing: '0.4em',
+                            }}
+                            onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--color-brand-secondary)')}
+                            onBlur={(e) => (e.currentTarget.style.borderColor = errors.pin ? 'var(--color-verb)' : 'var(--color-brand-primary)')}
+                            data-testid="input-home-code"
+                            aria-describedby={errors.pin ? 'home-code-error' : 'home-code-hint'}
+                            aria-invalid={!!errors.pin}
+                            data-tts="Home code field"
+                          />
+                          {errors.pin ? (
+                            <p id="home-code-error" className="mt-1 text-xs text-center" style={{ color: 'var(--color-verb)' }} data-tts={errors.pin}>
+                              {errors.pin}
+                            </p>
+                          ) : (
+                            <p id="home-code-hint" className="mt-1 text-xs text-center" style={{ color: 'var(--color-text-muted)' }}>
+                              Your parent can find this code in their WriFe account
+                            </p>
+                          )}
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={isLoading || homeCode.length < 6}
+                          className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-60"
+                          style={{ backgroundColor: 'var(--color-brand-secondary)' }}
+                          data-testid="submit-home-code"
+                          data-tts="Log in with home code"
+                        >
+                          {isLoading ? 'Checking…' : 'Log In →'}
+                        </button>
+                      </form>
+                    )}
+
+                    {/* ── School pupil form ── */}
+                    {pupilMode === 'school' && (
                     <form onSubmit={handlePupilPinLogin} className="space-y-4" data-testid="pupil-form" noValidate>
                       {/* Class Code */}
                       <div>
@@ -987,6 +1096,7 @@ export default function LoginPage() {
                         {isLoading ? 'Checking…' : 'Enter Classroom'}
                       </button>
                     </form>
+                    )}
                   </>
                 )}
 

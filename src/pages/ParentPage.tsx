@@ -437,6 +437,34 @@ function PupilProgressPanel({ pupil, isPro }: { pupil: LinkedPupil; isPro: boole
   )
 }
 
+// ── Copy-PIN button ───────────────────────────────────────────────────────────
+
+function CopyPinButton({ pin }: { pin: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(pin)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // clipboard not available on this device
+    }
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="w-full py-3 rounded-full text-sm font-semibold transition-opacity hover:opacity-90"
+      style={{ backgroundColor: '#6C5CE7', color: '#fff' }}
+      data-testid="copy-pin-btn"
+      data-tts="Copy home code"
+    >
+      {copied ? '✓ Copied!' : '📋 Copy home code'}
+    </button>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ParentPage() {
@@ -446,8 +474,26 @@ export default function ParentPage() {
   const [loading, setLoading] = useState(true)
   const [portalLoading, setPortalLoading] = useState(false)
   const [setupPending, setSetupPending] = useState(false)
+  // PIN reveal modal — shown after a new home pupil is created
+  const [newChildPin, setNewChildPin] = useState<{ name: string; pin: string } | null>(null)
 
   const isPro = profile?.membership_tier === 'pro'
+
+  // Recover PIN that was saved to sessionStorage before the reload triggered after
+  // child-profile creation (window.location.reload() destroys React state).
+  useEffect(() => {
+    const pinRaw = sessionStorage.getItem('wrife_new_child_pin')
+    if (pinRaw) {
+      try {
+        const pinData = JSON.parse(pinRaw) as { name: string; pin: string }
+        setNewChildPin(pinData)
+      } catch {
+        // malformed data, ignore
+      } finally {
+        sessionStorage.removeItem('wrife_new_child_pin')
+      }
+    }
+  }, []) // run once on mount only
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -485,8 +531,16 @@ export default function ParentPage() {
           if (error) {
             console.error('ParentPage: create-child-profile error', error)
           } else {
-            console.log('ParentPage: child profile created', data)
-            // Reload so the new child appears in the dashboard
+            // Persist PIN to sessionStorage BEFORE the reload so it survives.
+            // The mount useEffect reads it back and shows the reveal modal.
+            const result = data as { pin: string; first_name: string }
+            if (result?.pin) {
+              sessionStorage.setItem(
+                'wrife_new_child_pin',
+                JSON.stringify({ name: result.first_name ?? pending.nickname, pin: result.pin }),
+              )
+            }
+            // Reload to refresh the linked pupils list
             window.location.reload()
           }
         } catch {
@@ -719,6 +773,81 @@ export default function ParentPage() {
           ))
         )}
       </main>
+
+      {/* ── PIN reveal modal ── */}
+      <AnimatePresence>
+        {newChildPin && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+            data-testid="pin-reveal-overlay"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 16 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 16 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+              className="rounded-2xl p-6 w-full max-w-sm"
+              style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+              data-testid="pin-reveal-modal"
+            >
+              <div className="text-center">
+                <div className="text-4xl mb-3" aria-hidden="true">🎉</div>
+
+                <h2
+                  className="text-lg font-bold mb-1"
+                  style={{ color: 'var(--color-text)' }}
+                  data-tts={`${newChildPin.name}'s account is ready`}
+                >
+                  {newChildPin.name}'s account is ready!
+                </h2>
+                <p className="text-sm mb-5" style={{ color: 'var(--color-text-muted)' }}>
+                  Share this home code with {newChildPin.name} so they can log in.
+                </p>
+
+                {/* PIN display */}
+                <div
+                  className="rounded-xl px-6 py-4 mb-2"
+                  style={{ backgroundColor: '#EDE7F6' }}
+                >
+                  <p
+                    className="text-xs font-semibold uppercase tracking-widest mb-1"
+                    style={{ color: '#6D28D9' }}
+                  >
+                    Home Code
+                  </p>
+                  <p
+                    className="text-4xl font-bold"
+                    style={{ color: '#4C1D95', fontFamily: 'monospace', letterSpacing: '0.3em' }}
+                    data-tts={`Home code: ${newChildPin.pin}`}
+                  >
+                    {newChildPin.pin}
+                  </p>
+                </div>
+
+                <p className="text-xs mb-5" style={{ color: 'var(--color-text-muted)' }}>
+                  Save this somewhere safe — it won't be shown again.
+                </p>
+
+                <CopyPinButton pin={newChildPin.pin} />
+
+                <button
+                  onClick={() => setNewChildPin(null)}
+                  className="mt-3 w-full py-3 rounded-full text-sm font-semibold transition-opacity hover:opacity-80"
+                  style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-text)' }}
+                  data-testid="pin-modal-dismiss"
+                  data-tts="Got it, I have saved the code"
+                >
+                  Got it — I've saved the code
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

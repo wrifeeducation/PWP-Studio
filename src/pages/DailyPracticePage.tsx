@@ -79,17 +79,17 @@ const DailyPracticePage: React.FC = () => {
   const { data: levelData } = useQuery({
     queryKey: ['pwp_pupil_level', pupilId, classId],
     queryFn: async () => {
-      if (!pupilId || !classId) return null
-      const { data, error } = await supabase
+      if (!pupilId) return null
+      // Home learners have no classId — filter by IS NULL; school pupils filter by the specific class.
+      const q = supabase
         .from('pwp_pupil_levels')
         .select('current_level, mastery_points')
         .eq('pupil_id', pupilId)
-        .eq('class_id', classId)
-        .maybeSingle()
+      const { data, error } = await (classId ? q.eq('class_id', classId) : q.is('class_id', null)).maybeSingle()
       if (error) throw error
       return data
     },
-    enabled: !!pupilId && !!classId,
+    enabled: !!pupilId, // home learners have no classId — enable as soon as we have pupilId
   })
 
   // ── Fetch streak ─────────────────────────────────────────────────────────────
@@ -169,10 +169,11 @@ const DailyPracticePage: React.FC = () => {
   }, [])
 
   const handleSaveAndDone = useCallback(async () => {
-    if (!pupilId || !classId) {
+    if (!pupilId) {
       navigate('/dashboard')
       return
     }
+    // classId is null for home learners — this is allowed throughout
 
     setSaving(true)
     try {
@@ -224,19 +225,38 @@ const DailyPracticePage: React.FC = () => {
         if (sentErr) throw sentErr
       }
 
-      // Upsert pupil level + mastery points
+      // Upsert pupil level + mastery points.
+      // School pupils: use onConflict so the partial index (pupil_id, class_id WHERE class_id IS NOT NULL) handles it.
+      // Home learners (classId=null): Postgres onConflict can't match NULL columns, so we SELECT then UPDATE/INSERT.
       const newMasteryTotal = Math.min((levelData?.mastery_points ?? 0) + masteryPoints, 99)
-      await supabase.from('pwp_pupil_levels').upsert(
-        {
-          pupil_id: pupilId,
-          class_id: classId,
-          current_level: currentLevel,
-          mastery_points: newMasteryTotal,
-          mastery_signal: newMasteryTotal >= 12,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'pupil_id,class_id' },
-      )
+      const levelPayload = {
+        current_level: currentLevel,
+        mastery_points: newMasteryTotal,
+        mastery_signal: newMasteryTotal >= 12,
+        updated_at: new Date().toISOString(),
+      }
+
+      if (classId) {
+        // School pupil
+        await supabase.from('pwp_pupil_levels').upsert(
+          { pupil_id: pupilId, class_id: classId, ...levelPayload },
+          { onConflict: 'pupil_id,class_id' },
+        )
+      } else {
+        // Home learner — manual upsert because NULL conflicts don't work with onConflict
+        const { data: existing } = await supabase
+          .from('pwp_pupil_levels')
+          .select('id')
+          .eq('pupil_id', pupilId)
+          .is('class_id', null)
+          .maybeSingle()
+
+        if (existing) {
+          await supabase.from('pwp_pupil_levels').update(levelPayload).eq('id', existing.id)
+        } else {
+          await supabase.from('pwp_pupil_levels').insert({ pupil_id: pupilId, class_id: null, ...levelPayload })
+        }
+      }
 
       // Save compound session (if pupil attempted / accepted)
       const anchorSentence = completedRows[completedRows.length - 1]?.sentence ?? ''
