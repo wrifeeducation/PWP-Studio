@@ -208,19 +208,22 @@ export default function ParagraphPage() {
   const queryClient = useQueryClient()
   const { user, profile } = useAuthStore()
 
-  // Props passed from FormulaPage via router state
+  // Props passed from FormulaPage or ConnectGridPage via router state
   const state = location.state as {
     leadSentence?: string
     levelId?: number
     formulaScore?: number
     phase?: Phase
     genreRotation?: Genre[]
+    gridSession?: { anchorSentence?: string; genre?: string }
   } | null
 
   const levelId = state?.levelId ?? 8
   const formulaScore = state?.formulaScore ?? 0
   const phase: Phase = state?.phase ?? Phase.A
-  const leadSentence = state?.leadSentence ?? ''
+  // Accept anchor sentence from ConnectGridPage (gridSession.anchorSentence) or
+  // the direct leadSentence prop passed from FormulaPage
+  const leadSentence = state?.leadSentence ?? state?.gridSession?.anchorSentence ?? ''
 
   // Phase 4: fetch genre progress from hook
   const { data: paragraphProgress } = useParagraphProgress(user?.id)
