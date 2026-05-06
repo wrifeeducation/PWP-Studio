@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { supabase } from '../lib/supabase'
 import { WrifeEditor } from '../components/writing-studio/WrifeEditor'
@@ -18,6 +18,7 @@ import { assessWriting } from '../lib/assessWriting'
 import type { AssessWritingOutput } from '../lib/assessWriting'
 import { calcWritingXP } from '../lib/xpEngine'
 import { Genre, WritingDimension } from '../types/index'
+import type { GridSessionState } from '../types/index'
 import { sanitizeText } from '../lib/sanitize'
 import { SessionExpiryBanner } from '../components/ui/SessionExpiryBanner'
 // WF-050: Writing Studio is now open to all tiers — stars model gates free users via mistake cost
@@ -62,15 +63,22 @@ function pickTask(genre: Genre, yearGroup: number): LocalWritingTask | null {
 
 export default function WritingStudioPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { profile } = useAuthStore()
   // WF-050: No tier gate here — all pupils can access Writing Studio
+
+  // Grid session passed from ParagraphPage completion (via DailyPractice → ConnectGrid → Paragraph → Studio flow)
+  const locationState = location.state as { gridSession?: GridSessionState } | null
+  const gridSession: GridSessionState | null = locationState?.gridSession ?? null
 
   // Guard: check studio unlocked
   const [studioChecked, setStudioChecked] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
 
-  // Genre & task
-  const [genre, setGenre] = useState<Genre>(Genre.NARRATIVE)
+  // Genre & task — pre-seeded from grid session if present
+  const [genre, setGenre] = useState<Genre>(
+    (gridSession?.genre ?? Genre.NARRATIVE) as Genre
+  )
   const [task, setTask] = useState<LocalWritingTask | null>(null)
   const [planOpen, setPlanOpen] = useState(false)
   const [planData, setPlanData] = useState<PlanData>({})
@@ -150,9 +158,15 @@ export default function WritingStudioPage() {
     setPlanData({})
   }
 
+  // Effective prompt — from assigned task, or derived from the grid session context
+  const effectivePromptText = task?.prompt_text ??
+    (gridSession
+      ? `Write a ${GENRE_LABELS[genre].toLowerCase()} piece. Your opening sentence: "${gridSession.anchorSentence}"`
+      : '')
+
   // Save draft
   const handleSaveDraft = async () => {
-    if (!profile || !task) return
+    if (!profile || (!task && !gridSession)) return
     setSaving(true)
     try {
       if (pieceId) {
@@ -171,7 +185,7 @@ export default function WritingStudioPage() {
           .insert({
             pupil_id: profile.id,
             genre,
-            task_prompt_text: task.prompt_text,
+            task_prompt_text: effectivePromptText,
             full_text: sanitizeText(plainText),
             word_count: wordCount,
             plan_data: planData,
@@ -190,7 +204,7 @@ export default function WritingStudioPage() {
 
   // Submit for assessment
   const handleSubmit = async () => {
-    if (!profile || !task) return
+    if (!profile || (!task && !gridSession)) return
     setAssessing(true)
     try {
       // Ensure we have a piece ID
@@ -201,7 +215,7 @@ export default function WritingStudioPage() {
           .insert({
             pupil_id: profile.id,
             genre,
-            task_prompt_text: task.prompt_text,
+            task_prompt_text: effectivePromptText,
             full_text: sanitizeText(plainText),
             word_count: wordCount,
             plan_data: planData,
@@ -220,7 +234,7 @@ export default function WritingStudioPage() {
         piece_id: currentPieceId,
         genre,
         year_group: profile.year_group ?? 4,
-        task_prompt_text: task.prompt_text,
+        task_prompt_text: effectivePromptText,
         full_text: sanitizeText(plainText),
         word_count: wordCount,
         plan_submitted: Object.keys(planData).some((k) => !!planData[k]),
@@ -373,6 +387,33 @@ export default function WritingStudioPage() {
           className="w-full lg:w-80 flex-shrink-0 p-4 space-y-4"
           style={{ borderRight: '1px solid var(--color-border)' }}
         >
+          {/* Grid session context banner — shown when arriving from Connect Grid flow */}
+          {gridSession && (
+            <section
+              className="rounded-xl p-3"
+              style={{ backgroundColor: '#EDE7F6', border: '1.5px solid #C4B5FD' }}
+              data-tts="Your writing context from the Connect Grid"
+            >
+              <p className="text-xs font-bold uppercase tracking-wide mb-1" style={{ color: '#6D28D9' }}>
+                ⚓ Your opening sentence
+              </p>
+              <p className="text-sm font-medium italic" style={{ color: '#4C1D95' }}>
+                "{gridSession.anchorSentence}"
+              </p>
+              {gridSession.rows.some((r) => r.col2) && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs font-semibold" style={{ color: '#6D28D9' }}>Your plan:</p>
+                  {gridSession.rows.filter((r) => r.col2 || r.col3).map((r, i) => (
+                    <div key={i} className="text-xs" style={{ color: '#5B21B6' }}>
+                      <span className="font-medium">{r.col1}:</span>{' '}
+                      {[r.col2, r.col3].filter(Boolean).join(' · ')}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           {/* Genre selector */}
           <section>
             <h2
@@ -382,24 +423,38 @@ export default function WritingStudioPage() {
             >
               Genre
             </h2>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.values(Genre).map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => handleGenreChange(g)}
-                  data-testid={`genre-${g}`}
-                  className="py-2 px-3 rounded-lg text-sm font-medium transition-colors"
-                  style={{
-                    backgroundColor: genre === g ? 'var(--color-brand-primary)' : 'var(--color-surface)',
-                    color: genre === g ? '#fff' : 'var(--color-text)',
-                    border: genre === g ? 'none' : '1px solid var(--color-border)',
-                  }}
-                >
-                  {GENRE_LABELS[g]}
-                </button>
-              ))}
-            </div>
+            {gridSession ? (
+              // Locked to the genre from the Connect Grid session
+              <div
+                className="py-2 px-3 rounded-lg text-sm font-medium text-center"
+                style={{
+                  backgroundColor: 'var(--color-brand-primary)',
+                  color: '#fff',
+                }}
+                data-tts={`Genre locked to ${GENRE_LABELS[genre]}`}
+              >
+                {GENRE_LABELS[genre]}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {Object.values(Genre).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => handleGenreChange(g)}
+                    data-testid={`genre-${g}`}
+                    className="py-2 px-3 rounded-lg text-sm font-medium transition-colors"
+                    style={{
+                      backgroundColor: genre === g ? 'var(--color-brand-primary)' : 'var(--color-surface)',
+                      color: genre === g ? '#fff' : 'var(--color-text)',
+                      border: genre === g ? 'none' : '1px solid var(--color-border)',
+                    }}
+                  >
+                    {GENRE_LABELS[g]}
+                  </button>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* Task prompt */}
@@ -475,6 +530,28 @@ export default function WritingStudioPage() {
                   ))}
                 </ul>
               )}
+            </section>
+          )}
+
+          {/* Word count progress — shown when no task card (grid session flow) */}
+          {!task && gridSession && (
+            <section
+              className="rounded-xl p-4"
+              style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+            >
+              <div className="flex justify-between text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                <span data-tts={`Target: ${minWords} words minimum`}>Target: {minWords}+ words</span>
+                <span>{wordCount} written</span>
+              </div>
+              <div className="h-1.5 rounded-full" style={{ backgroundColor: 'var(--color-border)' }}>
+                <div
+                  className="h-1.5 rounded-full transition-all"
+                  style={{
+                    width: `${progress}%`,
+                    backgroundColor: progress >= 100 ? '#16A34A' : 'var(--color-brand-primary)',
+                  }}
+                />
+              </div>
             </section>
           )}
 

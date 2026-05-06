@@ -53,6 +53,8 @@ export const useFormulaLevel = (overrideLevelId?: number) => {
   const pupilId = user?.id ?? null
 
   // Step 1: always fetch pupil_progress (needed for XP, streak, and progression)
+  // Uses maybeSingle so home learners (who have no pre-created row) don't error out.
+  // If the row is missing it is auto-provisioned with safe defaults on first visit.
   const progressQuery = useQuery({
     queryKey: ['formula_progress', pupilId],
     queryFn: async (): Promise<PupilProgress> => {
@@ -61,9 +63,20 @@ export const useFormulaLevel = (overrideLevelId?: number) => {
         .from('formula_progress')
         .select('*')
         .eq('pupil_id', pupilId)
-        .single()
+        .maybeSingle()
       if (error) throw error
-      return data as PupilProgress
+
+      if (data) return data as PupilProgress
+
+      // No row yet — auto-provision for home learners (school pupils get their row
+      // created by a server-side trigger or the onboarding flow)
+      const { data: inserted, error: insertError } = await supabase
+        .from('formula_progress')
+        .insert({ pupil_id: pupilId })
+        .select('*')
+        .single()
+      if (insertError) throw insertError
+      return inserted as PupilProgress
     },
     enabled: !!pupilId,
     staleTime: 1000 * 60 * 5,

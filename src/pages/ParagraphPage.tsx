@@ -18,6 +18,7 @@ import type { RawParagraphAssessment } from '../lib/assessParagraph'
 import { ParagraphFrame } from '../components/paragraph/ParagraphFrame'
 import { ParagraphFeedback } from '../components/paragraph/ParagraphFeedback'
 import { Genre, Phase, TeacherNotificationType, MasteryEventType } from '../types/index'
+import type { GridSessionState } from '../types/index'
 import paragraphStartersJson from '../../content/paragraph-starters.json'
 import { sanitizeText } from '../lib/sanitize'
 import { supabase } from '../lib/supabase'
@@ -215,7 +216,7 @@ export default function ParagraphPage() {
     formulaScore?: number
     phase?: Phase
     genreRotation?: Genre[]
-    gridSession?: { anchorSentence?: string; genre?: string }
+    gridSession?: GridSessionState
   } | null
 
   const levelId = state?.levelId ?? 8
@@ -224,6 +225,8 @@ export default function ParagraphPage() {
   // Accept anchor sentence from ConnectGridPage (gridSession.anchorSentence) or
   // the direct leadSentence prop passed from FormulaPage
   const leadSentence = state?.leadSentence ?? state?.gridSession?.anchorSentence ?? ''
+  // Full grid session — forwarded to Writing Studio on completion if studio is unlocked
+  const gridSession: GridSessionState | null = state?.gridSession ?? null
 
   // Phase 4: fetch genre progress from hook
   const { data: paragraphProgress } = useParagraphProgress(user?.id)
@@ -245,6 +248,7 @@ export default function ParagraphPage() {
   const [xpEarned, setXpEarned] = useState(0)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [genreJustMastered, setGenreJustMastered] = useState<Genre | null>(null)
+  const [studioUnlocked, setStudioUnlocked] = useState(false)
 
   const yearGroup = profile?.year_group ?? 4
   const starters = getStarters(selectedGenre, phase)
@@ -307,7 +311,9 @@ export default function ParagraphPage() {
         const alreadySuggested = !!progressSnap?.writing_studio_suggested_at
         const alreadyUnlocked = !!progressSnap?.writing_studio_unlocked
 
-        if (!alreadySuggested && !alreadyUnlocked) {
+        if (alreadyUnlocked) {
+          setStudioUnlocked(true)
+        } else if (!alreadySuggested) {
           const readiness = await checkWritingStudioReadiness(user.id)
           if (readiness.ready) {
             await triggerWritingStudioSuggestion(user.id, readiness.evidence)
@@ -588,7 +594,14 @@ export default function ParagraphPage() {
               compositeScore={compositeScore}
               xpEarned={xpEarned}
               onRetry={handleRetry}
-              onContinue={() => navigate('/dashboard')}
+              onContinue={() => {
+                // If studio is unlocked and we have a grid session, flow straight into Writing Studio
+                if (studioUnlocked && gridSession) {
+                  navigate('/studio', { state: { gridSession } })
+                } else {
+                  navigate('/dashboard')
+                }
+              }}
             />
           </>
         )}

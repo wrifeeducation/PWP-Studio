@@ -130,19 +130,21 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── 5. Create profile row ─────────────────────────────────────────────────
-    // The handle_new_user trigger may also fire — upsert with ignoreDuplicates
-    // so we don't lose the fields we explicitly set here.
+    // The handle_new_user trigger fires on auth.admin.createUser and inserts a
+    // minimal profile (id, email, role, display_name). We UPDATE to add the
+    // fields the trigger doesn't know about. Using UPDATE avoids the NOT NULL
+    // email constraint problem that upsert INSERT would hit.
     const { error: profileInsertError } = await supabaseAdmin
       .from('profiles')
-      .upsert({
-        id: newUserId,
+      .update({
         role: 'pupil',
         first_name: nickname,
         year_group,
         pin_code: pin,
         is_active: true,
         membership_tier: 'free',
-      }, { onConflict: 'id', ignoreDuplicates: false })  // false so we overwrite trigger defaults
+      })
+      .eq('id', newUserId)
 
     if (profileInsertError) {
       console.error('create-child-profile: profile insert error', profileInsertError.message)

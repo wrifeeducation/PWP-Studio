@@ -903,6 +903,8 @@ interface ClassRow {
   teacher_id: string | null
   school_id: string
   created_at: string
+  w_level: number
+  active_genre: string
 }
 
 interface PupilRow {
@@ -926,6 +928,9 @@ function MyClassesTab() {
   const [addingPupil, setAddingPupil] = useState<string | null>(null)
   const [removingPupil, setRemovingPupil] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Programme settings
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [settingsFlash, setSettingsFlash] = useState<string | null>(null)
 
   useEffect(() => {
     if (!profile?.school_id) return
@@ -990,6 +995,24 @@ function MyClassesTab() {
     setRemovingPupil(null)
   }
 
+  const handleSaveSettings = async (wLevel: number, activeGenre: string) => {
+    if (!selectedClass) return
+    setSettingsSaving(true)
+    const { error: err } = await supabase
+      .from('classes')
+      .update({ w_level: wLevel, active_genre: activeGenre })
+      .eq('id', selectedClass.id)
+    setSettingsSaving(false)
+    if (err) {
+      setSettingsFlash('Save failed — try again.')
+    } else {
+      setSelectedClass((c) => c ? { ...c, w_level: wLevel, active_genre: activeGenre } : c)
+      setClasses((prev) => prev.map((c) => c.id === selectedClass.id ? { ...c, w_level: wLevel, active_genre: activeGenre } : c))
+      setSettingsFlash('Settings saved!')
+    }
+    setTimeout(() => setSettingsFlash(null), 2500)
+  }
+
   if (loading) return <LoadingSpinner />
 
   // ── Class detail view ──────────────────────────────────────────────────────
@@ -1012,6 +1035,15 @@ function MyClassesTab() {
             {selectedClass.academic_year}
           </span>
         </div>
+
+        {/* Programme settings panel */}
+        <ProgrammeSettingsPanel
+          wLevel={selectedClass.w_level ?? 2}
+          activeGenre={selectedClass.active_genre ?? 'narrative'}
+          saving={settingsSaving}
+          flash={settingsFlash}
+          onSave={handleSaveSettings}
+        />
 
         {loadingPupils ? <LoadingSpinner /> : (
           <div className="grid gap-6 md:grid-cols-2">
@@ -1815,6 +1847,133 @@ function NotificationsTab({ teacherId, onActionTaken }: NotificationsTabProps) {
           <p className="text-lg">No notifications yet.</p>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Programme Settings Panel ─────────────────────────────────────────────────
+
+const GENRE_OPTIONS = [
+  { value: 'narrative', label: 'Narrative' },
+  { value: 'non_fiction', label: 'Non-fiction' },
+  { value: 'persuasive', label: 'Persuasive' },
+  { value: 'poetry', label: 'Poetry' },
+]
+
+const W_LEVELS = [1, 2, 3, 4, 5, 6]
+
+interface ProgrammeSettingsPanelProps {
+  wLevel: number
+  activeGenre: string
+  saving: boolean
+  flash: string | null
+  onSave: (wLevel: number, activeGenre: string) => void
+}
+
+function ProgrammeSettingsPanel({ wLevel, activeGenre, saving, flash, onSave }: ProgrammeSettingsPanelProps) {
+  const [localLevel, setLocalLevel] = useState(wLevel)
+  const [localGenre, setLocalGenre] = useState(activeGenre)
+
+  // Sync if parent changes (e.g. after save)
+  useEffect(() => { setLocalLevel(wLevel) }, [wLevel])
+  useEffect(() => { setLocalGenre(activeGenre) }, [activeGenre])
+
+  const isDirty = localLevel !== wLevel || localGenre !== activeGenre
+
+  return (
+    <div
+      className="rounded-xl p-4 space-y-4"
+      style={{ backgroundColor: 'var(--color-surface)', border: '1.5px solid var(--color-brand-primary)' }}
+      data-testid="programme-settings-panel"
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>
+          Programme Settings
+        </h3>
+        {flash && (
+          <span
+            className="text-xs px-2 py-1 rounded font-semibold"
+            style={{
+              backgroundColor: flash.includes('failed') ? '#FEE2E2' : '#D1FAE5',
+              color: flash.includes('failed') ? '#991B1B' : '#065F46',
+            }}
+          >
+            {flash}
+          </span>
+        )}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        {/* W-level */}
+        <div>
+          <label className="text-xs font-semibold uppercase tracking-wide mb-2 block" style={{ color: 'var(--color-text-muted)' }}>
+            W-Level (scaffold complexity)
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {W_LEVELS.map((lvl) => (
+              <button
+                key={lvl}
+                type="button"
+                onClick={() => setLocalLevel(lvl)}
+                data-testid={`w-level-${lvl}`}
+                className="w-10 h-10 rounded-lg text-sm font-bold transition-colors"
+                style={{
+                  backgroundColor: localLevel === lvl ? 'var(--color-brand-primary)' : 'var(--color-background)',
+                  color: localLevel === lvl ? '#fff' : 'var(--color-text)',
+                  border: localLevel === lvl ? 'none' : '1px solid var(--color-border)',
+                }}
+              >
+                W{lvl}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs mt-1.5" style={{ color: 'var(--color-text-muted)' }}>
+            {localLevel <= 2 ? 'W1–W2: Fully scaffolded Connect Grid columns' :
+             localLevel <= 4 ? 'W3–W4: Partial scaffold, pupil adds details' :
+             'W5–W6: Open plan — pupils write their own col 2 & 3'}
+          </p>
+        </div>
+
+        {/* Active genre */}
+        <div>
+          <label className="text-xs font-semibold uppercase tracking-wide mb-2 block" style={{ color: 'var(--color-text-muted)' }}>
+            Active Genre
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {GENRE_OPTIONS.map((g) => (
+              <button
+                key={g.value}
+                type="button"
+                onClick={() => setLocalGenre(g.value)}
+                data-testid={`genre-option-${g.value}`}
+                className="py-2 px-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: localGenre === g.value ? 'var(--color-brand-secondary)' : 'var(--color-background)',
+                  color: localGenre === g.value ? '#fff' : 'var(--color-text)',
+                  border: localGenre === g.value ? 'none' : '1px solid var(--color-border)',
+                }}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onSave(localLevel, localGenre)}
+        disabled={saving || !isDirty}
+        data-testid="save-programme-settings"
+        className="w-full py-2 rounded-lg text-sm font-semibold text-white transition-opacity"
+        style={{
+          backgroundColor: 'var(--color-brand-primary)',
+          opacity: saving || !isDirty ? 0.5 : 1,
+          cursor: saving || !isDirty ? 'not-allowed' : 'pointer',
+        }}
+      >
+        {saving ? 'Saving…' : 'Save Programme Settings'}
+      </button>
     </div>
   )
 }
