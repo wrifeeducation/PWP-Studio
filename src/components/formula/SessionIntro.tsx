@@ -16,7 +16,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { WORD_CLASS_DEFINITIONS } from '../../lib/definitions'
 import type { FormulaLevel } from '../../types/index'
 import { WordClass } from '../../types/index'
-import { useTTS } from '../../hooks/useTTS'
 import { sfx } from '../../lib/sfx'
 
 // ─── Colour map ───────────────────────────────────────────────────────────────
@@ -247,66 +246,22 @@ type IntroPhase = 'greeting' | 'example' | 'ready'
 export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSkip }: SessionIntroProps) {
   const [phase, setPhase] = useState<IntroPhase>('greeting')
   const [mascotPose, setMascotPose] = useState<'wave' | 'point' | 'cheer'>('wave')
-  const { speak, stop } = useTTS()
 
-  // Build formula description — use technical names for the spoken pattern
+  // Build formula description for visual display
   const wordClassNames = level.formula_elements
     .map(el => WORD_CLASS_DEFINITIONS[el.word_class]?.label ?? el.word_class)
     .join(', ')
 
-  // ── Narrate greeting, then advance to example when speech ends ───────────────
+  // ── Auto-advance greeting → example after a short pause ─────────────────────
   useEffect(() => {
     if (phase !== 'greeting') return
     setMascotPose('wave')
-
-    const greetText = isReturning
-      ? `Hi, welcome back! ${todaysSubject ? `Today we are writing about ${todaysSubject}.` : "Let's keep going!"} Watch me build a sentence first.`
-      : `Hi there! ${todaysSubject ? `Today we are writing about ${todaysSubject}.` : "Let's build some sentences!"} Watch me put one together first.`
-
-    let advanced = false
-    const advance = () => {
-      if (advanced) return
-      advanced = true
-      setTimeout(() => {
-        setPhase('example')
-        setMascotPose('point')
-      }, 400)
-    }
-
-    // Speak; advance when speech ends.
-    // Fallback timer (5 s) guards against Chrome onend not firing — a known
-    // Web Speech API bug where onend is silently dropped if voices load late.
-    const tSpeak = setTimeout(() => speak(greetText, advance), 500)
-    const tFallback = setTimeout(advance, 5000)
-
-    return () => {
-      clearTimeout(tSpeak)
-      clearTimeout(tFallback)
-    }
-  }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Narrate example phase ────────────────────────────────────────────────────
-  useEffect(() => {
-    if (phase !== 'example') return
     const t = setTimeout(() => {
-      speak(`Here is today's sentence pattern: ${wordClassNames}. Watch how the words fit together!`)
-    }, 300)
+      setPhase('example')
+      setMascotPose('point')
+    }, 2000)
     return () => clearTimeout(t)
-  }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Narrate ready phase ──────────────────────────────────────────────────────
-  useEffect(() => {
-    if (phase !== 'ready') return
-    const t = setTimeout(() => {
-      speak(`Great! Now it is your turn. Can you build one?`)
-    }, 300)
-    return () => clearTimeout(t)
-  }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Stop TTS if the pupil skips or navigates away
-  useEffect(() => {
-    return () => stop()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase])
 
   const handleExampleComplete = () => {
     setPhase('ready')
