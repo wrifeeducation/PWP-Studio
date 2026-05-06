@@ -1,13 +1,22 @@
 # WriFe PWP Studio
-*Last updated: 2026-05-05 · Session 23*
+*Last updated: 2026-05-05 · Session 24*
 
 ## Current state
-The app is live at https://pwp-studio.wrife.co.uk. Phases 1–3 (Formula Chain + Compound Builder) are complete and deployed. The direct sign-up route (Session 23) is built and TypeScript-clean, awaiting one git push: home learner login works via 6-digit home code on the pupil card; ParentPage shows a PIN reveal modal after child creation (PIN saved to sessionStorage before reload, read back on mount); DailyPracticePage supports home learners — classId gate removed, level query handles `class_id IS NULL`, level upsert uses manual SELECT+UPDATE/INSERT for home learners.
+The app is live at https://pwp-studio.wrife.co.uk. The Formula Chain (CL1–CL11), Compound Builder, and Connect Grid UI are all built and pushed. The direct home-learner sign-up route is also pushed (Session 23). The "← Back to wrife.co.uk" nav link has been added to TeacherPage, AdminPage, and DashboardPage but the commit is blocked by a stale `.git/HEAD.lock` — Michael needs to clear it and push (commands below). One DB mismatch: the Connect Grid frontend uses `grid_sessions` but production DB has `connect_grid_saves` — the local migration `20260505000002_connect_grid.sql` has not been applied yet. **parseSentence.ts bug fixed (Session 25):** missing `-s` morphological verb rule meant "grows", "eats" etc. were tagged as NOUN, silently failing CL1 validation.
+
+## Pending push — nav links (remove lock first)
+```bash
+rm "/Users/michael/Library/CloudStorage/GoogleDrive-wrife.education@gmail.com/My Drive/WriFe App Build/wrifeapp/.git/HEAD.lock"
+git add src/pages/TeacherPage.tsx src/pages/AdminPage.tsx src/pages/DashboardPage.tsx
+git commit -m "feat(nav): add Back to wrife.co.uk link in teacher, admin and pupil headers"
+git push origin main
+```
 
 ## Next steps
-1. **Push Session 23:** run the git commands provided (delete `.git/index.lock`, stage 3 files, commit, push)
-2. **E2E test direct route:** parent signs up → creates child → sees PIN modal → child logs in with home code → reaches /dashboard → completes daily practice session → level saved
-3. **Connect Grid planner:** 3-column planner (Mc placeholder, anchor→topic sentence auto-seed) — next major feature per spec §4
+1. **Push nav links** — run the commands above to clear HEAD.lock and deploy the wrife.co.uk back-links
+2. **Apply Connect Grid migration** — `20260505000002_connect_grid.sql` needs to be run against WriFe Platform (`gzmgjkbtsvezfclmreru`). It creates `grid_sessions`, `grid_templates`, and adds `w_level` + `active_genre` to `classes`. Live DB currently has old `connect_grid_saves` table — the frontend uses `grid_sessions` so the page will silently fail until migration is applied.
+3. **E2E test Connect Grid** — navigate through DailyPracticePage → ConnectGridPage → ParagraphPage with a real pupil account
+4. **E2E test home-learner route** — parent signs up → creates child → sees PIN modal → child logs in with 6-digit code → /dashboard → completes daily practice session
 
 ## Key decisions — carried forward
 - **Phase A progression:** No score gates. Auto-advance after 3 sessions.
@@ -21,8 +30,10 @@ The app is live at https://pwp-studio.wrife.co.uk. Phases 1–3 (Formula Chain +
 - **SubjectType:** default 'thing' ("Choose a place or thing"). Teacher can set 'person' or 'place' via `subjectType` prop.
 - **Diff badges:** `formula.newElement` shown on each ChainRow header (e.g. "+PREP", "+ADJ"). Also shown in SessionComplete growing sentence panel.
 - **Compound/complex:** CL9+ pupils see CompoundBuilder after chain. Default `allowedTypes=['coordinating']`. Subordinating unlock = future teacher setting. `strictPunctuation=false` by default (W4+ will set it true).
-- **Connect Grid:** 3-column planner (topic sentence / Mc plot / events). Column 2 always impersonal with "Mc" placeholder. Anchor sentence auto-seeds Col 1. Genre-specific row labels.
+- **Connect Grid:** 3-column planner (topic sentence / Mc plot / events). Column 2 always impersonal with "Mc" placeholder. Anchor sentence auto-seeds Col 1. Genre-specific row labels. W-level (1–6) governs row count, scaffolding and anchor lock. Teacher sets w_level and active_genre per class.
 - **Anchor→topic sentence:** Formula sentence must auto-populate as locked topic sentence in Paragraph Builder via Connect Grid.
+- **Admin/teacher login (BUG-006 fixed):** Removed `async` from onAuthStateChange callback to prevent Supabase Web Lock race. AdminLoginPage is self-sufficient: 250ms delay then direct DB fetch after signInWithPassword. SIGNED_IN path uses 300ms setTimeout before profile fetch.
+- **Back to WriFe navigation:** "← wrife.co.uk" link in TeacherPage and AdminPage headers (right side, next to Sign out). "← WriFe" pill in DashboardPage top bar (left side, before avatar). All link to https://wrife.co.uk (same tab).
 
 ## Supabase projects
 | ID | Name | Used for |
@@ -34,46 +45,78 @@ The app is live at https://pwp-studio.wrife.co.uk. Phases 1–3 (Formula Chain +
 RLS notes for WriFe Platform: no `is_school_admin()` function — use `EXISTS (SELECT 1 FROM school_admins WHERE user_id = auth.uid())`. Class membership table is `class_members` (not `class_memberships`).
 
 ## Architecture (5 layers)
-1. Formula Chain (L10–L26) — anchor sentence — **COMPLETE**
-2. Compound/Complex Builder (L30) — **COMPLETE (built, needs deploy + migration)**
-3. Connect Grid Planner (L27–L38) — NEW, not yet built
-4. Paragraph Builder (L27–L34) — exists, needs anchor-seeding update
-5. Writing Studio (L39–L51) — exists, needs Connect Grid integration
+1. Formula Chain (CL1–CL11) — anchor sentence — **COMPLETE & LIVE**
+2. Compound/Complex Builder (CL9+) — **COMPLETE & LIVE**
+3. Connect Grid Planner — **UI COMPLETE** (ConnectGrid.tsx + ConnectGridPage.tsx). **DB migration pending** — apply `20260505000002_connect_grid.sql` to prod.
+4. Paragraph Builder — exists, receives `gridSession` state from ConnectGridPage. Needs anchor-sentence auto-seeding from gridSession verified.
+5. Writing Studio — exists, needs Connect Grid integration for prompt display.
 
-## DB tables required / status
-- `chain_levels` — replaces formula_levels with CL1–CL11 definitions
-- `pwp_compound_sessions` — **LIVE** in WriFe Platform (`gzmgjkbtsvezfclmreru`)
-- `grid_sessions` — Connect Grid pupil data per session
-- `grid_templates` — teacher-configured Column 2 content per genre/stage
+## DB tables — live in WriFe Platform (`gzmgjkbtsvezfclmreru`)
+| Table | Status | Notes |
+|---|---|---|
+| `pwp_compound_sessions` | ✅ LIVE | Phase 3 compound builder results |
+| `pwp_pupil_levels` | ✅ LIVE | nullable class_id for home learners |
+| `pwp_chain_sessions` | ✅ LIVE | chain session records |
+| `pwp_chain_sentences` | ✅ LIVE | individual sentences in a chain |
+| `connect_grid_saves` | ✅ LIVE | old table name — frontend uses `grid_sessions` instead |
+| `grid_sessions` | ❌ NOT YET APPLIED | migration `20260505000002_connect_grid.sql` pending |
+| `grid_templates` | ❌ NOT YET APPLIED | same migration |
+| `chain_levels` | ❌ NOT IN DB | CL1–CL11 defined in frontend only (`formulaDefinitions.ts`) |
 
 ## Test accounts
 | Role | Email | Password/PIN | Notes |
 |------|-------|-------------|-------|
 | School Admin | miyk99@gmail.com | existing | Test Primary School |
 | Teacher | teacher@pwptest.com | WriFe2026! | Test Primary School |
+| Test admin | test-admin@wrife.education | WriFeTest2026! | Verified working (Session 24) |
+| Test teacher | test-teacher@wrife.education | WriFeTest2026! | Verified working (Session 24) |
 | Pupil | Alex | PIN (see admin) | Now at L2, 415 XP |
+| Pupil (E2E) | isrd11 (Israel D) | PIN 4318 · class SIL42495 (Silver Birch) | Verified working for JWT bypass login; use for E2E tests |
 | Parent | parent@pwptest.com | WriFe2026! | Linked to Jamie |
 
 ## Files & locations
-- `src/lib/chain/formulaDefinitions.ts` — CL1–CL11 definitions (COMPLETE)
-- `src/lib/chain/parseSentence.ts` — verb-phrase merging (COMPLETE)
-- `src/lib/chain/validateChainSentence.ts` — exact word-class count + named error feedback (COMPLETE)
-- `src/lib/chain/validateCompoundSentence.ts` — compound/complex validator; returns `conjunction` word in result (COMPLETE)
-- `src/components/chain/SubjectPicker.tsx` — subjectType prop (COMPLETE)
-- `src/components/chain/ChainRow.tsx` — diff badge (COMPLETE)
-- `src/components/chain/SessionComplete.tsx` — "How your chain grew 🌱" panel (COMPLETE)
-- `src/components/chain/CompoundBuilder.tsx` — Phase 3 compound builder UI (COMPLETE)
+
+### Formula Chain (COMPLETE)
+- `src/lib/chain/formulaDefinitions.ts` — CL1–CL11 definitions
+- `src/lib/chain/parseSentence.ts` — verb-phrase merging
+- `src/lib/chain/validateChainSentence.ts` — exact word-class count + named error feedback
+- `src/lib/chain/validateCompoundSentence.ts` — compound/complex validator; returns `conjunction` word in result
+- `src/components/chain/SubjectPicker.tsx` — subjectType prop
+- `src/components/chain/ChainRow.tsx` — diff badge
+- `src/components/chain/SessionComplete.tsx` — "How your chain grew 🌱" panel
+- `src/components/chain/CompoundBuilder.tsx` — Phase 3 compound builder UI
 - `src/pages/DailyPracticePage.tsx` — 'compounding' phase; classId-free home learner support
+
+### Connect Grid (UI COMPLETE — DB migration pending)
+- `src/components/chain/ConnectGrid.tsx` — 3-column grid UI (592 lines). W-level governs row count, scaffolding, anchor lock. Genre selector. Col 2 Mc defaults per genre.
+- `src/pages/ConnectGridPage.tsx` — loads teacher grid_templates, saves to grid_sessions, navigates to ParagraphPage with gridSession state.
+- `src/types/index.ts` — GridRowState, GridSessionState, GridSessionSave, GridTemplate, GRID_ROW_LABELS, GRID_ROW_COUNT_BY_W_LEVEL
+- `supabase/migrations/20260505000002_connect_grid.sql` — **NOT YET APPLIED**. Creates grid_sessions, grid_templates; adds w_level + active_genre to classes.
+
+### Auth & navigation
+- `src/pages/AdminLoginPage.tsx` — self-sufficient login (BUG-006 fix). 250ms delay post-signIn before profile fetch.
+- `src/App.tsx` — AuthInitialiser: synchronous onAuthStateChange callback, 300ms setTimeout before SIGNED_IN profile fetch, stale-while-revalidate profile cache (`wrife_profile_v1` localStorage).
+- `src/pages/TeacherPage.tsx` — "← wrife.co.uk" link in header right (next to Sign out)
+- `src/pages/AdminPage.tsx` — same "← wrife.co.uk" link
+- `src/pages/DashboardPage.tsx` — "← WriFe" pill in top bar left (before avatar)
+
+### Home learner route
 - `src/pages/LoginPage.tsx` — School/Home toggle on pupil card; home learner 6-digit code login
 - `src/pages/ParentPage.tsx` — PIN reveal modal (sessionStorage bridge across reload); CopyPinButton
-- `src/types/index.ts` — ConjunctionType, CompoundValidationResult (with `conjunction` field), CompoundSessionSave
-- `supabase/migrations/20260505000001_compound_sessions.sql` — pwp_compound_sessions table + RLS; **LIVE**
+
+### DB migrations (applied to prod)
+- `supabase/migrations/20260505000001_compound_sessions.sql` — pwp_compound_sessions + RLS ✅
+- `supabase/migrations/20260505165950_pwp_pupil_levels_nullable_class_id.sql` — nullable class_id ✅
+
+### Docs
 - `docs/WriFe-PWP-Development-Spec.docx` — CANONICAL SPEC
+- `docs/WriFe-PWP-Platform-Review-May2026.docx` — platform integration review (May 2026)
 - `docs/Complete WriFe Curriculum For Lesson Creation.pdf` — full 67-lesson curriculum
-- `docs/Connect Grid Various.docx` — Connect Grid worked examples
+- `docs/Connect Grid Various.docx` — Connect Grid worked examples with Mc placeholder
 
 ## Open questions
-- Does wrife.co.uk need SSO handoff to pwp-studio.wrife.co.uk, or is separate login acceptable for now?
+- Does wrife.co.uk need SSO handoff to pwp-studio.wrife.co.uk, or is separate login acceptable? (Cross-domain localStorage means sessions don't share — users re-login on each domain.)
+- Should `connect_grid_saves` be dropped or kept as an alias once `grid_sessions` migration is applied?
 
 ---
 
@@ -81,8 +124,9 @@ RLS notes for WriFe Platform: no `is_school_admin()` function — use `EXISTS (S
 
 | # | Date | Summary |
 |---|------|---------|
-| 23 | 2026-05-05 | Direct sign-up route: home learner login on pupil card (6-digit code); ParentPage PIN reveal modal (sessionStorage bridge); DailyPracticePage classId gate removed; home learner upsert pattern. Zero TS errors. |
+| 25 | 2026-05-06 | E2E test: pupil-login Edge Function fixed (bcrypt.compare→compareSync, Deno Deploy Worker issue). Israel D (isrd11/4318/SIL42495) confirmed working. parseSentence.ts bug fixed: missing -s morphological verb rule caused "grows" to tag as NOUN, silently failing CL1. Fix: added -es/-s suffix rules checking COMMON_VERBS base form. E2E test still in progress (Connect Grid not yet reached). |
+| 24 | 2026-05-05 | BUG-006: admin/teacher login fix (async onAuthStateChange Web Lock race). Platform review saved to docs. Connect Grid status audited (UI complete, migration pending). "← wrife.co.uk" nav added to TeacherPage, AdminPage, DashboardPage (push blocked by HEAD.lock — run rm + commit commands above). |
+| 23 | 2026-05-05 | Direct sign-up route: home learner login on pupil card (6-digit code); ParentPage PIN reveal modal (sessionStorage bridge); DailyPracticePage classId gate removed; home learner upsert pattern. Zero TS errors. Pushed. |
 | 22 | 2026-05-05 | Phase 3 Compound Builder: validateCompoundSentence.ts, CompoundBuilder.tsx, DailyPracticePage 'compounding' phase, pwp_compound_sessions migration applied to production. |
 | 21 | 2026-05-05 | Phase 2 Formula Chain rewrite: formulaDefinitions.ts → CL1–CL11; parseSentence.ts → verb-phrase merging; validateChainSentence.ts → word-class count + named errors; SubjectPicker → subjectType prop; ChainRow → diff badges. |
 | 20 | 2026-05-05 | Full pedagogical review. Development spec produced. 5-layer architecture defined. Connect Grid, W1–W6 scaffolding, genre row labels documented. |
-| 19 | 2026-05-05 | Platform review report; BUG-005 identified; Google Play TWA strategy documented. |

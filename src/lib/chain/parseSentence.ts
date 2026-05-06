@@ -245,6 +245,9 @@ export function tagToken(
   if (w.endsWith('ing') && w.length > 4) return WordClass.VERB // swimming, running
   if (w.endsWith('ed') && w.length > 3) return WordClass.VERB  // walked, jumped
   if (w.endsWith('ies') && w.length > 4) return WordClass.VERB // flies, cries
+  // 3rd-person singular -s/-es (e.g. "grows" → "grow", "goes" → "go")
+  if (w.endsWith('es') && w.length > 4 && COMMON_VERBS.has(w.slice(0, -2))) return WordClass.VERB
+  if (w.endsWith('s') && w.length > 3 && COMMON_VERBS.has(w.slice(0, -1))) return WordClass.VERB
 
   // 6. Adverb lookup + -ly morphology
   if (COMMON_ADVERBS.has(w)) return WordClass.ADVERB
