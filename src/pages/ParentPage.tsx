@@ -556,11 +556,17 @@ export default function ParentPage() {
     if (!profile) return
 
     async function loadLinkedPupils() {
-      const { data: links } = await supabase
+      const { data: links, error: linksError } = await supabase
         .from('parent_pupil')
         .select('pupil_id')
         .eq('parent_id', profile!.id)
         .eq('approved', true)
+
+      if (linksError) {
+        console.error('[ParentPage] parent_pupil query failed:', linksError)
+        setLoading(false)
+        return
+      }
 
       if (!links || links.length === 0) {
         setLoading(false)
@@ -569,10 +575,14 @@ export default function ParentPage() {
 
       const pupilIds = links.map((l) => l.pupil_id)
 
-      const { data: profiles } = await supabase
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, first_name, year_group')
         .in('id', pupilIds)
+
+      if (profilesError) {
+        console.error('[ParentPage] profiles query failed:', profilesError)
+      }
 
       if (!profiles) { setLoading(false); return }
 
