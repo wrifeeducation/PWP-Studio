@@ -933,7 +933,11 @@ function MyClassesTab() {
   const [settingsFlash, setSettingsFlash] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!profile?.school_id) return
+    if (!profile) return
+    if (!profile.school_id) {
+      setLoading(false)
+      return
+    }
     supabase
       .from('classes')
       .select('*')
