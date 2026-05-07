@@ -242,6 +242,30 @@ const DEFINITIONS: Partial<Record<WordClass, WordClassDef>> = {
   },
 }
 
+// ── Word class personality maps ───────────────────────────────────────────────
+
+const EMOJI_MAP: Record<WordClass, string> = {
+  [WordClass.NOUN]: '🏷️',
+  [WordClass.VERB]: '⚡',
+  [WordClass.ADJECTIVE]: '🎨',
+  [WordClass.DETERMINER]: '👆',
+  [WordClass.ADVERB]: '🚀',
+  [WordClass.PREPOSITION]: '📍',
+  [WordClass.PRONOUN]: '🔄',
+  [WordClass.CONJUNCTION]: '🔗',
+}
+
+const PLAIN_ENGLISH_MAP_DU: Record<WordClass, string> = {
+  [WordClass.NOUN]: 'naming word',
+  [WordClass.VERB]: 'doing word',
+  [WordClass.ADJECTIVE]: 'describing word',
+  [WordClass.DETERMINER]: 'pointer word',
+  [WordClass.ADVERB]: 'how / when word',
+  [WordClass.PREPOSITION]: 'position word',
+  [WordClass.PRONOUN]: 'replacement word',
+  [WordClass.CONJUNCTION]: 'joining word',
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function shuffleOptions(correct: string, distractors: [string, string]): string[] {
@@ -440,12 +464,42 @@ export function DefinitionUnlock({ wordClass, onComplete, onDismiss }: Definitio
         className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl"
         style={{ backgroundColor: 'var(--color-surface)' }}
       >
-        {/* Colour band top */}
-        <div
-          className="h-2 w-full"
-          style={{ backgroundColor: colour }}
-          aria-hidden="true"
-        />
+        {/* ── Coloured header panel (quiz phase only) ── */}
+        {!completed && (
+          <div
+            className="px-5 py-4 flex items-start justify-between"
+            style={{ backgroundColor: colour }}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-4xl leading-none" aria-hidden="true">
+                {EMOJI_MAP[wordClass]}
+              </span>
+              <div>
+                <p className="text-white text-xs font-semibold uppercase tracking-wide opacity-75 leading-none mb-0.5">
+                  ✦ New Word Class
+                </p>
+                <h2
+                  id="def-unlock-title"
+                  className="text-white text-xl font-bold leading-tight"
+                  data-tts={`Learn the definition of ${def.label}`}
+                >
+                  Learn: {def.label}
+                </h2>
+                <p className="text-white text-sm opacity-90 font-medium mt-0.5">
+                  {PLAIN_ENGLISH_MAP_DU[wordClass]}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onDismiss}
+              className="p-1.5 rounded-lg text-white opacity-60 hover:opacity-100 transition-opacity"
+              aria-label="Dismiss"
+              data-testid="def-unlock-dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         <div className="p-6">
           {/* ── Completion screen ── */}
@@ -485,7 +539,7 @@ export function DefinitionUnlock({ wordClass, onComplete, onDismiss }: Definitio
               </p>
               <button
                 onClick={handleContinue}
-                className="w-full py-3 rounded-xl text-sm font-semibold text-white"
+                className="w-full py-3 rounded-xl text-base font-bold text-white"
                 style={{ backgroundColor: colour }}
                 data-testid="def-unlock-continue"
                 data-tts="Continue"
@@ -495,49 +549,23 @@ export function DefinitionUnlock({ wordClass, onComplete, onDismiss }: Definitio
             </motion.div>
           ) : (
             <>
-              {/* ── Header ── */}
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <div
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mb-1"
-                    style={{ backgroundColor: colour + '18', color: colour }}
-                    data-tts={`New word class: ${def.label}`}
-                  >
-                    ✦ New Word Class
-                  </div>
-                  <h2
-                    id="def-unlock-title"
-                    className="text-base font-bold"
-                    style={{ color: 'var(--color-text)' }}
-                    data-tts={`Learn the definition of ${def.label}`}
-                  >
-                    Learn: {def.label}
-                  </h2>
-                </div>
-                <button
-                  onClick={onDismiss}
-                  className="p-1.5 rounded-lg text-sm transition-opacity hover:opacity-60"
-                  style={{ color: 'var(--color-text-muted)' }}
-                  aria-label="Dismiss"
-                  data-testid="def-unlock-dismiss"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Stage progress dots */}
-              <div className="flex items-center gap-1.5 mb-5" aria-label={`Stage ${stageIndex + 1} of ${totalStages}`}>
+              {/* ── Stage progress bar — thicker active segment ── */}
+              <div
+                className="flex items-end gap-1.5 mb-4"
+                aria-label={`Stage ${stageIndex + 1} of ${totalStages}`}
+              >
                 {Array.from({ length: totalStages }).map((_, i) => (
                   <motion.div
                     key={i}
-                    className="h-1.5 rounded-full flex-1"
+                    className="rounded-full flex-1"
                     animate={{
                       backgroundColor:
                         i < stageIndex
                           ? colour
                           : i === stageIndex
-                          ? colour + 'AA'
+                          ? colour + 'BB'
                           : 'var(--color-border)',
+                      height: i === stageIndex ? 10 : 6,
                     }}
                     transition={{ duration: 0.3 }}
                     aria-hidden="true"
@@ -545,28 +573,33 @@ export function DefinitionUnlock({ wordClass, onComplete, onDismiss }: Definitio
                 ))}
               </div>
 
-              {/* Stage label */}
-              <p
-                className="text-xs font-semibold uppercase tracking-wide mb-3"
-                style={{ color: 'var(--color-text-muted)' }}
-              >
-                Stage {stageIndex + 1} of {totalStages} — Fill in the blank
-              </p>
+              {/* ── Stage badge ── */}
+              <div className="flex items-center gap-2 mb-4">
+                <span
+                  className="text-xs font-bold uppercase tracking-wide px-2.5 py-1 rounded-full"
+                  style={{ backgroundColor: colour + '18', color: colour }}
+                >
+                  Stage {stageIndex + 1} of {totalStages}
+                </span>
+                <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>
+                  — Fill in the blank
+                </span>
+              </div>
 
-              {/* Definition with blanks */}
+              {/* ── Definition with blanks — lightly tinted ── */}
               <div
                 className="rounded-xl p-4 mb-5 text-base leading-loose"
                 style={{
-                  backgroundColor: 'var(--color-background)',
-                  border: `1.5px solid ${colour}44`,
+                  backgroundColor: colour + '0C',
+                  border: `1.5px solid ${colour}33`,
                 }}
                 data-tts="Definition with blanks"
               >
                 {renderDefinition()}
               </div>
 
-              {/* Multiple choice options */}
-              <div className="space-y-2" role="group" aria-label="Choose the correct word or phrase">
+              {/* ── Multiple choice options — bigger tap targets ── */}
+              <div className="space-y-2.5" role="group" aria-label="Choose the correct word or phrase">
                 <AnimatePresence mode="wait">
                   {options.map((opt) => {
                     const isThisSelected = selected === opt
@@ -578,20 +611,22 @@ export function DefinitionUnlock({ wordClass, onComplete, onDismiss }: Definitio
                         key={opt}
                         onClick={() => handleSelect(opt)}
                         disabled={selected !== null && selected !== opt}
-                        whileTap={{ scale: 0.98 }}
+                        whileTap={{ scale: 0.97 }}
                         animate={
                           isThisWrong
                             ? { x: [-6, 6, -6, 6, 0], transition: { duration: 0.4 } }
+                            : isThisCorrect
+                            ? { scale: [1, 1.04, 1], transition: { duration: 0.25 } }
                             : {}
                         }
-                        className="w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all"
+                        className="w-full text-left px-4 py-3.5 rounded-xl text-sm font-semibold transition-all"
                         style={{
                           backgroundColor: isThisCorrect
                             ? colour + '20'
                             : isThisWrong
                             ? '#FEE2E2'
                             : 'var(--color-background)',
-                          border: `1.5px solid ${
+                          border: `2px solid ${
                             isThisCorrect ? colour : isThisWrong ? '#F87171' : 'var(--color-border)'
                           }`,
                           color: isThisCorrect
@@ -599,7 +634,7 @@ export function DefinitionUnlock({ wordClass, onComplete, onDismiss }: Definitio
                             : isThisWrong
                             ? '#DC2626'
                             : 'var(--color-text)',
-                          opacity: selected !== null && !isThisSelected ? 0.4 : 1,
+                          opacity: selected !== null && !isThisSelected ? 0.35 : 1,
                           cursor: selected !== null ? 'default' : 'pointer',
                         }}
                         data-testid={`def-choice-${opt.replace(/\s+/g, '-')}`}
@@ -614,7 +649,6 @@ export function DefinitionUnlock({ wordClass, onComplete, onDismiss }: Definitio
                 </AnimatePresence>
               </div>
 
-              {/* Hint: what this blank needs */}
               <p
                 className="mt-3 text-xs text-center"
                 style={{ color: 'var(--color-text-muted)' }}

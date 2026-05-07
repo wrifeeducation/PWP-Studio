@@ -342,7 +342,7 @@ Assess each slot in the formula definition, calculate the overall score, and pro
       const errorText = await anthropicResponse.text();
       console.error('Anthropic API error:', errorText);
       return new Response(
-        JSON.stringify({ error: 'Assessment service unavailable', details: anthropicResponse.status }),
+        JSON.stringify({ error: 'Assessment service unavailable', details: anthropicResponse.status, anthropic_error: errorText }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
