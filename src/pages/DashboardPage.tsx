@@ -1190,6 +1190,9 @@ interface TopBarProps {
 
 const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWardrobe, onLogout, isPro = true }) => {
   const navigate = useNavigate()
+  // Show "← WriFe" only when the pupil arrived via Route A (hub SSO hash token).
+  // entryViaHub is set in App.tsx AuthInitialiser on SIGNED_IN + hash detection.
+  const showBackToHub = sessionStorage.getItem('entryViaHub') === '1'
   return (
   <div style={{
     position: 'sticky',
@@ -1202,7 +1205,8 @@ const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWa
     alignItems: 'center',
     gap: 12,
   }}>
-    {/* Back to WriFe main site */}
+    {/* Back to WriFe main site — Route A only */}
+    {showBackToHub && (
     <a
       href="https://wrife.co.uk"
       data-tts="Back to WriFe main site"
@@ -1223,6 +1227,7 @@ const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWa
     >
       ← WriFe
     </a>
+    )}
 
     {/* Avatar button — white circle so Writz is visible */}
     <button
