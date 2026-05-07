@@ -68,6 +68,10 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
   // Reference card expansion state
   const [refCardOpen, setRefCardOpen] = useState(false)
   const [refCardIndex, setRefCardIndex] = useState(0)
+  // Sequential hint index: which slot (by formula_elements index) should auto-show its hint.
+  // Starts at 0 (first slot). Advances when that slot gets filled so only one tooltip
+  // is ever visible at a time — avoids double-tooltip overload for younger pupils.
+  const [activeHintIndex, setActiveHintIndex] = useState(0)
 
   // Phase B: hide labels after 3 seconds
   useEffect(() => {
@@ -90,7 +94,18 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
     setHintsUsed([])
     setRefCardOpen(false)
     setRefCardIndex(0)
+    setActiveHintIndex(0)
   }, [level.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Advance the active hint slot when the current slot is filled.
+  // This drives the sequential tooltip reveal: once the pupil places a word
+  // in slot N, the hint for slot N+1 becomes active.
+  useEffect(() => {
+    const activeEl = level.formula_elements[activeHintIndex]
+    if (activeEl && slotSelections[activeEl.position]) {
+      setActiveHintIndex((prev) => prev + 1)
+    }
+  }, [slotSelections, activeHintIndex, level.formula_elements])
 
   // dnd-kit sensors (mouse + touch)
   const sensors = useSensors(
@@ -354,7 +369,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
           aria-label="Formula slots"
           data-testid="formula-slots"
         >
-          {level.formula_elements.map((el) => (
+          {level.formula_elements.map((el, index) => (
             <FormulaSlot
               key={el.position}
               id={`slot-${el.position}`}
@@ -366,6 +381,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
               example={el.example}
               scaffoldStage={scaffoldStage}
               wordBankExamples={(activeWordBanks[el.word_class as WordClass] ?? []).slice(0, 4)}
+              autoHint={scaffoldStage === 1 && index === activeHintIndex}
               onClear={() => {
                 const wordId = Object.keys(slotSelections)
                   .map((k) => ({

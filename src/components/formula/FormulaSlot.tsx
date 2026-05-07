@@ -36,6 +36,12 @@ export interface FormulaSlotProps {
   /** Called when hint is shown (for tracking) */
   onHintUsed?: (wordClass: WordClass) => void
   dataTestId?: string
+  /**
+   * Sequential hint control: when true this slot should auto-show its hint
+   * tooltip. Managed by the parent (FormulaBuilder) so only one slot is
+   * active at a time, avoiding the double-tooltip overload for younger pupils.
+   */
+  autoHint?: boolean
 }
 
 // ─── colour map ──────────────────────────────────────────────────────────────
@@ -159,6 +165,7 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
   onClear,
   onHintUsed,
   dataTestId,
+  autoHint = false,
 }) => {
   const { isOver, setNodeRef } = useDroppable({ id })
   const [hintVisible, setHintVisible] = useState(false)
@@ -177,16 +184,32 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
   // Hint costs −5 points at Stage 3 (communicated via onHintUsed callback)
   const hintHasCost = scaffoldStage === 3
 
-  // Stage 1: auto-show hint on first empty slot render
+  // Sequential auto-hint: only show when the parent marks this slot as active.
+  // When autoHint becomes false (parent moved on), clear state so it's ready
+  // if ever reactivated. This replaces the old per-slot independent auto-show
+  // which caused all tooltips to appear simultaneously.
   useEffect(() => {
-    if (scaffoldStage === 1 && !autoHintShown && !selectedWord) {
+    if (!autoHint) {
+      setHintVisible(false)
+      setAutoHintShown(false)
+      return
+    }
+    // autoHint is true — show after a short delay if slot is still empty
+    if (!autoHintShown && !selectedWord) {
       const timer = setTimeout(() => {
         setHintVisible(true)
         setAutoHintShown(true)
-      }, 800) // brief delay so the card animation settles first
+      }, 800)
       return () => clearTimeout(timer)
     }
-  }, [scaffoldStage, autoHintShown, selectedWord])
+  }, [autoHint, autoHintShown, selectedWord])
+
+  // Close the auto-hint tooltip as soon as the pupil places a word
+  useEffect(() => {
+    if (selectedWord) {
+      setHintVisible(false)
+    }
+  }, [selectedWord])
 
   const handleHintClick = () => {
     if (!hintsAvailable) return
