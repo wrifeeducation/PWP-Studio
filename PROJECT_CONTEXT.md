@@ -1,13 +1,12 @@
 # WriFe PWP Studio
-*Last updated: 2026-05-06 · Session 28*
+*Last updated: 2026-05-06 · Session 30*
 
 ## Current state
-The app is live at https://pwp-studio.wrife.co.uk. All backlog items from sessions 26–27 are resolved. The full Connect Grid → Paragraph → Writing Studio flow is wired. Teachers have programme settings controls. Home learners can use both `/practice` and `/daily-practice` routes.
+The app is live at https://pwp-studio.wrife.co.uk. E2E Test 4 (Connect Grid → Writing Studio) is complete. All three conditions verified in Writing Studio: anchor sentence banner ("Robots work."), plan display ("Robots: work in factories"), and genre selector locked to Narrative. **Note:** `ANTHROPIC_API_KEY` is NOT configured in Supabase project secrets — both `assess-paragraph` and `assess-formula` currently return mock/placeholder responses. Real AI assessment requires the key to be set via Supabase CLI.
 
 ## Next steps
-1. **E2E test the Connect Grid → Writing Studio flow** — verify anchor sentence banner, plan display, and locked genre appear in studio when arriving from a completed paragraph session
-2. **E2E test teacher programme settings** — log in as teacher, open a class, change W-level and genre, verify ConnectGridPage picks up the new values
-3. **Google Play TWA** — Bubblewrap CLI wrap; needs 512×512 icon, assetlinks.json, signed AAB
+1. **Set `ANTHROPIC_API_KEY` in Supabase secrets** — `supabase secrets set ANTHROPIC_API_KEY=sk-... --project-ref gzmgjkbtsvezfclmreru` — required for real AI paragraph/formula assessment to work in production
+2. **Google Play TWA** — Bubblewrap CLI wrap; needs 512×512 icon, assetlinks.json, signed AAB
 
 ## Key decisions — carried forward
 - **Phase A progression:** No score gates. Auto-advance after 3 sessions.
@@ -18,6 +17,9 @@ The app is live at https://pwp-studio.wrife.co.uk. All backlog items from sessio
 - **profiles_role_check fix (Session 26):** Migration `20260506000001_add_parent_role.sql` added 'parent' to the CHECK constraint. Without this, parent signup fails with "Database error saving new user".
 - **Pupil auth:** `pupil-login` Edge Function — takes classCode + username + PIN, bcrypt.compareSync (NOT async), auto-provisions auth.users entry, returns JWT. Frontend calls `supabase.auth.setSession()`.
 - **Home learner login:** Uses `supabase.auth.signInWithPassword({ email: home-{PIN}@wrife.school, password: PIN })` — direct Supabase auth, no Edge Function needed.
+- **React Router v6 state injection (Session 30):** `window.history.replaceState` must use `{ usr: { yourState }, key: 'string', idx: 0 }` format — React Router reads from `window.history.state.usr`, NOT top-level. Plain `pushState({ gridSession }, ...)` is silently ignored by React Router.
+- **assess-paragraph graceful fallback (Session 30):** Edge Function v2 returns mock 200 response when `ANTHROPIC_API_KEY` is not set, instead of hard 500. Mirrors the pattern in `generate-session-content`.
+- **paragraph_sessions RLS (Session 30):** Table had RLS enabled with zero policies — silently blocked all pupil INSERTs. Fixed with INSERT policy (`auth.uid() = pupil_id`) and SELECT policies for pupils + teachers.
 - **Connect Grid → Writing Studio flow (Session 28):** ParagraphPage checks `writing_studio_unlocked` after submission and routes to `/studio` with `gridSession` in nav state when unlocked. WritingStudioPage reads this and shows anchor sentence banner + plan, locks genre selector, and uses grid context as fallback prompt text.
 - **Teacher programme settings (Session 28):** `ProgrammeSettingsPanel` component added inside class detail view in TeacherPage. W-level (W1–W6) and active genre buttons with save; locked W-levels show scaffold complexity hint. Updates `classes.w_level` and `classes.active_genre` via Supabase.
 - **`/practice` home learner fix (Session 28):** `useFormulaLevel` now uses `.maybeSingle()` and auto-inserts a `formula_progress` row with defaults if none exists. RLS already allows `auth.uid() = pupil_id` INSERT so this works client-side.
@@ -64,6 +66,7 @@ The app is live at https://pwp-studio.wrife.co.uk. All backlog items from sessio
 - `src/pages/DailyPracticePage.tsx` — home learner support: no classId gate, class_id IS NULL for pwp_pupil_levels
 
 ### DB migrations (applied to prod)
+- `paragraph_sessions_rls_policies` (inline migration, Session 30) — INSERT policy for pupils + SELECT for pupils + SELECT for teachers via class_members ✅
 - `supabase/migrations/20260506000002_parent_pupil_rls.sql` — RLS SELECT policies for parent_pupil + linked pupil profiles ✅
 - `supabase/migrations/20260506000001_add_parent_role.sql` — 'parent' role in profiles CHECK ✅
 - `supabase/migrations/20260505000002_connect_grid.sql` — grid_sessions, grid_templates ✅
@@ -75,10 +78,9 @@ The app is live at https://pwp-studio.wrife.co.uk. All backlog items from sessio
 
 | # | Date | Summary |
 |---|------|---------|
+| 30 | 2026-05-06 | E2E Test 4 passed: full Connect Grid → ParagraphPage → WritingStudio journey verified for isrd11. Fixed: (1) assess-paragraph v2 graceful mock fallback when ANTHROPIC_API_KEY absent; (2) paragraph_sessions RLS zero-policy bug; (3) React Router v6 state injection format. |
+| 29 | 2026-05-06 | E2E Test 3 passed: teacher login (mankrah@kafed.org.uk), My Classes → Year 4 Maple, changed W4+Persuasive, "Settings saved!" confirmed, DB verified. Fixed MyClassesTab infinite spinner (setLoading(false) guard). Fixed teacher profile: school_id + first_name set in DB. Deployed. |
 | 28 | 2026-05-06 | Wired Connect Grid → Writing Studio; added ProgrammeSettingsPanel to teacher class view (w_level + active_genre); fixed /practice for home learners (auto-provision formula_progress); dropped connect_grid_saves. |
 | 27 | 2026-05-06 | Fixed ParentPage "No linked children" bug: parent_pupil had RLS enabled with zero policies — added SELECT policy for parents + profiles SELECT policy for linked pupils. Added error logging to loadLinkedPupils. Migration: 20260506000002_parent_pupil_rls.sql. |
 | 26 | 2026-05-06 | Home-learner E2E complete. Found+fixed: (1) profiles_role_check missing 'parent'; (2) create-child-profile upsert failing on NOT NULL email — switched to UPDATE. Verified: parent signup, child creation (PIN 173349), child login at /login Home learner tab, /dashboard, DailyPracticePage chain session. |
 | 25 | 2026-05-06 | E2E test: full flow DailyPracticePage→Connect Grid→ParagraphPage verified. parseSentence -s rule fix. grid_sessions DB verified saving. |
-| 24 | 2026-05-05 | BUG-006: admin/teacher login fix. Connect Grid status audited. Navigation links added. |
-| 23 | 2026-05-05 | Direct sign-up route: home learner login; ParentPage PIN modal; DailyPracticePage classId gate removed. |
-| 22 | 2026-05-05 | Phase 3 Compound Builder: validateCompoundSentence, CompoundBuilder, DailyPracticePage 'compounding' phase. |

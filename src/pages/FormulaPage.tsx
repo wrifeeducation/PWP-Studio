@@ -526,7 +526,7 @@ export default function FormulaPage() {
           {
             pupil_id: user.id,
             badge_id: badge.id,
-            awarded_at: new Date().toISOString(),
+            earned_at: new Date().toISOString(),
             source: null,
           },
           { onConflict: 'pupil_id,badge_id' }
@@ -682,7 +682,7 @@ export default function FormulaPage() {
           {
             pupil_id: user.id,
             badge_id: badge.id,
-            awarded_at: new Date().toISOString(),
+            earned_at: new Date().toISOString(),
             source: null,
           },
           { onConflict: 'pupil_id,badge_id' }

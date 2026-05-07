@@ -321,7 +321,7 @@ export interface PupilBadge extends WithTimestamps {
   id: UUID;
   pupil_id: UUID;
   badge_id: UUID;
-  awarded_at: string;
+  earned_at: string;
   source: Nullable<{
     type: 'formula_session_id' | 'paragraph_session_id' | 'writing_piece_id';
     value: UUID;

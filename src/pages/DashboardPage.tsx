@@ -47,7 +47,7 @@ interface PupilProgressRow {
 interface PupilBadgeRow {
   id: string
   badge_id: string
-  awarded_at: string
+  earned_at: string
   badges: {
     id: string
     name: string
@@ -1391,7 +1391,7 @@ export default function DashboardPage() {
         .from('pupil_badges')
         .select('*, badges(*)')
         .eq('pupil_id', pupilId)
-        .order('awarded_at', { ascending: false })
+        .order('earned_at', { ascending: false })
       if (error) throw error
       return data as PupilBadgeRow[]
     },

@@ -878,7 +878,7 @@ export type Database = {
       }
       pupil_badges: {
         Row: {
-          awarded_at: string | null
+          earned_at: string | null
           badge_id: string
           created_at: string | null
           id: string
@@ -886,7 +886,7 @@ export type Database = {
           source: Json | null
         }
         Insert: {
-          awarded_at?: string | null
+          earned_at?: string | null
           badge_id: string
           created_at?: string | null
           id?: string
@@ -894,7 +894,7 @@ export type Database = {
           source?: Json | null
         }
         Update: {
-          awarded_at?: string | null
+          earned_at?: string | null
           badge_id?: string
           created_at?: string | null
           id?: string

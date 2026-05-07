@@ -37,7 +37,7 @@ interface BadgeSummary {
   badge_id: string
   name: string
   icon_key: string
-  awarded_at: string
+  earned_at: string
 }
 
 interface WritingPieceSummary {
@@ -381,7 +381,7 @@ function PupilProgressPanel({ pupil, isPro }: { pupil: LinkedPupil; isPro: boole
                         className="text-xs px-2 py-1 rounded-full font-medium"
                         style={{ backgroundColor: '#F5F3FF', color: '#6D28D9' }}
                         data-tts={b.name}
-                        title={new Date(b.awarded_at).toLocaleDateString('en-GB')}
+                        title={new Date(b.earned_at).toLocaleDateString('en-GB')}
                       >
                         {b.name}
                       </span>
@@ -592,9 +592,9 @@ export default function ParentPage() {
             supabase.from('formula_progress').select('*').eq('pupil_id', p.id).single(),
             supabase
               .from('pupil_badges')
-              .select('badge_id, awarded_at, badges(name, icon_key)')
+              .select('badge_id, earned_at, badges(name, icon_key)')
               .eq('pupil_id', p.id)
-              .order('awarded_at', { ascending: false })
+              .order('earned_at', { ascending: false })
               .limit(3),
             supabase
               .from('writing_pieces')
@@ -610,7 +610,7 @@ export default function ParentPage() {
               badge_id: b.badge_id as string,
               name: (b.badges as { name: string; icon_key: string } | null)?.name ?? 'Badge',
               icon_key: (b.badges as { name: string; icon_key: string } | null)?.icon_key ?? '',
-              awarded_at: b.awarded_at as string,
+              earned_at: b.earned_at as string,
             }),
           )
 

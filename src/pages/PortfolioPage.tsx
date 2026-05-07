@@ -303,7 +303,7 @@ function BadgesStrip({ pupilId }: BadgesStripProps) {
         .from('pupil_badges')
         .select('*, badges(*)')
         .eq('pupil_id', pupilId)
-        .order('awarded_at', { ascending: true })
+        .order('earned_at', { ascending: true })
       if (error) throw error
       return data as Array<PupilBadge & { badges: Badge }>
     },
