@@ -373,17 +373,20 @@ Deno.serve(async (req: Request) => {
       if (createError) return err(createError.message)
 
       if (newUser?.user) {
-        await admin.from('profiles').upsert({
-          id: newUser.user.id,
+        // Use UPDATE (not upsert with ignoreDuplicates) because the handle_new_user
+        // trigger already inserted a minimal row. UPDATE overwrites the fields the
+        // trigger doesn't know about, including the correct membership_tier.
+        // School pupils get 'school' tier (unlimited stars); home pupils get 'free'.
+        await admin.from('profiles').update({
           role: 'pupil',
           first_name: firstName.trim(),
           year_group: yearGroup || null,
           school_id: schoolId || null,
           class_id: classId || null,
           pin_code: pin,
-          membership_tier: 'free',
+          membership_tier: schoolId ? 'school' : 'free',
           is_active: true,
-        }, { onConflict: 'id', ignoreDuplicates: true })
+        }).eq('id', newUser.user.id)
       }
 
       return ok({ created: true, userId: newUser?.user?.id ?? null, pin, syntheticEmail })
