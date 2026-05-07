@@ -250,7 +250,7 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
   // Build formula description for visual display
   const wordClassNames = level.formula_elements
     .map(el => WORD_CLASS_DEFINITIONS[el.word_class]?.label ?? el.word_class)
-    .join(', ')
+    .join(' + ')
 
   // ── Auto-advance greeting → example after a short pause ─────────────────────
   useEffect(() => {
