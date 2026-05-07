@@ -41,6 +41,7 @@ import { SessionExpiryBanner } from '../components/ui/SessionExpiryBanner'
 import { CertificateModal } from '../components/ui/CertificateModal'
 import { awardCertificate } from '../lib/certificateEngine'
 import { sanitizeText } from '../lib/sanitize'
+import { insertLearningEvent } from '../lib/learningEvents'
 import type { MasteryTracking, Badge, PupilProgress, WordClass } from '../types/index'
 import { DefinitionUnlock } from '../components/gamification/DefinitionUnlock'
 import { useStars } from '../hooks/useStars'
@@ -538,6 +539,18 @@ export default function FormulaPage() {
       // Invalidate React Query cache so dashboard refreshes
       queryClient.invalidateQueries({ queryKey: ['formula_progress', user.id] })
 
+      // Report formula session to wrife.co.uk teacher dashboard via learning_events
+      void insertLearningEvent(
+        user.id,
+        profile?.class_id ?? null,
+        'formula_completed',
+        {
+          level: data.level.id,
+          score: raw.overall_score,
+          attempts: (masteryState.sessionsOnLevel ?? 0) + 1,
+        },
+      )
+
       if (didLevelUp) {
         setShowLevelUp(true)
         // S-04: delay levelUp fanfare by 500ms so it doesn't clash with sfx.star()
@@ -887,9 +900,11 @@ export default function FormulaPage() {
         </motion.div>
       )}
 
-      {/* Definition Unlock ceremony — fires when a new word class is first encountered */}
+      {/* Definition Unlock ceremony — fires when a new word class is first encountered.
+          Only shown once the pupil has moved past the SessionIntro (screen !== 'intro'),
+          so the modal never overlaps with the intro screen and triggers conflicting audio. */}
       <AnimatePresence>
-        {showingDefinition && (
+        {showingDefinition && screen !== 'intro' && (
           <DefinitionUnlock
             key={showingDefinition}
             wordClass={showingDefinition}

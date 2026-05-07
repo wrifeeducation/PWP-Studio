@@ -24,6 +24,7 @@ import { ChainBuilder } from '../components/chain/ChainBuilder'
 import { ChainRow } from '../components/chain/ChainRow'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { insertLearningEvent } from '../lib/learningEvents'
 import { getChainFormula } from '../lib/chain/formulaDefinitions'
 import { validateChainSentence } from '../lib/chain/validateChainSentence'
 import type { ChainRowState, FreePracticeSentenceSave } from '../types/index'
@@ -203,13 +204,20 @@ const FreePracticePage: React.FC = () => {
       if (sentences.length > 0) {
         await supabase.from('pwp_free_practice_sentences').insert(sentences)
       }
+
+      // Report free practice session to wrife.co.uk teacher dashboard
+      const sentenceCount = completedRows.filter((r) => r.status === 'accepted').length
+      void insertLearningEvent(pupilId, classId, 'free_practice_session', {
+        sentences_built: sentenceCount,
+        theme: themeData?.theme ?? null,
+      })
     } catch (err) {
       console.error('Failed to save free practice sentences:', err)
     } finally {
       setSaving(false)
       navigate('/dashboard')
     }
-  }, [pupilId, classId, subjectNoun, completedRows, challengeRow, navigate])
+  }, [pupilId, classId, subjectNoun, completedRows, challengeRow, themeData, navigate])
 
   // ── Derived ───────────────────────────────────────────────────────────────────
   const acceptedCount  = completedRows.filter((r) => r.status === 'accepted').length

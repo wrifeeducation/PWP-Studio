@@ -52,7 +52,7 @@ export const ConceptCard: React.FC<ConceptCardProps> = ({
     : definition.examples
   ).join(', ')
 
-  const ttsText = `${definition.plainEnglishName}. ${definition.childFriendlyDefinition} Examples: ${examples}.`
+  const ttsText = `${definition.label}. ${definition.definition} Also known as a ${definition.plainEnglishName}. Examples: ${examples}.`
 
   return (
     <motion.div
@@ -100,12 +100,25 @@ export const ConceptCard: React.FC<ConceptCardProps> = ({
         className="px-5 py-5 space-y-4"
         style={{ backgroundColor: 'var(--color-surface)' }}
       >
+        {/* Technical definition — shown first so pupils learn the correct term */}
         <p
-          className="text-base font-medium leading-snug"
+          className="text-base font-semibold leading-snug"
           style={{ color: 'var(--color-text)' }}
-          data-tts={definition.childFriendlyDefinition}
+          data-tts={definition.definition}
         >
-          {definition.childFriendlyDefinition}
+          {definition.definition}
+        </p>
+        {/* Plain-English alias — helps pupils connect the term to everyday language */}
+        <p
+          className="text-sm leading-snug mt-1"
+          style={{ color: 'var(--color-text-muted)' }}
+          data-tts={`A ${definition.label.toLowerCase()} is also known as a '${definition.plainEnglishName}'.`}
+        >
+          Also known as a{' '}
+          <span className="font-semibold" style={{ color }}>
+            '{definition.plainEnglishName}'
+          </span>
+          .
         </p>
 
         {/* Examples */}
@@ -145,7 +158,9 @@ export const ConceptCard: React.FC<ConceptCardProps> = ({
             Your task
           </p>
           <p className="text-sm leading-snug" style={{ color: 'var(--color-text)' }}>
-            Find a <strong>{definition.plainEnglishName}</strong> in the word bank and drag or double-tap it into the{' '}
+            Find a <strong>{definition.label}</strong>{' '}
+            <span style={{ color: 'var(--color-text-muted)' }}>({definition.plainEnglishName})</span>{' '}
+            in the word bank and drag or double-tap it into the{' '}
             <span className="font-bold" style={{ color }}>{definition.label}</span> box.
           </p>
         </div>

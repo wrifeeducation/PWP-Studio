@@ -25,6 +25,7 @@ import { CompoundBuilder } from '../components/chain/CompoundBuilder'
 import { SessionComplete } from '../components/chain/SessionComplete'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { insertLearningEvent } from '../lib/learningEvents'
 import type { ChainRowState, ChainSessionSave, CompoundValidationResult } from '../types/index'
 
 // ─── Mastery points calculation (mirrors server-side spec) ────────────────────
@@ -276,6 +277,13 @@ const DailyPracticePage: React.FC = () => {
         })
         if (compoundErr) console.warn('Compound session save failed (non-fatal):', compoundErr)
       }
+
+      // Report chain session to wrife.co.uk teacher dashboard via learning_events
+      void insertLearningEvent(pupilId, classId, 'chain_session_completed', {
+        level: currentLevel,
+        sentences_built: completedRows.filter((r) => r.status === 'accepted').length,
+        streak_day: currentStreak,
+      })
 
       // Navigate to Connect Grid with the anchor sentence
       navigate('/connect-grid', { state: { anchorSentence: lastSentence, classId } })

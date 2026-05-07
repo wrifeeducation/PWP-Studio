@@ -36,8 +36,8 @@ interface SettingsActions {
 export const useSettingsStore = create<SettingsState & SettingsActions>()(
   persist(
     (set) => ({
-      // TTS defaults
-      ttsEnabled: true,
+      // TTS defaults — off by default; pupil opts in via Settings
+      ttsEnabled: false,
       ttsRate: 0.85,
       ttsVoice: null,
 
