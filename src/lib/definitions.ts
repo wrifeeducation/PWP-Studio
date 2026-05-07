@@ -28,7 +28,8 @@ export const WORD_CLASS_DEFINITIONS: Record<WordClass, WordClassDefinition> = {
     colour: 'bg-blue-500',
     definition: 'A noun is the name of a person, place, thing or idea.',
     childFriendlyDefinition:
-      'A naming word is a word that names a person, a place or a thing — like a label for the world around you!',
+      'A noun is the name of a person, place, thing or idea — every word that labels something in the world is a noun. ' +
+      'A good way to remember a noun is to think of it as a \'naming word\'.',
     examples: ['teacher', 'London', 'table', 'happiness'],
     teacherNote:
       'Covers common nouns (table), proper nouns (London), and abstract nouns (happiness). ' +
@@ -39,9 +40,10 @@ export const WORD_CLASS_DEFINITIONS: Record<WordClass, WordClassDefinition> = {
     label: 'Verb',
     plainEnglishName: 'doing word',
     colour: 'bg-red-500',
-    definition: 'A verb is a doing, being or feeling word.',
+    definition: 'A verb is a word that expresses an action, a state of being, or a feeling.',
     childFriendlyDefinition:
-      'A doing word shows what someone or something does, is, or feels. Without a doing word, nothing happens in your sentence!',
+      'A verb is a word that shows what someone or something does, is, or feels — without a verb, nothing happens in your sentence. ' +
+      'A good way to remember a verb is to think of it as a \'doing word\'.',
     examples: ['run', 'is', 'love', 'think'],
     teacherNote:
       'The most difficult word class for primary pupils. Covers action verbs (run, jump), ' +
@@ -53,9 +55,10 @@ export const WORD_CLASS_DEFINITIONS: Record<WordClass, WordClassDefinition> = {
     label: 'Adjective',
     plainEnglishName: 'describing word',
     colour: 'bg-green-500',
-    definition: 'An adjective is a describing word. It tells you more about a noun.',
+    definition: 'An adjective is a word that describes a noun. It tells you more about a person, place or thing.',
     childFriendlyDefinition:
-      'A describing word paints a picture of a naming word — it tells you what something looks, feels, sounds or smells like.',
+      'An adjective is a word that gives you more information about a noun — it tells you what something looks, feels, sounds or smells like. ' +
+      'A good way to remember an adjective is to think of it as a \'describing word\'.',
     examples: ['tall', 'red', 'busy', 'ancient'],
   },
   [WordClass.DETERMINER]: {
@@ -63,9 +66,10 @@ export const WORD_CLASS_DEFINITIONS: Record<WordClass, WordClassDefinition> = {
     label: 'Determiner',
     plainEnglishName: 'pointer word',
     colour: 'bg-purple-500',
-    definition: 'A determiner introduces a noun. It tells you which one or how many.',
+    definition: 'A determiner is a word that comes before a noun to introduce it. It tells you which one or how many.',
     childFriendlyDefinition:
-      'A pointer word always goes in front of a naming word and points to which one you mean — like "the cat" or "my dog".',
+      'A determiner is a word that comes before a noun to introduce it, telling you which one or how many — like "the cat" or "my dog". ' +
+      'A good way to remember a determiner is to think of it as a \'pointer word\'.',
     examples: ['the', 'a', 'my', 'some', 'this'],
     teacherNote:
       'Includes articles (the, a/an), possessives (my, his, their), demonstratives (this, that), ' +
@@ -78,9 +82,10 @@ export const WORD_CLASS_DEFINITIONS: Record<WordClass, WordClassDefinition> = {
     plainEnglishName: 'how/when word',
     colour: 'bg-orange-500',
     definition:
-      'An adverb describes a verb, an adjective or another adverb. It often tells you how, when or where.',
+      'An adverb is a word that describes a verb, an adjective or another adverb. It often tells you how, when or where something happens.',
     childFriendlyDefinition:
-      'A how/when word tells you more about a doing word — how something happens ("quickly"), when ("always") or where ("here").',
+      'An adverb is a word that adds detail to a verb, telling you how something happens ("quickly"), when ("always") or where ("here"). ' +
+      'A good way to remember an adverb is to think of it as a \'how/when word\'.',
     examples: ['quickly', 'always', 'very', 'nearly'],
     teacherNote:
       'Pupils often think adverbs only end in -ly. Include manner (quickly), ' +
@@ -92,9 +97,10 @@ export const WORD_CLASS_DEFINITIONS: Record<WordClass, WordClassDefinition> = {
     plainEnglishName: 'position word',
     colour: 'bg-amber-800',
     definition:
-      'A preposition shows the relationship between one thing and another. It tells you position, direction or time.',
+      'A preposition is a word that shows the relationship between one thing and another. It tells you position, direction or time.',
     childFriendlyDefinition:
-      'A position word shows where something is or when something happens — words like "on the table", "under the bed" or "before lunch".',
+      'A preposition is a word that shows the relationship between one thing and another, telling you where something is or when it happens — like "on the table" or "before lunch". ' +
+      'A good way to remember a preposition is to think of it as a \'position word\'.',
     examples: ['on', 'under', 'before', 'through', 'beside'],
   },
   [WordClass.PRONOUN]: {
@@ -102,9 +108,10 @@ export const WORD_CLASS_DEFINITIONS: Record<WordClass, WordClassDefinition> = {
     label: 'Pronoun',
     plainEnglishName: 'replacement word',
     colour: 'bg-pink-500',
-    definition: 'A pronoun takes the place of a noun. It saves you repeating the same name.',
+    definition: 'A pronoun is a word that takes the place of a noun. It prevents you from repeating the same name.',
     childFriendlyDefinition:
-      'A replacement word takes the place of a naming word so you don\'t repeat it — instead of "Sam ran, Sam fell", you say "Sam ran, he fell".',
+      'A pronoun is a word that takes the place of a noun so you do not have to keep repeating it — instead of "Sam ran, Sam fell", you say "Sam ran, he fell". ' +
+      'A good way to remember a pronoun is to think of it as a \'replacement word\'.',
     examples: ['he', 'she', 'it', 'they', 'we'],
     teacherNote:
       'Focus on personal pronouns at KS1/2. Relative pronouns (who, which, that) and ' +
@@ -115,9 +122,10 @@ export const WORD_CLASS_DEFINITIONS: Record<WordClass, WordClassDefinition> = {
     label: 'Conjunction',
     plainEnglishName: 'joining word',
     colour: 'bg-yellow-400',
-    definition: 'A conjunction is a joining word. It connects words, phrases or clauses.',
+    definition: 'A conjunction is a word that connects words, phrases or clauses together.',
     childFriendlyDefinition:
-      'A joining word connects two ideas together, like glue between sentences — words like "and", "but" and "because".',
+      'A conjunction is a word that connects two ideas or parts of a sentence — it acts like glue, using words such as "and", "but" and "because". ' +
+      'A good way to remember a conjunction is to think of it as a \'joining word\'.',
     examples: ['and', 'but', 'because', 'although', 'so'],
     teacherNote:
       'Distinguish co-ordinating conjunctions (and, but, or, so) from subordinating ' +

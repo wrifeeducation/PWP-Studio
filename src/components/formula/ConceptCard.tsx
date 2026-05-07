@@ -108,13 +108,15 @@ export const ConceptCard: React.FC<ConceptCardProps> = ({
         >
           {definition.definition}
         </p>
-        {/* Plain-English alias — helps pupils connect the term to everyday language */}
+        {/* Plain-English memory hook — frames the nickname as a memory aid, not the definition */}
         <p
           className="text-sm leading-snug mt-1"
           style={{ color: 'var(--color-text-muted)' }}
-          data-tts={`A ${definition.label.toLowerCase()} is also known as a '${definition.plainEnglishName}'.`}
+          data-tts={`A good way to remember a ${definition.label.toLowerCase()} is to think of it as a '${definition.plainEnglishName}'.`}
         >
-          Also known as a{' '}
+          A good way to remember a{' '}
+          <span className="font-semibold" style={{ color }}>{definition.label.toLowerCase()}</span>
+          {' '}is to think of it as a{' '}
           <span className="font-semibold" style={{ color }}>
             '{definition.plainEnglishName}'
           </span>
