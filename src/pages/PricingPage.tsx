@@ -9,7 +9,7 @@
  * Monthly/Annual toggle controls which Pro price is sent to stripe-checkout.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
@@ -48,6 +48,26 @@ export default function PricingPage() {
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly')
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
+
+  // Cross-app Route C handoff: practice.wrife.co.uk/home-signup redirects here
+  // with ?nc=<base64(JSON)> containing the pending child details.
+  // Store them in sessionStorage so ParentPage provisions the child after checkout.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const nc = params.get('nc')
+    if (nc) {
+      try {
+        const decoded = JSON.parse(atob(decodeURIComponent(nc)))
+        if (decoded.nickname && decoded.year_group) {
+          sessionStorage.setItem('wrife_pending_child', JSON.stringify(decoded))
+        }
+      } catch {
+        // Malformed param — ignore silently
+      }
+      // Clean the URL so the param doesn't persist on refresh
+      window.history.replaceState({}, '', '/pricing')
+    }
+  }, [])
 
   const priceId = billing === 'monthly' ? PRO_MONTHLY_PRICE_ID : PRO_ANNUAL_PRICE_ID
   const proPrice = billing === 'monthly' ? '£4.99' : '£30'

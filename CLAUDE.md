@@ -1,5 +1,12 @@
 # WriFe: Technical Handoff for Claude Code
 
+> **CROSS-APP CONTEXT — READ FIRST**
+> Before writing any code, read `PLATFORM_STATUS.md` in this repo root.
+> It contains the feature status matrix, shared DB schema, Edge Function map,
+> cross-app conventions, known gotchas, and the recommended workflow for
+> working across all three WriFe apps. It is mirrored in all three repos
+> and is the single source of truth for any Claude on any app.
+
 ## Project Overview
 
 **WriFe** is a gamified digital literacy platform designed for UK primary and secondary schools (Key Stages 1–3: Years 1–9). It teaches structured sentence and paragraph writing through three integrated learning layers: formula practice (sentence building), paragraph construction (using the LSC scaffold), and extended writing (full compositions up to 700 words). The platform is offline-capable, uses AI-powered assessment, and implements a complete teacher/parent dashboard with real-time progress tracking.
