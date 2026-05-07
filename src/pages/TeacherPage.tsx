@@ -901,7 +901,9 @@ interface ClassRow {
   year_group: number
   academic_year: string
   teacher_id: string | null
-  school_id: string
+  school_id: string | null
+  class_code: string | null
+  account_type: string | null
   created_at: string
   w_level: number
   active_genre: string
@@ -932,49 +934,76 @@ function MyClassesTab() {
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [settingsFlash, setSettingsFlash] = useState<string | null>(null)
 
+  // Is this an independent teacher (Route D — no school account)?
+  const isIndependentTeacher = !!profile && !profile.school_id
+
   useEffect(() => {
     if (!profile) return
-    if (!profile.school_id) {
+    const query = isIndependentTeacher
+      ? supabase.from('classes').select('*').eq('teacher_id', profile.id).order('year_group')
+      : supabase.from('classes').select('*').eq('school_id', profile.school_id!).order('year_group')
+    query.then(({ data }) => {
+      setClasses((data as ClassRow[]) ?? [])
       setLoading(false)
-      return
-    }
-    supabase
-      .from('classes')
-      .select('*')
-      .eq('school_id', profile.school_id)
-      .order('year_group')
-      .then(({ data }) => {
-        setClasses((data as ClassRow[]) ?? [])
-        setLoading(false)
-      })
-  }, [profile])
+    })
+  }, [profile, isIndependentTeacher])
 
   const loadClassPupils = async (cls: ClassRow) => {
     setSelectedClass(cls)
     setLoadingPupils(true)
-    const [enrolledRes, unassignedRes] = await Promise.all([
-      supabase.from('profiles').select('id, first_name, year_group, class_id')
-        .eq('class_id', cls.id).eq('role', 'pupil').order('first_name'),
-      supabase.from('profiles').select('id, first_name, year_group, class_id')
-        .eq('school_id', cls.school_id).eq('role', 'pupil').is('class_id', null).order('first_name'),
-    ])
+    const enrolledRes = await supabase
+      .from('profiles').select('id, first_name, year_group, class_id')
+      .eq('class_id', cls.id).eq('role', 'pupil').order('first_name')
     setPupils((enrolledRes.data as PupilRow[]) ?? [])
-    setUnassignedPupils((unassignedRes.data as PupilRow[]) ?? [])
+    // Independent teachers don't have a school pool — pupils join via class code
+    if (!isIndependentTeacher && cls.school_id) {
+      const unassignedRes = await supabase
+        .from('profiles').select('id, first_name, year_group, class_id')
+        .eq('school_id', cls.school_id).eq('role', 'pupil').is('class_id', null).order('first_name')
+      setUnassignedPupils((unassignedRes.data as PupilRow[]) ?? [])
+    } else {
+      setUnassignedPupils([])
+    }
     setLoadingPupils(false)
   }
 
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!profile?.school_id || !newClass.name.trim()) return
+    if (!profile || !newClass.name.trim()) return
     setSaving(true)
     setError(null)
-    const { data, error: err } = await supabase.from('classes').insert({
-      name: newClass.name.trim(),
-      year_group: parseInt(newClass.year_group),
-      academic_year: newClass.academic_year.replace('/', '-'),
-      school_id: profile.school_id,
-      teacher_id: profile.id,
-    }).select().single()
+
+    let result
+    if (isIndependentTeacher) {
+      // Route D: create class without school_id; generate a class code
+      const classCode = Math.random().toString(36).slice(2, 9).toUpperCase()
+      result = await supabase
+        .from('classes')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .insert({
+          name: newClass.name.trim(),
+          year_group: parseInt(newClass.year_group),
+          academic_year: newClass.academic_year.replace('/', '-'),
+          teacher_id: profile.id,
+          account_type: 'independent_teacher',
+          class_code: classCode,
+        } as never)
+        .select().single()
+    } else {
+      if (!profile.school_id) { setSaving(false); return }
+      result = await supabase
+        .from('classes')
+        .insert({
+          name: newClass.name.trim(),
+          year_group: parseInt(newClass.year_group),
+          academic_year: newClass.academic_year.replace('/', '-'),
+          school_id: profile.school_id,
+          teacher_id: profile.id,
+        })
+        .select().single()
+    }
+
+    const { data, error: err } = result
     setSaving(false)
     if (err) { setError(err.message); return }
     setClasses((prev) => [...prev, data as ClassRow].sort((a, b) => a.year_group - b.year_group))
@@ -1087,47 +1116,70 @@ function MyClassesTab() {
               )}
             </div>
 
-            {/* Unassigned pupils */}
+            {/* Unassigned pupils (school teachers only) / Class code (independent teachers) */}
             <div>
-              <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text)' }}>
-                Pupils not in a class ({unassignedPupils.length})
-              </h3>
-              {unassignedPupils.length === 0 ? (
-                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                  All school pupils are already assigned to a class.
-                </p>
+              {isIndependentTeacher ? (
+                <>
+                  <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text)' }}>
+                    Class code
+                  </h3>
+                  <div
+                    className="rounded-lg px-4 py-3 text-center"
+                    style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)' }}
+                  >
+                    <p className="text-2xl font-bold tracking-widest" style={{ color: 'var(--color-brand-primary)', fontFamily: 'monospace' }}>
+                      {selectedClass.class_code ?? '—'}
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                      Share this code with pupils so they can log in on PWP Studio or Interactive Practice.
+                    </p>
+                  </div>
+                </>
               ) : (
-                <div className="space-y-2">
-                  {unassignedPupils.map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between rounded-lg px-3 py-2"
-                      style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)' }}
-                      data-testid={`unassigned-pupil-${p.id}`}
-                    >
-                      <span className="text-sm" style={{ color: 'var(--color-text)' }}>
-                        {p.first_name}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleAddPupil(p)}
-                        disabled={addingPupil === p.id}
-                        className="text-xs px-2 py-1 rounded font-medium text-white"
-                        style={{ backgroundColor: 'var(--color-brand-primary)', opacity: addingPupil === p.id ? 0.6 : 1 }}
-                      >
-                        {addingPupil === p.id ? '…' : 'Add'}
-                      </button>
+                <>
+                  <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text)' }}>
+                    Pupils not in a class ({unassignedPupils.length})
+                  </h3>
+                  {unassignedPupils.length === 0 ? (
+                    <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                      All school pupils are already assigned to a class.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {unassignedPupils.map((p) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center justify-between rounded-lg px-3 py-2"
+                          style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)' }}
+                          data-testid={`unassigned-pupil-${p.id}`}
+                        >
+                          <span className="text-sm" style={{ color: 'var(--color-text)' }}>
+                            {p.first_name}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleAddPupil(p)}
+                            disabled={addingPupil === p.id}
+                            className="text-xs px-2 py-1 rounded font-medium text-white"
+                            style={{ backgroundColor: 'var(--color-brand-primary)', opacity: addingPupil === p.id ? 0.6 : 1 }}
+                          >
+                            {addingPupil === p.id ? '…' : 'Add'}
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               )}
             </div>
           </div>
         )}
 
-        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          To create new pupil accounts, use the School Admin panel → Manage Users.
-        </p>
+        {!isIndependentTeacher && (
+          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            To create new pupil accounts, use the School Admin panel → Manage Users.
+          </p>
+        )}
       </div>
     )
   }
