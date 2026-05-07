@@ -594,6 +594,52 @@ export default function HomePage() {
           </button>
 
         </div>
+
+        {/* Home learning CTA — full width below the 2-col grid */}
+        <button
+          onClick={() => navigate('/home-signup')}
+          style={{
+            width: '100%',
+            marginTop: 10,
+            background: `linear-gradient(135deg, ${C.teal} 0%, #00CCA3 100%)`,
+            border: 'none',
+            borderRadius: 12,
+            padding: '14px 16px',
+            cursor: 'pointer',
+            textAlign: 'left',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 22 }}>🏠</span>
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.8)', marginBottom: 2 }}>
+                For parents · home learning
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: C.white, lineHeight: 1.2 }}>
+                Sign up your child for home use
+              </div>
+            </div>
+          </div>
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            fontSize: 11,
+            fontWeight: 800,
+            padding: '5px 12px',
+            borderRadius: 6,
+            background: C.white,
+            color: C.teal,
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+          }}>
+            Get started →
+          </span>
+        </button>
+
         </div>
       </div>
 

@@ -27,6 +27,9 @@ import DailyPracticePage from './pages/DailyPracticePage'
 import FreePracticePage from './pages/FreePracticePage'
 import ConnectGridPage from './pages/ConnectGridPage'
 
+// Home signup — standalone parent sign-up page (Route C entry point)
+const HomeSignupPage = lazy(() => import('./pages/HomeSignupPage'))
+
 // WF-040: Heavy pages — lazy loaded to reduce initial bundle
 const WritingStudioPage = lazy(() => import('./pages/WritingStudioPage'))
 const TeacherPage = lazy(() => import('./pages/TeacherPage'))
@@ -228,6 +231,7 @@ function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/home-signup" element={<HomeSignupPage />} />
             <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/auth/confirm" element={<AuthConfirmPage />} />
             <Route path="/update-password" element={<UpdatePasswordPage />} />
