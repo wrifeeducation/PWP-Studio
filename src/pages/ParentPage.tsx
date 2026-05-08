@@ -478,6 +478,10 @@ export default function ParentPage() {
   const [newChildPin, setNewChildPin] = useState<{ name: string; pin: string } | null>(null)
 
   const isPro = profile?.membership_tier === 'pro'
+  const [showAddChildModal, setShowAddChildModal] = useState(false)
+  const [addChildName, setAddChildName] = useState('')
+  const [addChildYear, setAddChildYear] = useState('3')
+  const [addingChild, setAddingChild] = useState(false)
 
   // Recover PIN that was saved to sessionStorage before the reload triggered after
   // child-profile creation (window.location.reload() destroys React state).
@@ -498,6 +502,30 @@ export default function ParentPage() {
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     navigate('/login', { replace: true })
+  }
+
+  const handleAddChild = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!addChildName.trim()) return
+    setAddingChild(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('create-child-profile', {
+        body: { nickname: addChildName.trim(), year_group: parseInt(addChildYear) },
+      })
+      if (error) throw error
+      const result = data as { pin: string; first_name: string }
+      if (result?.pin) {
+        // Use same sessionStorage→reload mechanism so PIN survives the refresh
+        sessionStorage.setItem(
+          'wrife_new_child_pin',
+          JSON.stringify({ name: result.first_name ?? addChildName.trim(), pin: result.pin }),
+        )
+      }
+      window.location.reload()
+    } catch (err) {
+      console.error('ParentPage: add-child error', err)
+      setAddingChild(false)
+    }
   }
 
   const handleManagePlan = async () => {
@@ -783,6 +811,110 @@ export default function ParentPage() {
           ))
         )}
       </main>
+
+      {/* ── Add another child button ── */}
+      {!setupPending && !loading && (
+        <button
+          type="button"
+          onClick={() => setShowAddChildModal(true)}
+          data-testid="add-another-child-button"
+          data-tts="Add another child"
+          className="w-full py-3 rounded-xl text-sm font-semibold"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            border: '2px dashed var(--color-border)',
+            color: 'var(--color-brand-primary)',
+          }}
+        >
+          + Add another child
+        </button>
+      )}
+
+      {/* ── Add another child modal ── */}
+      {showAddChildModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+          data-testid="add-child-modal"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAddChildModal(false) }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-6 space-y-5 shadow-xl"
+            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+          >
+            <div>
+              <h3 className="text-base font-bold" style={{ color: 'var(--color-text)' }}>
+                Add another child
+              </h3>
+              <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                A home code will be generated so they can log in on WriFe Interactive Practice.
+              </p>
+            </div>
+
+            <form onSubmit={handleAddChild} className="space-y-4">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="add-child-name" className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+                  First name or nickname
+                </label>
+                <input
+                  id="add-child-name"
+                  type="text"
+                  required
+                  autoFocus
+                  value={addChildName}
+                  onChange={(e) => setAddChildName(e.target.value)}
+                  placeholder="e.g. Amara"
+                  data-testid="add-child-name-input"
+                  className="rounded-lg px-3 py-2 text-sm"
+                  style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label htmlFor="add-child-year" className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+                  Year group
+                </label>
+                <select
+                  id="add-child-year"
+                  value={addChildYear}
+                  onChange={(e) => setAddChildYear(e.target.value)}
+                  data-testid="add-child-year-select"
+                  className="rounded-lg px-3 py-2 text-sm"
+                  style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                >
+                  {[1,2,3,4,5,6,7,8,9].map((y) => (
+                    <option key={y} value={y}>Year {y}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => { setShowAddChildModal(false); setAddChildName('') }}
+                  className="flex-1 py-2 rounded-lg text-sm font-medium"
+                  style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addingChild || !addChildName.trim()}
+                  data-testid="add-child-submit"
+                  className="flex-1 py-2 rounded-lg text-sm font-semibold text-white transition-opacity"
+                  style={{
+                    backgroundColor: 'var(--color-brand-primary)',
+                    opacity: addingChild || !addChildName.trim() ? 0.55 : 1,
+                    cursor: addingChild || !addChildName.trim() ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {addingChild ? 'Adding…' : 'Add child'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── PIN reveal modal ── */}
       <AnimatePresence>

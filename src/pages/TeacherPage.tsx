@@ -933,6 +933,12 @@ function MyClassesTab() {
   // Programme settings
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [settingsFlash, setSettingsFlash] = useState<string | null>(null)
+  // Add pupil (independent teacher)
+  const [showAddPupilModal, setShowAddPupilModal] = useState(false)
+  const [newPupilName, setNewPupilName] = useState('')
+  const [newPupilYear, setNewPupilYear] = useState('3')
+  const [creatingPupil, setCreatingPupil] = useState(false)
+  const [newPupilPin, setNewPupilPin] = useState<{ name: string; pin: string } | null>(null)
 
   // Is this an independent teacher (Route D — no school account)?
   const isIndependentTeacher = !!profile && !profile.school_id
@@ -1046,13 +1052,46 @@ function MyClassesTab() {
     setTimeout(() => setSettingsFlash(null), 2500)
   }
 
+  const handleCreatePupil = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newPupilName.trim() || !selectedClass) return
+    setCreatingPupil(true)
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke('teacher-create-pupil', {
+        body: {
+          firstName: newPupilName.trim(),
+          yearGroup: parseInt(newPupilYear),
+          classId: selectedClass.id,
+        },
+      })
+      if (fnErr) throw fnErr
+      if (!data?.pin) throw new Error('No PIN returned')
+      // Refresh enrolled pupils list
+      const res = await supabase
+        .from('profiles')
+        .select('id, first_name, year_group, class_id')
+        .eq('class_id', selectedClass.id)
+        .eq('role', 'pupil')
+        .order('first_name')
+      setPupils((res.data as PupilRow[]) ?? [])
+      setShowAddPupilModal(false)
+      setNewPupilName('')
+      setNewPupilYear('3')
+      setNewPupilPin({ name: data.firstName as string, pin: data.pin as string })
+    } catch (err) {
+      console.error('teacher-create-pupil:', err)
+    } finally {
+      setCreatingPupil(false)
+    }
+  }
+
   if (loading) return <LoadingSpinner />
 
   // ── Class detail view ──────────────────────────────────────────────────────
   if (selectedClass) {
     return (
       <div className="space-y-5" data-testid="class-detail-view">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <button
             type="button"
             onClick={() => setSelectedClass(null)}
@@ -1067,6 +1106,18 @@ function MyClassesTab() {
           <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
             {selectedClass.academic_year}
           </span>
+          {isIndependentTeacher && (
+            <button
+              type="button"
+              onClick={() => setShowAddPupilModal(true)}
+              data-testid="add-pupil-button"
+              data-tts="Add a pupil to this class"
+              className="ml-auto text-sm px-4 py-1.5 rounded-lg font-semibold text-white"
+              style={{ backgroundColor: 'var(--color-brand-primary)' }}
+            >
+              + Add pupil
+            </button>
+          )}
         </div>
 
         {/* Programme settings panel */}
@@ -1179,6 +1230,149 @@ function MyClassesTab() {
           <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
             To create new pupil accounts, use the School Admin panel → Manage Users.
           </p>
+        )}
+
+        {/* ── Add Pupil Modal (independent teachers) ── */}
+        {showAddPupilModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+            data-testid="add-pupil-modal"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowAddPupilModal(false) }}
+          >
+            <div
+              className="w-full max-w-sm rounded-2xl p-6 space-y-5 shadow-xl"
+              style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+            >
+              <div>
+                <h3 className="text-base font-bold" style={{ color: 'var(--color-text)' }}>
+                  Add a pupil
+                </h3>
+                <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                  A unique 4-digit PIN will be generated for this pupil to log in.
+                </p>
+              </div>
+
+              <form onSubmit={handleCreatePupil} className="space-y-4">
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="pupil-first-name" className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+                    First name
+                  </label>
+                  <input
+                    id="pupil-first-name"
+                    type="text"
+                    required
+                    autoFocus
+                    value={newPupilName}
+                    onChange={(e) => setNewPupilName(e.target.value)}
+                    placeholder="e.g. Amara"
+                    data-testid="new-pupil-name-input"
+                    className="rounded-lg px-3 py-2 text-sm"
+                    style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="pupil-year-group" className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+                    Year group
+                  </label>
+                  <select
+                    id="pupil-year-group"
+                    value={newPupilYear}
+                    onChange={(e) => setNewPupilYear(e.target.value)}
+                    data-testid="new-pupil-year-select"
+                    className="rounded-lg px-3 py-2 text-sm"
+                    style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                  >
+                    {[1,2,3,4,5,6,7,8,9].map((y) => (
+                      <option key={y} value={y}>Year {y}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddPupilModal(false); setNewPupilName('') }}
+                    className="flex-1 py-2 rounded-lg text-sm font-medium"
+                    style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creatingPupil || !newPupilName.trim()}
+                    data-testid="create-pupil-submit"
+                    className="flex-1 py-2 rounded-lg text-sm font-semibold text-white transition-opacity"
+                    style={{
+                      backgroundColor: 'var(--color-brand-primary)',
+                      opacity: creatingPupil || !newPupilName.trim() ? 0.55 : 1,
+                      cursor: creatingPupil || !newPupilName.trim() ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {creatingPupil ? 'Creating…' : 'Create pupil'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── PIN Reveal Modal ── */}
+        {newPupilPin && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+            data-testid="pin-reveal-modal"
+          >
+            <div
+              className="w-full max-w-sm rounded-2xl p-6 space-y-5 shadow-xl text-center"
+              style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+            >
+              <div className="text-4xl" aria-hidden="true">🎉</div>
+
+              <div>
+                <h3 className="text-base font-bold" style={{ color: 'var(--color-text)' }}>
+                  {newPupilPin.name} is ready!
+                </h3>
+                <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                  Share this PIN — it's their login for PWP Studio and Interactive Practice.
+                </p>
+              </div>
+
+              {/* PIN display */}
+              <div
+                className="rounded-xl px-6 py-5 mx-auto"
+                style={{ backgroundColor: 'var(--color-background)', border: '2px solid var(--color-brand-primary)' }}
+              >
+                <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                  {newPupilPin.name}'s PIN
+                </p>
+                <p
+                  className="text-5xl font-bold tracking-[0.25em] select-all"
+                  style={{ color: 'var(--color-brand-primary)', fontFamily: 'monospace' }}
+                  data-testid="generated-pin"
+                  data-tts={`PIN: ${newPupilPin.pin.split('').join(' ')}`}
+                >
+                  {newPupilPin.pin}
+                </p>
+              </div>
+
+              <p className="text-xs" style={{ color: '#DC2626' }}>
+                ⚠ Write this down now — it won't be shown again.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setNewPupilPin(null)}
+                data-testid="pin-reveal-done"
+                className="w-full py-2.5 rounded-lg text-sm font-semibold text-white"
+                style={{ backgroundColor: 'var(--color-brand-primary)' }}
+              >
+                Done — I've written it down
+              </button>
+            </div>
+          </div>
         )}
       </div>
     )
