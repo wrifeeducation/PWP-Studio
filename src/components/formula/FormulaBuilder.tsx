@@ -68,6 +68,9 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
   // Reference card expansion state
   const [refCardOpen, setRefCardOpen] = useState(false)
   const [refCardIndex, setRefCardIndex] = useState(0)
+  // Interactive sentence-finishing state
+  const [isCapitalised, setIsCapitalised] = useState(false)
+  const [selectedPunctuation, setSelectedPunctuation] = useState<string | null>(null)
   // Sequential hint index: which slot (by formula_elements index) should auto-show its hint.
   // Starts at 0 (first slot). Advances when that slot gets filled so only one tooltip
   // is ever visible at a time — avoids double-tooltip overload for younger pupils.
@@ -95,7 +98,17 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
     setRefCardOpen(false)
     setRefCardIndex(0)
     setActiveHintIndex(0)
+    setIsCapitalised(false)
+    setSelectedPunctuation(null)
   }, [level.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset finishing steps whenever a slot is cleared (allFilled → false)
+  useEffect(() => {
+    if (!allFilled) {
+      setIsCapitalised(false)
+      setSelectedPunctuation(null)
+    }
+  }, [allFilled])
 
   // Advance the active hint slot when the current slot is filled.
   // This drives the sequential tooltip reveal: once the pupil places a word
@@ -113,8 +126,8 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
   )
 
-  // Double-click / double-tap: place tile into the first empty matching slot
-  const handleTileDoubleClick = useCallback(
+  // Single-tap: place tile into the first empty matching slot
+  const handleTileSingleClick = useCallback(
     (word: string, wordClass: WordClass, tileId: string) => {
       if (usedWordIds.has(tileId)) return // already placed
       const matchingSlot = level.formula_elements.find(
@@ -159,7 +172,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
       .join(' ')
   }
 
-  // Build the sentence with correct capitalisation and a full stop
+  // Build the sentence with correct capitalisation and a full stop (legacy — used for TTS on preview)
   const buildDisplaySentence = (): string => {
     const raw = buildSentence()
     if (!raw) return raw
@@ -167,16 +180,26 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
     return capitalised.endsWith('.') ? capitalised : `${capitalised}.`
   }
 
+  // Build the final sentence using the pupil's own capitalisation + punctuation choices
+  const buildFinalSentence = (): string => {
+    const words = level.formula_elements.map((el) => slotSelections[el.position] ?? '_____')
+    const first = words[0] ?? ''
+    const capitalisedFirst = isCapitalised ? first.charAt(0).toUpperCase() + first.slice(1) : first
+    const joined = [capitalisedFirst, ...words.slice(1)].join(' ')
+    return selectedPunctuation ? `${joined}${selectedPunctuation}` : joined
+  }
+
+  // Punctuation options: Stage 1–2 = full stop only (establish habit);
+  // Stage 3–4 = all three (choose appropriately — AI assessor notes the choice)
+  const punctuationOptions = scaffoldStage <= 2 ? ['.'] : ['.', '?', '!']
+
+  // Whether the pupil has completed both finishing steps
+  const sentenceComplete = isCapitalised && selectedPunctuation !== null
+
   // Compute allFilled directly from the subscribed slotSelections snapshot rather than
   // going through areAllSlotsFilled()'s internal get() call, which can return stale state
   // when the store is updated from outside React's event system (WF-BUG-003).
   const allFilled = level.formula_elements.every((el) => !!slotSelections[el.position])
-
-  // Punctuation check: first word capitalised AND ends with a full stop (only meaningful when all filled)
-  const rawSentence = buildSentence()
-  const firstWord = rawSentence.split(' ')[0] ?? ''
-  const hasCapital = allFilled && firstWord.length > 0 && firstWord[0] === firstWord[0].toUpperCase() && firstWord[0] !== '_'
-  const hasPunctuation = allFilled && !rawSentence.endsWith('_____')
 
   // Gather used words (for submission payload)
   const getUsedWords = (): string[] =>
@@ -349,14 +372,14 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
         <div
           className="rounded-xl px-4 py-3 flex items-start gap-3"
           style={{ backgroundColor: 'var(--color-surface-alt)', border: '1px solid var(--color-border)' }}
-          data-tts="How to play: choose one word for each coloured box below. Drag a word from the word bank, or double-tap it to place it."
+          data-tts="How to play: choose one word for each coloured box below. Drag a word from the word bank, or tap it to place it."
           data-testid="task-instruction"
         >
           <span className="text-xl leading-none mt-0.5" aria-hidden="true">🎯</span>
           <div>
             <p className="text-base font-bold mb-1" style={{ color: 'var(--color-brand-secondary)' }}>What to do</p>
             <p className="text-sm leading-snug" style={{ color: 'var(--color-text)' }}>
-              Choose one word for each coloured box. Drag a word from the bank below — or <strong>double-tap</strong> it to place it automatically.
+              Choose one word for each coloured box. Drag a word from the bank below — or <strong>tap</strong> it to place it automatically.
             </p>
           </div>
         </div>
@@ -403,63 +426,165 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
           ))}
         </div>
 
-        {/* ── Live sentence preview with capitalisation indicator ── */}
-        <div
-          className="rounded-xl p-4"
-          style={{
-            backgroundColor: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-          }}
-          data-testid="sentence-preview"
-          aria-live="polite"
-          aria-label="Sentence preview"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <p
-              className="text-xs uppercase tracking-wider font-semibold"
-              style={{ color: 'var(--color-text-muted)' }}
-            >
-              Your sentence
-            </p>
-            <div className="flex items-center gap-2">
-              {/* Punctuation rule indicators — shown once all slots filled */}
-              {allFilled && (
-                <div className="flex items-center gap-1.5 text-[10px] font-semibold">
-                  <span
-                    className="px-1.5 py-0.5 rounded"
-                    style={{
-                      backgroundColor: hasCapital ? 'var(--color-correct-bg)' : 'var(--color-incorrect-bg)',
-                      color: hasCapital ? 'var(--color-correct-text)' : 'var(--color-incorrect-text)',
-                    }}
-                    title="First letter must be a capital"
-                    data-tts={hasCapital ? 'Capital letter: correct' : 'Capital letter missing'}
-                  >
-                    {hasCapital ? '✓ Aa' : '✗ Aa'}
-                  </span>
-                  <span
-                    className="px-1.5 py-0.5 rounded"
-                    style={{
-                      backgroundColor: hasPunctuation ? 'var(--color-correct-bg)' : 'var(--color-incorrect-bg)',
-                      color: hasPunctuation ? 'var(--color-correct-text)' : 'var(--color-incorrect-text)',
-                    }}
-                    title="Sentence must end with a full stop"
-                    data-tts={hasPunctuation ? 'Full stop: correct' : 'Full stop needed'}
-                  >
-                    {hasPunctuation ? '✓ .' : '✗ .'}
-                  </span>
-                </div>
-              )}
-              <TTSButton text={buildDisplaySentence()} />
-            </div>
-          </div>
-          <p
-            className="text-lg font-mono font-semibold leading-snug"
-            style={{ color: allFilled ? 'var(--color-text)' : 'var(--color-text-muted)' }}
-            data-tts={buildDisplaySentence()}
+        {/* ── Sentence preview / finishing mechanic ── */}
+        {!allFilled ? (
+          /* Static preview while slots still empty */
+          <div
+            className="rounded-xl p-4"
+            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+            data-testid="sentence-preview"
+            aria-live="polite"
           >
-            {buildDisplaySentence()}
-          </p>
-        </div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs uppercase tracking-wider font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+                Your sentence so far
+              </p>
+              <TTSButton text={buildSentence()} />
+            </div>
+            <p
+              className="text-lg font-mono font-semibold leading-snug"
+              style={{ color: 'var(--color-text-muted)' }}
+              data-tts={buildSentence()}
+            >
+              {buildSentence()}
+            </p>
+          </div>
+        ) : (
+          /* Interactive finishing mechanic — all slots filled */
+          <div
+            className="rounded-xl p-4 space-y-4"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              border: `2px solid ${sentenceComplete ? 'var(--color-brand-secondary)' : 'var(--color-brand-primary)'}`,
+            }}
+            data-testid="sentence-finish-panel"
+            aria-live="polite"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span aria-hidden="true">{sentenceComplete ? '✅' : '✨'}</span>
+                <p className="text-sm font-bold" style={{ color: sentenceComplete ? 'var(--color-brand-secondary)' : 'var(--color-brand-primary)' }}>
+                  {sentenceComplete ? 'Great — your sentence is ready!' : 'Make it a proper sentence!'}
+                </p>
+              </div>
+              <TTSButton text={buildFinalSentence()} />
+            </div>
+
+            {/* ── Step 1: Capitalise first word ── */}
+            <div className="space-y-2" data-testid="capitalise-step">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                  style={{ backgroundColor: isCapitalised ? 'var(--color-brand-secondary)' : 'var(--color-brand-primary)' }}
+                  aria-hidden="true"
+                >
+                  {isCapitalised ? '✓' : '1'}
+                </span>
+                <p className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+                  {isCapitalised ? 'Capital letter added' : 'Tap the first word to start with a capital letter'}
+                </p>
+              </div>
+
+              {/* Sentence with tappable first word */}
+              <div
+                className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-lg font-mono font-semibold leading-snug px-1"
+                data-tts={buildFinalSentence()}
+              >
+                {/* First word — clickable toggle */}
+                {(() => {
+                  const words = level.formula_elements.map((el) => slotSelections[el.position] ?? '_____')
+                  const first = words[0] ?? ''
+                  const rest = words.slice(1)
+                  const displayFirst = isCapitalised
+                    ? first.charAt(0).toUpperCase() + first.slice(1)
+                    : first
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setIsCapitalised((v) => !v)}
+                        data-testid="capitalise-toggle"
+                        data-tts={isCapitalised ? `${displayFirst} — tap to un-capitalise` : `${displayFirst} — tap to capitalise`}
+                        aria-label={isCapitalised ? 'Tap to un-capitalise first word' : 'Tap to capitalise first word'}
+                        className="rounded-md px-1.5 py-0.5 transition-all duration-150 focus:outline-none focus-visible:ring-2"
+                        style={{
+                          color: isCapitalised ? 'var(--color-brand-primary)' : 'var(--color-text)',
+                          border: isCapitalised
+                            ? '2px solid var(--color-brand-primary)'
+                            : '2px dashed var(--color-text-muted)',
+                          backgroundColor: isCapitalised ? 'rgba(108,92,231,0.08)' : 'transparent',
+                          minWidth: '44px',
+                          minHeight: '36px',
+                        }}
+                      >
+                        {displayFirst}
+                      </button>
+                      {rest.map((w, i) => (
+                        <span key={i} style={{ color: 'var(--color-text)' }}>{w}</span>
+                      ))}
+                      {selectedPunctuation && (
+                        <span style={{ color: 'var(--color-brand-secondary)' }}>{selectedPunctuation}</span>
+                      )}
+                    </>
+                  )
+                })()}
+              </div>
+            </div>
+
+            {/* ── Step 2: Punctuation ── (revealed after step 1) */}
+            {isCapitalised && (
+              <div className="space-y-2" data-testid="punctuation-step">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                    style={{ backgroundColor: selectedPunctuation ? 'var(--color-brand-secondary)' : 'var(--color-brand-primary)' }}
+                    aria-hidden="true"
+                  >
+                    {selectedPunctuation ? '✓' : '2'}
+                  </span>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+                    {selectedPunctuation ? `Ending with "${selectedPunctuation}"` : 'How does the sentence end?'}
+                  </p>
+                </div>
+
+                <div className="flex gap-3" role="group" aria-label="Choose punctuation">
+                  {punctuationOptions.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setSelectedPunctuation(selectedPunctuation === p ? null : p)}
+                      data-testid={`punctuation-${p === '.' ? 'full-stop' : p === '?' ? 'question' : 'exclamation'}`}
+                      data-tts={p === '.' ? 'Full stop' : p === '?' ? 'Question mark' : 'Exclamation mark'}
+                      aria-pressed={selectedPunctuation === p}
+                      aria-label={p === '.' ? 'Full stop' : p === '?' ? 'Question mark' : 'Exclamation mark'}
+                      className="flex items-center justify-center rounded-xl text-3xl font-bold transition-all duration-150 focus:outline-none focus-visible:ring-2"
+                      style={{
+                        minWidth: '64px',
+                        minHeight: '64px',
+                        backgroundColor: selectedPunctuation === p ? 'var(--color-brand-primary)' : 'var(--color-background)',
+                        color: selectedPunctuation === p ? '#fff' : 'var(--color-text)',
+                        border: selectedPunctuation === p
+                          ? '2px solid var(--color-brand-primary)'
+                          : '2px solid var(--color-border)',
+                        transform: selectedPunctuation === p ? 'scale(1.08)' : 'scale(1)',
+                      }}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Hint for Stage 3+: which to choose */}
+                {scaffoldStage >= 3 && !selectedPunctuation && (
+                  <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                    Use <strong>.</strong> for a statement · <strong>?</strong> for a question · <strong>!</strong> for excitement
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Word bank ── */}
         <div data-testid="word-bank">
@@ -468,7 +593,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
             style={{ color: 'var(--color-text-muted)' }}
             data-tts="Your words — pick from these to fill the boxes above"
           >
-            Your words — drag or double-tap to place
+            Your words — drag or tap to place
           </p>
           <div className="flex flex-wrap gap-2.5 sm:gap-3.5">
             {uniqueBankEntries.map((entry) => (
@@ -480,8 +605,8 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
                 state={usedWordIds.has(entry.id) ? 'disabled' : 'idle'}
                 size="md"
                 dataTestId={`word-tile-${entry.id}`}
-                onDoubleClick={() =>
-                  handleTileDoubleClick(entry.word, entry.wordClass, entry.id)
+                onClick={() =>
+                  handleTileSingleClick(entry.word, entry.wordClass, entry.id)
                 }
               />
             ))}
@@ -507,19 +632,28 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
 
           <button
             onClick={() => {
-              if (allFilled && !isSubmitting) {
-                onSubmit(buildDisplaySentence(), getUsedWords(), hintsUsed)
+              if (sentenceComplete && !isSubmitting) {
+                onSubmit(buildFinalSentence(), getUsedWords(), hintsUsed)
               }
             }}
-            disabled={!allFilled || isSubmitting}
-            aria-disabled={!allFilled || isSubmitting}
+            disabled={!sentenceComplete || isSubmitting}
+            aria-disabled={!sentenceComplete || isSubmitting}
             className="flex-1 py-3.5 rounded-xl text-base font-bold text-white transition-all duration-150 focus:outline-none focus-visible:ring-2 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ backgroundColor: allFilled ? 'var(--color-brand-primary)' : 'var(--color-disabled)' }}
+            style={{ backgroundColor: sentenceComplete ? 'var(--color-brand-secondary)' : 'var(--color-disabled)' }}
             data-testid="submit-button"
-            data-tts={allFilled ? 'Submit your sentence' : 'Fill all slots to submit'}
+            data-tts={
+              !allFilled ? 'Fill all slots to continue'
+              : !isCapitalised ? 'Tap the first word to capitalise it'
+              : !selectedPunctuation ? 'Choose punctuation to submit'
+              : 'Submit your sentence'
+            }
             aria-label="Submit formula for assessment"
           >
-            {isSubmitting ? 'Checking…' : allFilled ? '✓ Submit Sentence' : 'Fill all slots'}
+            {isSubmitting ? 'Checking…'
+              : !allFilled ? 'Fill all slots'
+              : !isCapitalised ? 'Tap the first word first'
+              : !selectedPunctuation ? 'Choose how it ends'
+              : '✓ Submit Sentence'}
           </button>
         </div>
       </div>

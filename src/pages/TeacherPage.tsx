@@ -939,6 +939,16 @@ function MyClassesTab() {
   const [newPupilYear, setNewPupilYear] = useState('3')
   const [creatingPupil, setCreatingPupil] = useState(false)
   const [newPupilPin, setNewPupilPin] = useState<{ name: string; pin: string } | null>(null)
+  // Edit class
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [editClassData, setEditClassData] = useState({ name: '', year_group: '3', academic_year: '' })
+  const [editSaving, setEditSaving] = useState(false)
+  // Delete class
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  // PIN regeneration (independent teachers)
+  const [regenningPin, setRegenningPin] = useState<string | null>(null)  // pupilId being regenerated
+  const [regenPin, setRegenPin] = useState<{ name: string; pin: string } | null>(null)
 
   // Is this an independent teacher (Route D — no school account)?
   const isIndependentTeacher = !!profile && !profile.school_id
@@ -1052,6 +1062,61 @@ function MyClassesTab() {
     setTimeout(() => setSettingsFlash(null), 2500)
   }
 
+  const handleEditClass = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedClass || !editClassData.name.trim()) return
+    setEditSaving(true)
+    const { error: err } = await supabase
+      .from('classes')
+      .update({
+        name: editClassData.name.trim(),
+        year_group: parseInt(editClassData.year_group),
+        academic_year: editClassData.academic_year.trim(),
+      })
+      .eq('id', selectedClass.id)
+    setEditSaving(false)
+    if (!err) {
+      const updated = {
+        ...selectedClass,
+        name: editClassData.name.trim(),
+        year_group: parseInt(editClassData.year_group),
+        academic_year: editClassData.academic_year.trim(),
+      }
+      setSelectedClass(updated)
+      setClasses((prev) => prev.map((c) => (c.id === selectedClass.id ? updated : c)))
+      setShowEditForm(false)
+    }
+  }
+
+  const handleDeleteClass = async () => {
+    if (!selectedClass) return
+    setDeleting(true)
+    // Unlink all pupils first
+    await supabase.from('profiles').update({ class_id: null }).eq('class_id', selectedClass.id)
+    // Delete class record
+    await supabase.from('classes').delete().eq('id', selectedClass.id)
+    setClasses((prev) => prev.filter((c) => c.id !== selectedClass.id))
+    setSelectedClass(null)
+    setShowDeleteConfirm(false)
+    setDeleting(false)
+  }
+
+  const handleRegenPin = async (pupil: PupilRow) => {
+    setRegenningPin(pupil.id)
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke('teacher-regenerate-pin', {
+        body: { pupilId: pupil.id },
+      })
+      if (fnErr) throw fnErr
+      if (!data?.pin) throw new Error('No PIN returned')
+      setRegenPin({ name: pupil.first_name, pin: data.pin as string })
+    } catch (err) {
+      console.error('teacher-regenerate-pin:', err)
+    } finally {
+      setRegenningPin(null)
+    }
+  }
+
   const handleCreatePupil = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newPupilName.trim() || !selectedClass) return
@@ -1106,19 +1171,157 @@ function MyClassesTab() {
           <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
             {selectedClass.academic_year}
           </span>
-          {isIndependentTeacher && (
+          {/* Class action buttons */}
+          <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setShowAddPupilModal(true)}
-              data-testid="add-pupil-button"
-              data-tts="Add a pupil to this class"
-              className="ml-auto text-sm px-4 py-1.5 rounded-lg font-semibold text-white"
-              style={{ backgroundColor: 'var(--color-brand-primary)' }}
+              onClick={() => {
+                setEditClassData({
+                  name: selectedClass.name,
+                  year_group: String(selectedClass.year_group),
+                  academic_year: selectedClass.academic_year,
+                })
+                setShowEditForm((v) => !v)
+                setShowDeleteConfirm(false)
+              }}
+              data-testid="edit-class-button"
+              data-tts="Edit class details"
+              className="text-sm px-3 py-1.5 rounded-lg font-medium"
+              style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
             >
-              + Add pupil
+              ✏️ Edit
             </button>
-          )}
+            <button
+              type="button"
+              onClick={() => { setShowDeleteConfirm((v) => !v); setShowEditForm(false) }}
+              data-testid="delete-class-button"
+              data-tts="Delete this class"
+              className="text-sm px-3 py-1.5 rounded-lg font-medium"
+              style={{ border: '1px solid #FECACA', color: '#DC2626' }}
+            >
+              🗑 Delete
+            </button>
+            {isIndependentTeacher && (
+              <button
+                type="button"
+                onClick={() => setShowAddPupilModal(true)}
+                data-testid="add-pupil-button"
+                data-tts="Add a pupil to this class"
+                className="text-sm px-4 py-1.5 rounded-lg font-semibold text-white"
+                style={{ backgroundColor: 'var(--color-brand-primary)' }}
+              >
+                + Add pupil
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* ── Inline edit form ── */}
+        {showEditForm && (
+          <form
+            onSubmit={handleEditClass}
+            className="rounded-xl p-4 space-y-4"
+            style={{ backgroundColor: 'var(--color-surface)', border: '2px solid var(--color-brand-primary)' }}
+            data-testid="edit-class-form"
+          >
+            <h3 className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>Edit class details</h3>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Class name</label>
+                <input
+                  type="text"
+                  required
+                  value={editClassData.name}
+                  onChange={(e) => setEditClassData((d) => ({ ...d, name: e.target.value }))}
+                  data-testid="edit-class-name"
+                  className="rounded-lg px-3 py-2 text-sm"
+                  style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Year group</label>
+                <select
+                  value={editClassData.year_group}
+                  onChange={(e) => setEditClassData((d) => ({ ...d, year_group: e.target.value }))}
+                  data-testid="edit-class-year"
+                  className="rounded-lg px-3 py-2 text-sm"
+                  style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                >
+                  {[1,2,3,4,5,6,7,8,9].map((y) => (
+                    <option key={y} value={y}>Year {y}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Academic year</label>
+                <input
+                  type="text"
+                  value={editClassData.academic_year}
+                  onChange={(e) => setEditClassData((d) => ({ ...d, academic_year: e.target.value }))}
+                  placeholder="2025-26"
+                  data-testid="edit-class-acyear"
+                  className="rounded-lg px-3 py-2 text-sm"
+                  style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowEditForm(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium"
+                style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={editSaving}
+                data-testid="save-edit-class"
+                className="px-5 py-2 rounded-lg text-sm font-semibold text-white"
+                style={{ backgroundColor: 'var(--color-brand-primary)', opacity: editSaving ? 0.6 : 1 }}
+              >
+                {editSaving ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ── Delete confirmation ── */}
+        {showDeleteConfirm && (
+          <div
+            className="rounded-xl p-4 space-y-3"
+            style={{ backgroundColor: '#FEF2F2', border: '2px solid #FECACA' }}
+            data-testid="delete-class-confirm"
+          >
+            <p className="text-sm font-semibold" style={{ color: '#DC2626' }}>
+              Delete "{selectedClass.name}"?
+            </p>
+            <p className="text-xs" style={{ color: '#991B1B' }}>
+              All pupils will be unlinked from this class but their accounts will remain. This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium"
+                style={{ border: '1px solid #FECACA', color: '#DC2626' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteClass}
+                disabled={deleting}
+                data-testid="confirm-delete-class"
+                className="px-5 py-2 rounded-lg text-sm font-semibold text-white"
+                style={{ backgroundColor: '#DC2626', opacity: deleting ? 0.6 : 1 }}
+              >
+                {deleting ? 'Deleting…' : 'Yes, delete class'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Programme settings panel */}
         <ProgrammeSettingsPanel
@@ -1145,13 +1348,26 @@ function MyClassesTab() {
                   {pupils.map((p) => (
                     <div
                       key={p.id}
-                      className="flex items-center justify-between rounded-lg px-3 py-2"
+                      className="flex items-center justify-between rounded-lg px-3 py-2 gap-2"
                       style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
                       data-testid={`enrolled-pupil-${p.id}`}
                     >
-                      <span className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+                      <span className="text-sm font-medium flex-1" style={{ color: 'var(--color-text)' }}>
                         {p.first_name}
                       </span>
+                      {isIndependentTeacher && (
+                        <button
+                          type="button"
+                          onClick={() => handleRegenPin(p)}
+                          disabled={regenningPin === p.id}
+                          data-testid={`regen-pin-${p.id}`}
+                          data-tts={`Regenerate PIN for ${p.first_name}`}
+                          className="text-xs px-2 py-1 rounded whitespace-nowrap"
+                          style={{ color: '#6C5CE7', border: '1px solid #A29BFE' }}
+                        >
+                          {regenningPin === p.id ? '…' : '🔑 New PIN'}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => handleRemovePupil(p)}
@@ -1314,6 +1530,58 @@ function MyClassesTab() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── Regen PIN Reveal Modal ── */}
+        {regenPin && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+            data-testid="regen-pin-reveal-modal"
+          >
+            <div
+              className="w-full max-w-sm rounded-2xl p-6 space-y-5 shadow-xl text-center"
+              style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+            >
+              <div className="text-4xl" aria-hidden="true">🔑</div>
+              <div>
+                <h3 className="text-base font-bold" style={{ color: 'var(--color-text)' }}>
+                  New PIN for {regenPin.name}
+                </h3>
+                <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                  The old PIN no longer works. Share the new one with {regenPin.name}.
+                </p>
+              </div>
+              <div
+                className="rounded-xl px-6 py-5 mx-auto"
+                style={{ backgroundColor: 'var(--color-background)', border: '2px solid #6C5CE7' }}
+              >
+                <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                  New PIN
+                </p>
+                <p
+                  className="text-5xl font-bold tracking-[0.25em] select-all"
+                  style={{ color: '#6C5CE7', fontFamily: 'monospace' }}
+                  data-testid="regen-pin-display"
+                  data-tts={`New PIN: ${regenPin.pin.split('').join(' ')}`}
+                >
+                  {regenPin.pin}
+                </p>
+              </div>
+              <p className="text-xs" style={{ color: '#DC2626' }}>
+                ⚠ Write this down now — it won't be shown again.
+              </p>
+              <button
+                type="button"
+                onClick={() => setRegenPin(null)}
+                data-testid="regen-pin-done"
+                className="w-full py-2.5 rounded-lg text-sm font-semibold text-white"
+                style={{ backgroundColor: '#6C5CE7' }}
+              >
+                Done — I've written it down
+              </button>
             </div>
           </div>
         )}
