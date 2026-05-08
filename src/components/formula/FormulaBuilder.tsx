@@ -102,6 +102,11 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
     setSelectedPunctuation(null)
   }, [level.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Compute allFilled directly from the subscribed slotSelections snapshot rather than
+  // going through areAllSlotsFilled()'s internal get() call, which can return stale state
+  // when the store is updated from outside React's event system (WF-BUG-003).
+  const allFilled = level.formula_elements.every((el) => !!slotSelections[el.position])
+
   // Reset finishing steps whenever a slot is cleared (allFilled → false)
   useEffect(() => {
     if (!allFilled) {
@@ -172,14 +177,6 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
       .join(' ')
   }
 
-  // Build the sentence with correct capitalisation and a full stop (legacy — used for TTS on preview)
-  const buildDisplaySentence = (): string => {
-    const raw = buildSentence()
-    if (!raw) return raw
-    const capitalised = raw.charAt(0).toUpperCase() + raw.slice(1)
-    return capitalised.endsWith('.') ? capitalised : `${capitalised}.`
-  }
-
   // Build the final sentence using the pupil's own capitalisation + punctuation choices
   const buildFinalSentence = (): string => {
     const words = level.formula_elements.map((el) => slotSelections[el.position] ?? '_____')
@@ -195,11 +192,6 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
 
   // Whether the pupil has completed both finishing steps
   const sentenceComplete = isCapitalised && selectedPunctuation !== null
-
-  // Compute allFilled directly from the subscribed slotSelections snapshot rather than
-  // going through areAllSlotsFilled()'s internal get() call, which can return stale state
-  // when the store is updated from outside React's event system (WF-BUG-003).
-  const allFilled = level.formula_elements.every((el) => !!slotSelections[el.position])
 
   // Gather used words (for submission payload)
   const getUsedWords = (): string[] =>

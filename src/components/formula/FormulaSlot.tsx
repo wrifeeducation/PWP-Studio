@@ -152,6 +152,37 @@ const HintTooltip: React.FC<HintTooltipProps> = ({ wordClass, wordBankExamples, 
   )
 }
 
+// ─── collapsed pill ──────────────────────────────────────────────────────────
+
+interface HintPillProps {
+  plainEnglishLabel: string
+  color: string
+  onExpand: () => void
+}
+
+const HintPill: React.FC<HintPillProps> = ({ plainEnglishLabel, color, onExpand }) => (
+  <motion.button
+    initial={{ opacity: 0, scale: 0.8, y: 4 }}
+    animate={{ opacity: 1, scale: 1, y: 0 }}
+    exit={{ opacity: 0, scale: 0.8, y: 4 }}
+    transition={{ duration: 0.18 }}
+    onClick={onExpand}
+    className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 flex items-center gap-1.5 px-3 py-1 rounded-full text-white text-xs font-semibold shadow-md cursor-pointer whitespace-nowrap"
+    style={{ backgroundColor: color }}
+    aria-label={`Tap to expand ${plainEnglishLabel} hint`}
+    data-tts={`Tap to see the ${plainEnglishLabel} hint again`}
+  >
+    <span className="opacity-90">{plainEnglishLabel}</span>
+    <span
+      className="flex items-center justify-center rounded-full font-bold text-[10px] w-4 h-4 shrink-0"
+      style={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
+      aria-hidden="true"
+    >
+      ?
+    </span>
+  </motion.button>
+)
+
 // ─── component ────────────────────────────────────────────────────────────────
 
 export const FormulaSlot: React.FC<FormulaSlotProps> = ({
@@ -169,6 +200,7 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
 }) => {
   const { isOver, setNodeRef } = useDroppable({ id })
   const [hintVisible, setHintVisible] = useState(false)
+  const [hintCollapsed, setHintCollapsed] = useState(false)
   const [autoHintShown, setAutoHintShown] = useState(false)
 
   const color = VAR_MAP[wordClass]
@@ -185,40 +217,54 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
   const hintHasCost = scaffoldStage === 3
 
   // Sequential auto-hint: only show when the parent marks this slot as active.
-  // When autoHint becomes false (parent moved on), clear state so it's ready
-  // if ever reactivated. This replaces the old per-slot independent auto-show
-  // which caused all tooltips to appear simultaneously.
   useEffect(() => {
     if (!autoHint) {
       setHintVisible(false)
+      setHintCollapsed(false)
       setAutoHintShown(false)
       return
     }
-    // autoHint is true — show after a short delay if slot is still empty
     if (!autoHintShown && !selectedWord) {
       const timer = setTimeout(() => {
         setHintVisible(true)
+        setHintCollapsed(false)
         setAutoHintShown(true)
       }, 800)
       return () => clearTimeout(timer)
     }
   }, [autoHint, autoHintShown, selectedWord])
 
-  // Close the auto-hint tooltip as soon as the pupil places a word
+  // Close hint when a word is placed
   useEffect(() => {
     if (selectedWord) {
       setHintVisible(false)
+      setHintCollapsed(false)
     }
   }, [selectedWord])
+
+  // Auto-collapse to pill after 12 s of being open and fully expanded
+  useEffect(() => {
+    if (!hintVisible || hintCollapsed) return
+    const timer = setTimeout(() => setHintCollapsed(true), 12000)
+    return () => clearTimeout(timer)
+  }, [hintVisible, hintCollapsed])
+
+  // Reset collapsed state when hint is fully closed
+  useEffect(() => {
+    if (!hintVisible) setHintCollapsed(false)
+  }, [hintVisible])
 
   const handleHintClick = () => {
     if (!hintsAvailable) return
     const opening = !hintVisible
     setHintVisible(opening)
-    if (opening && onHintUsed) {
-      onHintUsed(wordClass)
+    if (opening) {
+      setHintCollapsed(false) // always start fully expanded
+      if (onHintUsed) onHintUsed(wordClass)
     }
   }
+
+  const handlePillExpand = () => setHintCollapsed(false)
 
   const isEmpty = selectedWord === null
 
@@ -320,16 +366,24 @@ export const FormulaSlot: React.FC<FormulaSlotProps> = ({
         </button>
       )}
 
-      {/* Hint tooltip */}
-      <AnimatePresence>
-        {hintVisible && (
+      {/* Hint tooltip — full card or collapsed pill */}
+      <AnimatePresence mode="wait">
+        {hintVisible && hintCollapsed ? (
+          <HintPill
+            key="pill"
+            plainEnglishLabel={plainEnglishLabel}
+            color={color}
+            onExpand={handlePillExpand}
+          />
+        ) : hintVisible ? (
           <HintTooltip
+            key="tooltip"
             wordClass={wordClass}
             wordBankExamples={wordBankExamples}
             color={color}
             onClose={() => setHintVisible(false)}
           />
-        )}
+        ) : null}
       </AnimatePresence>
     </div>
   )
