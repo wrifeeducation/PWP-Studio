@@ -17,6 +17,35 @@ import { WORD_CLASS_DEFINITIONS } from '../../lib/definitions'
 import type { FormulaLevel } from '../../types/index'
 import { WordClass } from '../../types/index'
 import { sfx } from '../../lib/sfx'
+import { useTTS } from '../../hooks/useTTS'
+
+// ─── Narration builder ────────────────────────────────────────────────────────
+// Builds the example-phase narration for a given formula level.
+// e.g. "Watch me. My naming word is dog, and my doing word is ran. Dog ran!"
+function buildExampleNarration(level: FormulaLevel): string {
+  const elements = level.formula_elements
+  if (!elements.length) return ''
+
+  // Build "My [word class] is [example word]" fragments
+  const fragments = elements.map((el, i) => {
+    const plainName = WORD_CLASS_DEFINITIONS[el.word_class]?.plainEnglishName ?? el.word_class.toLowerCase()
+    const word = el.example || level.word_banks[el.word_class]?.[0] ?? ''
+    if (i === 0) return `My ${plainName} is ${word}`
+    if (i === elements.length - 1) return `and my ${plainName} is ${word}`
+    return `my ${plainName} is ${word}`
+  })
+
+  // Completed sentence
+  const sentence = elements
+    .map(el => el.example || level.word_banks[el.word_class]?.[0] ?? '')
+    .join(' ')
+
+  const listStr = fragments.length === 1
+    ? fragments[0]
+    : fragments.slice(0, -1).join(', ') + ', ' + fragments[fragments.length - 1]
+
+  return `Watch me build a sentence. ${listStr}. ${sentence}!`
+}
 
 // ─── Colour map ───────────────────────────────────────────────────────────────
 
@@ -246,26 +275,39 @@ type IntroPhase = 'greeting' | 'example' | 'ready'
 export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSkip }: SessionIntroProps) {
   const [phase, setPhase] = useState<IntroPhase>('greeting')
   const [mascotPose, setMascotPose] = useState<'wave' | 'point' | 'cheer'>('wave')
+  const { speak, stop } = useTTS()
 
   // Build formula description for visual display
   const wordClassNames = level.formula_elements
     .map(el => WORD_CLASS_DEFINITIONS[el.word_class]?.label ?? el.word_class)
     .join(' + ')
 
-  // ── Auto-advance greeting → example after a short pause ─────────────────────
+  // ── Speak greeting on mount, then advance when speech ends ──────────────────
   useEffect(() => {
-    if (phase !== 'greeting') return
-    setMascotPose('wave')
-    const t = setTimeout(() => {
+    speak(isReturning ? 'session-intro--returning' : 'session-intro--new-user', () => {
+      // Advance to example phase once greeting finishes (or after 2.5s max)
       setPhase('example')
       setMascotPose('point')
+      // Short pause, then narrate the full worked example
+      setTimeout(() => speak(buildExampleNarration(level)), 400)
+    })
+    // Fallback: if TTS is disabled, auto-advance after 2s
+    const fallback = setTimeout(() => {
+      setPhase(p => p === 'greeting' ? 'example' : p)
+      setMascotPose('point')
     }, 2000)
-    return () => clearTimeout(t)
+    return () => { stop(); clearTimeout(fallback) }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Keep mascot in wave pose during greeting ──────────────────────────────
+  useEffect(() => {
+    if (phase === 'greeting') setMascotPose('wave')
   }, [phase])
 
   const handleExampleComplete = () => {
     setPhase('ready')
     setMascotPose('cheer')
+    setTimeout(() => speak('session-intro--your-turn'), 300)
   }
 
   return (
@@ -386,21 +428,22 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
               initial={{ opacity: 0, scale: 0.85, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{ type: 'spring', stiffness: 320, damping: 18 }}
-              onClick={() => { sfx.click(); onReady() }}
+              onClick={() => { sfx.click(); speak('session-intro--ready'); onReady() }}
               style={{
-                background: 'var(--color-primary)',
-                color: '#fff',
+                background: '#6C5CE7',
+                color: '#ffffff',
                 border: 'none',
                 borderRadius: 18,
                 padding: '20px 48px',
-                fontSize: 20,
+                fontSize: 22,
                 fontWeight: 800,
                 fontFamily: 'inherit',
                 cursor: 'pointer',
                 width: '100%',
-                boxShadow: '0 6px 20px rgba(108,92,231,0.4)',
+                boxShadow: '0 6px 24px rgba(108,92,231,0.45)',
+                letterSpacing: '0.01em',
               }}
-              data-tts="I'm ready! Let's go"
+              data-tts="session-intro--ready"
               data-testid="ready-btn"
             >
               I'm ready — let's go! 🚀
