@@ -11,6 +11,7 @@ import { useTTS } from '../../hooks/useTTS'
 interface FormulaFeedbackProps {
   result: RawAssessmentResult
   xpEarned: number
+  streakBonus?: number
   sentence: string
   onRetry: () => void
   onContinue: () => void
@@ -39,16 +40,36 @@ const BAND_COLOR = (score: number): string => {
 export const FormulaFeedback: React.FC<FormulaFeedbackProps> = ({
   result,
   xpEarned,
+  streakBonus = 0,
   onRetry,
   onContinue,
 }) => {
   const isPass = result.overall_score >= 80
   const { speak } = useTTS()
 
-  // Speak feedback phrase once on mount
+  // Speak feedback phrase on mount, then chain XP phrase if earned
   useEffect(() => {
-    const key = isPass ? 'feedback--correct' : 'feedback--try-again'
-    speak(key)
+    // Pick the most fitting feedback key based on score
+    let feedbackKey: string
+    if (result.overall_score === 100) {
+      feedbackKey = 'feedback--great-sentence'
+    } else if (result.overall_score >= 80) {
+      feedbackKey = 'feedback--correct'
+    } else if (result.overall_score >= 50) {
+      feedbackKey = 'feedback--try-again'
+    } else {
+      // Low score — likely a word-order or structural problem
+      feedbackKey = 'feedback--check-order'
+    }
+
+    // After the feedback phrase ends, speak the XP reward phrase
+    speak(feedbackKey, () => {
+      if (isPass && xpEarned > 0) {
+        setTimeout(() => {
+          speak(streakBonus > 0 ? 'xp--streak' : 'xp--earned')
+        }, 400)
+      }
+    })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

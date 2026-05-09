@@ -22,6 +22,7 @@ import { FormulaSlot } from './FormulaSlot'
 import { TTSButton } from '../ui/TTSButton'
 import { getNewConceptCardsForLevel } from '../../lib/definitions'
 import { sfx } from '../../lib/sfx'
+import { useTTS } from '../../hooks/useTTS'
 
 interface FormulaBuilderProps {
   level: FormulaLevel
@@ -62,7 +63,11 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
     labelsVisible,
   } = useFormulaStore()
 
+  const { speak } = useTTS()
   const labelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Refs to detect allFilled / sentenceComplete transitions for TTS cues
+  const prevAllFilled = useRef(false)
+  const prevSentenceComplete = useRef(false)
   // Track which word classes had hints used this session
   const [hintsUsed, setHintsUsed] = useState<WordClass[]>([])
   // Reference card expansion state
@@ -107,13 +112,29 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
   // when the store is updated from outside React's event system (WF-BUG-003).
   const allFilled = level.formula_elements.every((el) => !!slotSelections[el.position])
 
-  // Reset finishing steps whenever a slot is cleared (allFilled → false)
+  // Reset finishing steps whenever a slot is cleared (allFilled → false).
+  // Speak cap-step--intro the moment all slots become filled.
   useEffect(() => {
-    if (!allFilled) {
+    if (allFilled) {
+      if (!prevAllFilled.current) {
+        speak('cap-step--intro')
+      }
+    } else {
       setIsCapitalised(false)
       setSelectedPunctuation(null)
+      // Reset sentenceComplete tracking so the done cue can fire again next fill
+      prevSentenceComplete.current = false
     }
-  }, [allFilled])
+    prevAllFilled.current = allFilled
+  }, [allFilled]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Speak cap-step--done when both capitalisation and punctuation are chosen.
+  useEffect(() => {
+    if (sentenceComplete && !prevSentenceComplete.current) {
+      speak('cap-step--done')
+    }
+    prevSentenceComplete.current = sentenceComplete
+  }, [sentenceComplete]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Advance the active hint slot when the current slot is filled.
   // This drives the sequential tooltip reveal: once the pupil places a word

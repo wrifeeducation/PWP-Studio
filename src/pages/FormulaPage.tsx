@@ -82,6 +82,8 @@ export default function FormulaPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   // Track sessions completed on this level (for WhatsNext mastery bar)
   const [sessionsCompletedThisLevel, setSessionsCompletedThisLevel] = useState(0)
+  // Streak bonus earned this session — passed to FormulaFeedback for XP TTS selection
+  const [streakBonusEarned, setStreakBonusEarned] = useState(0)
 
   // Extension challenge assigned to this pupil (loaded when transitioning to whats-next)
   const [activeChallenge, setActiveChallenge] = useState<ActiveChallenge | null>(null)
@@ -362,6 +364,7 @@ export default function FormulaPage() {
       const levelXp = calcFormulaXP(data.level.id, raw.overall_score)
       const totalXpEarned = levelXp + streakBonus
       setXpEarned(totalXpEarned)
+      setStreakBonusEarned(streakBonus)
 
       // Play feedback sound based on score
       if (raw.overall_score >= 80) {
@@ -1151,6 +1154,7 @@ export default function FormulaPage() {
           <FormulaFeedback
             result={assessmentResult}
             xpEarned={xpEarned}
+            streakBonus={streakBonusEarned}
             sentence={
               data.level.formula_elements
                 .map((el) => useFormulaStore.getState().slotSelections[el.position] ?? '_')
