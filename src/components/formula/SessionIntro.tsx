@@ -11,7 +11,7 @@
  * on any existing character). Animations use Framer Motion.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { WORD_CLASS_DEFINITIONS } from '../../lib/definitions'
 import type { FormulaLevel } from '../../types/index'
@@ -247,7 +247,12 @@ type IntroPhase = 'greeting' | 'example' | 'ready'
 export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSkip }: SessionIntroProps) {
   const [phase, setPhase] = useState<IntroPhase>('greeting')
   const phaseRef = useRef<IntroPhase>('greeting')
-  const exampleCompleteFiredRef = useRef(false)
+  // Coordination refs: only advance to 'ready' when BOTH the tile animation
+  // AND the level-intro audio have finished. Whichever finishes first waits
+  // for the other so the narration is never cut off mid-sentence.
+  const levelIntroEndedRef = useRef(false)
+  const animationDoneRef = useRef(false)
+  const readyFiredRef = useRef(false)
   const [mascotPose, setMascotPose] = useState<'wave' | 'point' | 'cheer'>('wave')
   const { speak, stop } = useTTS()
 
@@ -259,6 +264,17 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
     .map(el => WORD_CLASS_DEFINITIONS[el.word_class]?.label ?? el.word_class)
     .join(' + ')
 
+  // Called once both animation and audio have signalled completion.
+  // Guards against double-fire from React StrictMode or duplicate callbacks.
+  const tryAdvanceToReady = useCallback(() => {
+    if (!levelIntroEndedRef.current || !animationDoneRef.current) return
+    if (readyFiredRef.current) return
+    readyFiredRef.current = true
+    setPhase('ready')
+    setMascotPose('cheer')
+    setTimeout(() => speak('session-intro--your-turn'), 300)
+  }, [speak])
+
   // ── Speak greeting on mount, then advance when speech ends ──────────────────
   useEffect(() => {
     speak(isReturning ? 'session-intro--returning' : 'session-intro--new-user', () => {
@@ -267,8 +283,12 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
       if (phaseRef.current !== 'greeting') return
       setPhase('example')
       setMascotPose('point')
-      // Short pause, then narrate the full worked example (pre-generated Alistair MP3)
-      setTimeout(() => speak(`level-intro--${level.id}`), 400)
+      // Short pause, then narrate the full worked example. The onEnd callback
+      // signals that audio is done; tryAdvanceToReady waits for animation too.
+      setTimeout(() => speak(`level-intro--${level.id}`, () => {
+        levelIntroEndedRef.current = true
+        tryAdvanceToReady()
+      }), 400)
     })
     // Fallback: if TTS is disabled or greeting is short, auto-advance after 2s
     const fallback = setTimeout(() => {
@@ -286,12 +306,9 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
   }, [phase])
 
   const handleExampleComplete = () => {
-    // Guard against double-fire from animation callbacks or StrictMode
-    if (exampleCompleteFiredRef.current) return
-    exampleCompleteFiredRef.current = true
-    setPhase('ready')
-    setMascotPose('cheer')
-    setTimeout(() => speak('session-intro--your-turn'), 300)
+    // Signal animation done; tryAdvanceToReady will fire once audio is done too
+    animationDoneRef.current = true
+    tryAdvanceToReady()
   }
 
   return (
