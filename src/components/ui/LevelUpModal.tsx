@@ -3,7 +3,9 @@
  * Shows when a pupil passes the mastery gate and advances to the next level.
  */
 
+import React, { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTTS } from '../../hooks/useTTS'
 
 interface LevelUpModalProps {
   isOpen: boolean
@@ -27,6 +29,16 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({
   didUnlockParagraph,
   onContinue,
 }) => {
+  const { speak } = useTTS()
+
+  // Speak level-up phrase when modal opens — delay matches the sfx.levelUp() 500ms offset
+  useEffect(() => {
+    if (isOpen) {
+      const t = setTimeout(() => speak('xp--level-up'), 600)
+      return () => clearTimeout(t)
+    }
+  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <AnimatePresence>
       {isOpen && (

@@ -3,9 +3,10 @@
  * Shows score, coloured sentence breakdown, praise, and improvement tip.
  */
 
-import React from 'react'
+import React, { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import type { RawAssessmentResult } from '../../lib/assessFormula'
+import { useTTS } from '../../hooks/useTTS'
 
 interface FormulaFeedbackProps {
   result: RawAssessmentResult
@@ -42,6 +43,13 @@ export const FormulaFeedback: React.FC<FormulaFeedbackProps> = ({
   onContinue,
 }) => {
   const isPass = result.overall_score >= 80
+  const { speak } = useTTS()
+
+  // Speak feedback phrase once on mount
+  useEffect(() => {
+    const key = isPass ? 'feedback--correct' : 'feedback--try-again'
+    speak(key)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <motion.div
