@@ -275,22 +275,17 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
     setTimeout(() => speak('session-intro--your-turn'), 300)
   }, [speak])
 
-  // ── Speak greeting on mount, then advance when speech ends ──────────────────
+  // ── Speak greeting on mount, then advance phase when it ends ────────────────
+  // The level-intro is NOT chained here — it lives in its own phase effect below.
+  // This prevents a race where the 2s fallback advances the phase before the
+  // greeting callback fires, which previously caused level-intro to be skipped.
   useEffect(() => {
     speak(isReturning ? 'session-intro--returning' : 'session-intro--new-user', () => {
-      // Guard: if the 2s fallback already advanced the phase past 'greeting',
-      // don't regress it back. Only advance + play level-intro if still in greeting.
       if (phaseRef.current !== 'greeting') return
       setPhase('example')
       setMascotPose('point')
-      // Short pause, then narrate the full worked example. The onEnd callback
-      // signals that audio is done; tryAdvanceToReady waits for animation too.
-      setTimeout(() => speak(`level-intro--${level.id}`, () => {
-        levelIntroEndedRef.current = true
-        tryAdvanceToReady()
-      }), 400)
     })
-    // Fallback: if TTS is disabled or greeting is short, auto-advance after 2s
+    // Fallback: if TTS is disabled or greeting audio is slow, auto-advance after 2s
     const fallback = setTimeout(() => {
       if (phaseRef.current === 'greeting') {
         setPhase('example')
@@ -299,6 +294,20 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
     }, 2000)
     return () => { stop(); clearTimeout(fallback) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Speak level-intro when phase becomes 'example' ───────────────────────────
+  // Decoupled from the greeting effect so it fires regardless of HOW the phase
+  // transitioned to 'example' (greeting callback OR the 2s fallback).
+  useEffect(() => {
+    if (phase !== 'example') return
+    const timer = setTimeout(() => {
+      speak(`level-intro--${level.id}`, () => {
+        levelIntroEndedRef.current = true
+        tryAdvanceToReady()
+      })
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Keep mascot in wave pose during greeting ──────────────────────────────
   useEffect(() => {
