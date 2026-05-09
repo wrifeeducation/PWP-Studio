@@ -51,6 +51,8 @@ import { SessionIntro } from '../components/formula/SessionIntro'
 import { sfx } from '../lib/sfx'
 import { FullscreenButton } from '../components/ui/FullscreenButton'
 import { useSessionContent } from '../hooks/useSessionContent'
+import { ChallengeCard } from '../components/formula/ChallengeCard'
+import type { ActiveChallenge } from '../components/formula/ChallengeCard'
 
 // ─── Screen states ────────────────────────────────────────────────────────────
 
@@ -80,6 +82,9 @@ export default function FormulaPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   // Track sessions completed on this level (for WhatsNext mastery bar)
   const [sessionsCompletedThisLevel, setSessionsCompletedThisLevel] = useState(0)
+
+  // Extension challenge assigned to this pupil (loaded when transitioning to whats-next)
+  const [activeChallenge, setActiveChallenge] = useState<ActiveChallenge | null>(null)
 
   // Phase 2: mastery state for current level
   const masteryState = useMasteryState(user?.id, data?.level.id)
@@ -751,8 +756,36 @@ export default function FormulaPage() {
 
   // ─── continue from feedback → WhatsNext screen ──────────────────────────────
 
-  const handleFeedbackContinue = () => {
+  const handleFeedbackContinue = async () => {
     if (showLevelUp) return // Let LevelUpModal handle navigation
+
+    if (user?.id && data?.level.id) {
+      // Step 1: AI readiness check — auto-creates 'ai_auto' challenge if criteria met.
+      // Isolated try/catch so a failure here never blocks the challenge fetch below.
+      try {
+        await supabase.functions.invoke('check-challenge-readiness', {
+          body: { levelId: data.level.id },
+        })
+      } catch {
+        // Non-fatal — readiness check is best-effort
+      }
+
+      // Step 2: Always fetch active challenges regardless of readiness check outcome.
+      // RLS filters to challenges assigned to this pupil or their class.
+      try {
+        const { data: challengeRows } = await supabase
+          .from('pwp_challenge_assignments')
+          .select('id, challenge_type, source, class_id, pupil_id')
+          .eq('active', true)
+          .limit(1)
+
+        if (challengeRows && challengeRows.length > 0) {
+          setActiveChallenge(challengeRows[0] as ActiveChallenge)
+        }
+      } catch {
+        // Non-fatal — challenges are optional bonus content
+      }
+    }
     setScreen('whats-next')
   }
 
@@ -780,6 +813,30 @@ export default function FormulaPage() {
     setSubmitError(null)
     setSessionMistakes(0)
     setScreen('practice')
+  }
+
+  // ─── Challenge accept / skip handlers ───────────────────────────────────────
+
+  const handleChallengeAccept = (challenge: ActiveChallenge) => {
+    // Log the challenge_completed learning event so teachers/parents can see it
+    if (user?.id) {
+      void insertLearningEvent(
+        user.id,
+        profile?.class_id ?? null,
+        'challenge_completed',
+        {
+          challenge_type: challenge.challenge_type,
+          source: challenge.source,
+          skipped: false,
+        },
+      )
+    }
+    // The card will show the instructions in-place (handled by ChallengeCard state)
+  }
+
+  const handleChallengeSkip = (_challenge: ActiveChallenge) => {
+    setActiveChallenge(null)
+    // No learning event logged for skips — keeps data cleaner
   }
 
   const handleWhatsNextNextLevel = () => {
@@ -1105,29 +1162,39 @@ export default function FormulaPage() {
         )}
 
         {screen === 'whats-next' && assessmentResult && (
-          <WhatsNext
-            level={data.level}
-            score={assessmentResult.overall_score}
-            xpEarned={xpEarned}
-            sessionsCompleted={sessionsCompletedThisLevel}
-            paragraphActive={data.level.paragraph_active ?? false}
-            writingUnlocked={false}
-            leadSentence={
-              data.level.formula_elements
-                .map((el) => useFormulaStore.getState().slotSelections[el.position] ?? '')
-                .filter(Boolean)
-                .join(' ')
-            }
-            formulaScore={assessmentResult.overall_score}
-            onParagraph={handleWhatsNextParagraph}
-            onRetry={handleWhatsNextRetry}
-            onDashboard={() => navigate('/dashboard')}
-            onNextLevel={
-              !isReviewMode && data.level.id < 67
-                ? handleWhatsNextNextLevel
-                : undefined
-            }
-          />
+          <div className="space-y-4">
+            {/* Extension challenge card — shown when a teacher/parent/AI has assigned one */}
+            {activeChallenge && (
+              <ChallengeCard
+                challenge={activeChallenge}
+                onAccept={handleChallengeAccept}
+                onSkip={handleChallengeSkip}
+              />
+            )}
+            <WhatsNext
+              level={data.level}
+              score={assessmentResult.overall_score}
+              xpEarned={xpEarned}
+              sessionsCompleted={sessionsCompletedThisLevel}
+              paragraphActive={data.level.paragraph_active ?? false}
+              writingUnlocked={false}
+              leadSentence={
+                data.level.formula_elements
+                  .map((el) => useFormulaStore.getState().slotSelections[el.position] ?? '')
+                  .filter(Boolean)
+                  .join(' ')
+              }
+              formulaScore={assessmentResult.overall_score}
+              onParagraph={handleWhatsNextParagraph}
+              onRetry={handleWhatsNextRetry}
+              onDashboard={() => navigate('/dashboard')}
+              onNextLevel={
+                !isReviewMode && data.level.id < 67
+                  ? handleWhatsNextNextLevel
+                  : undefined
+              }
+            />
+          </div>
         )}
       </main>
     </div>
