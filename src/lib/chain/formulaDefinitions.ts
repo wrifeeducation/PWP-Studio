@@ -342,11 +342,17 @@ export const CHAIN_FORMULA_DEFINITIONS: ChainFormulaDefinition[] = [
 export const getChainFormula = (level: number): ChainFormulaDefinition | undefined =>
   CHAIN_FORMULA_DEFINITIONS.find((f) => f.level === level)
 
-/** Returns all defined chain formulas up to and including `currentLevel` */
-export const getChainForLevel = (currentLevel: number): ChainFormulaDefinition[] =>
-  CHAIN_FORMULA_DEFINITIONS.filter((f) => f.level <= currentLevel).sort(
+/**
+ * Returns all defined chain formulas up to and including `currentLevel`.
+ * Minimum chain length is CL5 — pupils below CL5 always see CL1–CL5
+ * so every session has a meaningful arc of progression.
+ */
+export const getChainForLevel = (currentLevel: number): ChainFormulaDefinition[] => {
+  const effectiveLevel = Math.max(currentLevel, 5)
+  return CHAIN_FORMULA_DEFINITIONS.filter((f) => f.level <= effectiveLevel).sort(
     (a, b) => a.level - b.level,
   )
+}
 
 /** Returns the previous CL definition, for diff-badge calculation */
 export const getPreviousChainFormula = (level: number): ChainFormulaDefinition | undefined =>
