@@ -17,6 +17,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { sfx } from '../lib/sfx'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
@@ -1501,6 +1502,9 @@ export default function DashboardPage() {
   const handleNodeClick = (level: number, _node: NodeType) => {
     const currentLevel = progress?.current_formula_level ?? 1
     const tier = levelTier(level, currentLevel)
+    // S-07: Unlock <audio> autoplay within the gesture so SessionIntro TTS plays on iOS.
+    sfx.prime()
+    sfx.unlockAudio()
     if (tier === 'done') {
       // Completed level — open in review mode so progress isn't affected
       navigate(`/practice?level=${level}&review=true`)
@@ -1655,12 +1659,12 @@ export default function DashboardPage() {
           </div>
           <ContinueCard
             currentLevel={currentLevel}
-            onContinue={() => navigate('/practice')}
+            onContinue={() => { sfx.prime(); sfx.unlockAudio(); navigate('/practice') }}
           />
           <DailyPracticeCard
             completedToday={chainDoneToday}
             currentLevel={currentLevel}
-            onStart={() => navigate('/daily-practice')}
+            onStart={() => { sfx.prime(); sfx.unlockAudio(); navigate('/daily-practice') }}
             masterySignal={chainLevelData?.mastery_signal ?? false}
             masteryPoints={chainLevelData?.mastery_points ?? 0}
             chainStreak={chainStreak}
@@ -1668,7 +1672,7 @@ export default function DashboardPage() {
 
           {/* Free Practice entry — always available */}
           <motion.button
-            onClick={() => navigate('/free-practice')}
+            onClick={() => { sfx.prime(); sfx.unlockAudio(); navigate('/free-practice') }}
             whileTap={{ scale: 0.97 }}
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}

@@ -36,8 +36,8 @@ interface SettingsActions {
 export const useSettingsStore = create<SettingsState & SettingsActions>()(
   persist(
     (set) => ({
-      // TTS defaults — off by default; pupil opts in via Settings
-      ttsEnabled: false,
+      // TTS defaults — on by default so ElevenLabs greetings play immediately
+      ttsEnabled: true,
       ttsRate: 0.85,
       ttsVoice: null,
 

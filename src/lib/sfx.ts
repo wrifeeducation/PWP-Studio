@@ -115,6 +115,31 @@ export const sfx = {
     getCtx()
   },
 
+  /**
+   * S-07: Unlock <audio> element autoplay within a synchronous user gesture handler.
+   * iOS Safari blocks programmatic audio.play() calls that happen outside a direct
+   * user gesture (e.g. inside a useEffect after navigation). Call this at the very
+   * TOP of any onClick that navigates to a page with TTS — it "blesses" the page for
+   * subsequent audio.play() calls by touching a silent Audio element while the gesture
+   * context is still active.
+   *
+   * Call alongside sfx.prime() so both Web Audio API and <audio> elements are unlocked:
+   *   sfx.prime()
+   *   sfx.unlockAudio()
+   */
+  unlockAudio(): void {
+    try {
+      // A 1-sample silent WAV as a data URI — plays and ends instantly.
+      const silent = new Audio(
+        'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA='
+      )
+      silent.volume = 0
+      silent.play().catch(() => {})
+    } catch {
+      // ignore — not all browsers support this; we try best-effort
+    }
+  },
+
   /** Enable or disable all sound effects */
   setEnabled(enabled: boolean): void {
     _enabled = enabled
