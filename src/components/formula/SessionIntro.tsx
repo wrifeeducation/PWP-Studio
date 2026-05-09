@@ -19,34 +19,6 @@ import { WordClass } from '../../types/index'
 import { sfx } from '../../lib/sfx'
 import { useTTS } from '../../hooks/useTTS'
 
-// ─── Narration builder ────────────────────────────────────────────────────────
-// Builds the example-phase narration for a given formula level.
-// e.g. "Watch me. My naming word is dog, and my doing word is ran. Dog ran!"
-function buildExampleNarration(level: FormulaLevel): string {
-  const elements = level.formula_elements
-  if (!elements.length) return ''
-
-  // Build "My [word class] is [example word]" fragments
-  const fragments = elements.map((el, i) => {
-    const plainName = WORD_CLASS_DEFINITIONS[el.word_class]?.plainEnglishName ?? el.word_class.toLowerCase()
-    const word = el.example ?? (level.word_banks[el.word_class]?.[0] ?? '')
-    if (i === 0) return `My ${plainName} is ${word}`
-    if (i === elements.length - 1) return `and my ${plainName} is ${word}`
-    return `my ${plainName} is ${word}`
-  })
-
-  // Completed sentence
-  const sentence = elements
-    .map(el => el.example ?? (level.word_banks[el.word_class]?.[0] ?? ''))
-    .join(' ')
-
-  const listStr = fragments.length === 1
-    ? fragments[0]
-    : fragments.slice(0, -1).join(', ') + ', ' + fragments[fragments.length - 1]
-
-  return `Watch me build a sentence. ${listStr}. ${sentence}!`
-}
-
 // ─── Colour map ───────────────────────────────────────────────────────────────
 
 const WC_COLOUR: Record<WordClass, string> = {
