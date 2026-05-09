@@ -39,7 +39,7 @@ interface WritingTask {
   prompt_text: string
 }
 
-type TabId = 'pending' | 'progress' | 'assign' | 'interventions' | 'wordbanks' | 'analytics' | 'classes' | 'programme' | 'nc-report' | 'notifications'
+type TabId = 'pending' | 'progress' | 'assign' | 'interventions' | 'wordbanks' | 'analytics' | 'classes' | 'programme' | 'nc-report' | 'notifications' | 'challenges'
 
 const TAB_LABELS: Record<TabId, string> = {
   classes: 'My Classes',
@@ -47,6 +47,7 @@ const TAB_LABELS: Record<TabId, string> = {
   pending: 'Pending Review',
   progress: 'Class Progress',
   assign: 'Assign Task',
+  challenges: 'Challenges',
   interventions: 'Interventions',
   wordbanks: 'Word Banks',
   analytics: 'Analytics',
@@ -192,6 +193,7 @@ export default function TeacherPage() {
         {activeTab === 'interventions' && (
           <InterventionLogTab onResolve={() => setUnresolvedCount((c) => Math.max(0, c - 1))} />
         )}
+        {activeTab === 'challenges' && <ChallengesTab />}
         {activeTab === 'wordbanks' && <WordBankEditor />}
         {activeTab === 'analytics' && <AnalyticsTab />}
         {activeTab === 'nc-report' && <NCProgressReport />}
@@ -938,7 +940,7 @@ function MyClassesTab() {
   const [newPupilName, setNewPupilName] = useState('')
   const [newPupilYear, setNewPupilYear] = useState('3')
   const [creatingPupil, setCreatingPupil] = useState(false)
-  const [newPupilPin, setNewPupilPin] = useState<{ name: string; pin: string } | null>(null)
+  const [newPupilPin, setNewPupilPin] = useState<{ name: string; pin: string; username: string } | null>(null)
   // Edit class
   const [showEditForm, setShowEditForm] = useState(false)
   const [editClassData, setEditClassData] = useState({ name: '', year_group: '3', academic_year: '' })
@@ -1142,7 +1144,7 @@ function MyClassesTab() {
       setShowAddPupilModal(false)
       setNewPupilName('')
       setNewPupilYear('3')
-      setNewPupilPin({ name: data.firstName as string, pin: data.pin as string })
+      setNewPupilPin({ name: data.firstName as string, pin: data.pin as string, username: (data.username as string) ?? '' })
     } catch (err) {
       console.error('teacher-create-pupil:', err)
     } finally {
@@ -1604,30 +1606,47 @@ function MyClassesTab() {
                   {newPupilPin.name} is ready!
                 </h3>
                 <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                  Share this PIN — it's their login for PWP Studio and Interactive Practice.
+                  Share these login details — they work on PWP Studio and Interactive Practice.
                 </p>
               </div>
 
-              {/* PIN display */}
+              {/* Username + PIN display */}
               <div
-                className="rounded-xl px-6 py-5 mx-auto"
+                className="rounded-xl px-6 py-5 mx-auto space-y-4"
                 style={{ backgroundColor: 'var(--color-background)', border: '2px solid var(--color-brand-primary)' }}
               >
-                <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                  {newPupilPin.name}'s PIN
-                </p>
-                <p
-                  className="text-5xl font-bold tracking-[0.25em] select-all"
-                  style={{ color: 'var(--color-brand-primary)', fontFamily: 'monospace' }}
-                  data-testid="generated-pin"
-                  data-tts={`PIN: ${newPupilPin.pin.split('').join(' ')}`}
-                >
-                  {newPupilPin.pin}
-                </p>
+                {newPupilPin.username && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                      Username
+                    </p>
+                    <p
+                      className="text-2xl font-bold tracking-wide select-all"
+                      style={{ color: 'var(--color-text)', fontFamily: 'monospace' }}
+                      data-testid="generated-username"
+                      data-tts={`Username: ${newPupilPin.username}`}
+                    >
+                      {newPupilPin.username}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                    PIN
+                  </p>
+                  <p
+                    className="text-5xl font-bold tracking-[0.25em] select-all"
+                    style={{ color: 'var(--color-brand-primary)', fontFamily: 'monospace' }}
+                    data-testid="generated-pin"
+                    data-tts={`PIN: ${newPupilPin.pin.split('').join(' ')}`}
+                  >
+                    {newPupilPin.pin}
+                  </p>
+                </div>
               </div>
 
               <p className="text-xs" style={{ color: '#DC2626' }}>
-                ⚠ Write this down now — it won't be shown again.
+                ⚠ Write both down now — they won't be shown again.
               </p>
 
               <button
@@ -2502,6 +2521,396 @@ function LoadingSpinner() {
   return (
     <div className="flex items-center justify-center py-16">
       <p style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
+    </div>
+  )
+}
+
+// ─── Challenges Tab ───────────────────────────────────────────────────────────
+
+type ChallengeType = 'sentence_type' | 'add_list' | 'compound' | 'complex'
+type ChallengeSource = 'teacher' | 'parent' | 'independent' | 'ai_suggested' | 'ai_auto'
+
+interface ChallengeAssignment {
+  id: string
+  class_id: string | null
+  pupil_id: string | null
+  pupil_name?: string
+  challenge_type: ChallengeType
+  source: ChallengeSource
+  active: boolean
+  assigned_at: string
+  due_date: string | null
+}
+
+const CHALLENGE_TYPE_LABELS: Record<ChallengeType, string> = {
+  sentence_type: 'Change Sentence Type',
+  add_list:      'Add a List',
+  compound:      'Compound Sentence',
+  complex:       'Complex Sentence',
+}
+
+const CHALLENGE_TYPE_DESCRIPTIONS: Record<ChallengeType, string> = {
+  sentence_type: 'Transform the statement into a question, imperative, or exclamatory sentence',
+  add_list:      'Extend a noun phrase with a comma-separated list of adjectives or nouns',
+  compound:      'Join two clauses with a coordinating conjunction (FANBOYS)',
+  complex:       'Add a subordinate clause using a subordinating conjunction',
+}
+
+const CHALLENGE_TYPE_ICONS: Record<ChallengeType, string> = {
+  sentence_type: '❓',
+  add_list:      '📝',
+  compound:      '🔗',
+  complex:       '🌿',
+}
+
+const SOURCE_CONFIG: Record<ChallengeSource, { label: string; bg: string; colour: string }> = {
+  teacher:      { label: 'Teacher',      bg: '#DBEAFE', colour: '#1D4ED8' },
+  independent:  { label: 'Teacher',      bg: '#DBEAFE', colour: '#1D4ED8' },
+  parent:       { label: 'Parent',       bg: '#D1FAE5', colour: '#065F46' },
+  ai_suggested: { label: 'AI Suggested', bg: '#EDE9FE', colour: '#5B21B6' },
+  ai_auto:      { label: 'AI Auto',      bg: '#FEF3C7', colour: '#92400E' },
+}
+
+function ChallengesTab() {
+  const { profile } = useAuthStore()
+  const [classes, setClasses] = useState<ClassRow[]>([])
+  const [selectedClassId, setSelectedClassId] = useState<string>('')
+  const [pupils, setPupils] = useState<{ id: string; first_name: string }[]>([])
+  const [challenges, setChallenges] = useState<ChallengeAssignment[]>([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+
+  // New challenge form state
+  const [newType, setNewType] = useState<ChallengeType>('sentence_type')
+  const [assignScope, setAssignScope] = useState<'class' | 'pupil'>('class')
+  const [selectedPupilId, setSelectedPupilId] = useState<string>('')
+
+  // Load teacher's classes
+  useEffect(() => {
+    if (!profile) return
+    const query = profile.role === 'school_admin'
+      ? supabase.from('classes').select('*').eq('school_id', profile.school_id!).order('year_group')
+      : supabase.from('classes').select('*').eq('teacher_id', profile.id).order('year_group')
+    query.then(({ data }) => {
+      const rows = (data as ClassRow[]) ?? []
+      setClasses(rows)
+      if (rows.length > 0) setSelectedClassId(rows[0].id)
+    })
+  }, [profile])
+
+  // Load pupils and challenges whenever class changes
+  useEffect(() => {
+    if (!selectedClassId) return
+    setLoading(true)
+    setError(null)
+
+    Promise.all([
+      // Pupils via class_members → pupils (PWP home system)
+      supabase
+        .from('class_members')
+        .select('pupil_id, pupils(id, first_name)')
+        .eq('class_id', selectedClassId),
+      // Active challenges for this class
+      supabase
+        .from('pwp_challenge_assignments')
+        .select('*')
+        .eq('class_id', selectedClassId)
+        .eq('active', true)
+        .order('assigned_at', { ascending: false }),
+    ]).then(([pupilsRes, challengesRes]) => {
+      const pupilRows = (pupilsRes.data ?? []).map((row: Record<string, unknown>) => {
+        const p = row.pupils as { id: string; first_name: string } | null
+        return { id: p?.id ?? '', first_name: p?.first_name ?? 'Unknown' }
+      }).filter((p) => p.id)
+      setPupils(pupilRows)
+
+      // Enrich challenges with pupil names
+      const rawChallenges = (challengesRes.data ?? []) as ChallengeAssignment[]
+      const enriched = rawChallenges.map((c) => ({
+        ...c,
+        pupil_name: c.pupil_id
+          ? (pupilRows.find((p) => p.id === c.pupil_id)?.first_name ?? 'Unknown pupil')
+          : undefined,
+      }))
+      setChallenges(enriched)
+      setLoading(false)
+    })
+  }, [selectedClassId])
+
+  const flash = (msg: string, isError = false) => {
+    if (isError) { setError(msg); setTimeout(() => setError(null), 4000) }
+    else { setSuccess(msg); setTimeout(() => setSuccess(null), 3000) }
+  }
+
+  const handleAssign = async () => {
+    if (!selectedClassId) return
+    setSaving(true)
+    const payload: Record<string, unknown> = {
+      challenge_type: newType,
+      source: profile?.role === 'school_admin' ? 'teacher' : 'independent',
+      active: true,
+    }
+    if (assignScope === 'class') {
+      payload.class_id = selectedClassId
+    } else {
+      if (!selectedPupilId) { flash('Please select a pupil', true); setSaving(false); return }
+      payload.pupil_id = selectedPupilId
+      payload.class_id = selectedClassId
+    }
+
+    const { data, error: err } = await supabase
+      .from('pwp_challenge_assignments')
+      .insert(payload)
+      .select()
+      .single()
+
+    if (err) {
+      if (err.code === '23505') {
+        flash('That challenge is already active for this class or pupil.', true)
+      } else {
+        flash(err.message, true)
+      }
+    } else {
+      const newChallenge: ChallengeAssignment = {
+        ...(data as ChallengeAssignment),
+        pupil_name: assignScope === 'pupil'
+          ? pupils.find((p) => p.id === selectedPupilId)?.first_name
+          : undefined,
+      }
+      setChallenges((prev) => [newChallenge, ...prev])
+      flash(`✓ ${CHALLENGE_TYPE_LABELS[newType]} challenge assigned`)
+    }
+    setSaving(false)
+  }
+
+  const handleRemove = async (challengeId: string) => {
+    const { error: err } = await supabase
+      .from('pwp_challenge_assignments')
+      .update({ active: false })
+      .eq('id', challengeId)
+    if (err) { flash(err.message, true); return }
+    setChallenges((prev) => prev.filter((c) => c.id !== challengeId))
+    flash('Challenge removed')
+  }
+
+  const selectedClass = classes.find((c) => c.id === selectedClassId)
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <div>
+        <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--color-text)' }}>
+          Extension Challenges
+        </h2>
+        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+          Assign bonus challenges to a whole class or individual pupils after they complete their formula sentence.
+        </p>
+      </div>
+
+      {/* Feedback banners */}
+      {error && (
+        <div
+          className="px-4 py-3 rounded-xl text-sm"
+          style={{ backgroundColor: '#FEF2F2', color: '#991B1B', border: '1px solid #FECACA' }}
+        >
+          {error}
+        </div>
+      )}
+      {success && (
+        <div
+          className="px-4 py-3 rounded-xl text-sm"
+          style={{ backgroundColor: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0' }}
+        >
+          {success}
+        </div>
+      )}
+
+      {/* Class selector */}
+      {classes.length === 0 ? (
+        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+          No classes found. Create a class in the My Classes tab first.
+        </p>
+      ) : (
+        <div>
+          <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text)' }}>
+            Class
+          </label>
+          <select
+            value={selectedClassId}
+            onChange={(e) => setSelectedClassId(e.target.value)}
+            className="px-3 py-2 rounded-lg text-sm"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text)',
+            }}
+          >
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} (Yr {c.year_group})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {selectedClassId && (
+        <>
+          {/* ── Assign new challenge ── */}
+          <div
+            className="rounded-2xl p-5 space-y-4"
+            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+          >
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
+              Assign New Challenge
+            </h3>
+
+            {/* Challenge type grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {(Object.keys(CHALLENGE_TYPE_LABELS) as ChallengeType[]).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setNewType(type)}
+                  className="text-left rounded-xl p-3 transition-all"
+                  style={{
+                    backgroundColor: newType === type ? '#EDE9FE' : 'var(--color-background)',
+                    border: `2px solid ${newType === type ? '#7C3AED' : 'var(--color-border)'}`,
+                    color: 'var(--color-text)',
+                  }}
+                >
+                  <p className="text-base mb-0.5">{CHALLENGE_TYPE_ICONS[type]}</p>
+                  <p className="text-xs font-semibold">{CHALLENGE_TYPE_LABELS[type]}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    {CHALLENGE_TYPE_DESCRIPTIONS[type]}
+                  </p>
+                </button>
+              ))}
+            </div>
+
+            {/* Scope */}
+            <div className="flex gap-4">
+              {(['class', 'pupil'] as const).map((scope) => (
+                <label key={scope} className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--color-text)' }}>
+                  <input
+                    type="radio"
+                    name="assignScope"
+                    value={scope}
+                    checked={assignScope === scope}
+                    onChange={() => setAssignScope(scope)}
+                  />
+                  {scope === 'class' ? `Whole class (${selectedClass?.name ?? ''})` : 'Specific pupil'}
+                </label>
+              ))}
+            </div>
+
+            {/* Pupil selector */}
+            {assignScope === 'pupil' && (
+              pupils.length === 0 ? (
+                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                  No PWP pupils in this class yet. Add pupils via My Classes.
+                </p>
+              ) : (
+                <select
+                  value={selectedPupilId}
+                  onChange={(e) => setSelectedPupilId(e.target.value)}
+                  className="px-3 py-2 rounded-lg text-sm w-full"
+                  style={{
+                    backgroundColor: 'var(--color-background)',
+                    border: '1px solid var(--color-border)',
+                    color: 'var(--color-text)',
+                  }}
+                >
+                  <option value="">— Select pupil —</option>
+                  {pupils.map((p) => (
+                    <option key={p.id} value={p.id}>{p.first_name}</option>
+                  ))}
+                </select>
+              )
+            )}
+
+            <button
+              type="button"
+              onClick={handleAssign}
+              disabled={saving || (assignScope === 'pupil' && !selectedPupilId)}
+              className="px-5 py-2.5 rounded-full text-sm font-semibold transition-opacity disabled:opacity-50"
+              style={{ backgroundColor: '#6C5CE7', color: '#fff' }}
+            >
+              {saving ? 'Assigning…' : `Assign ${CHALLENGE_TYPE_LABELS[newType]}`}
+            </button>
+          </div>
+
+          {/* ── Active challenges ── */}
+          <div>
+            <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text)' }}>
+              Active Challenges for {selectedClass?.name}
+            </h3>
+
+            {loading ? (
+              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
+            ) : challenges.length === 0 ? (
+              <div
+                className="rounded-xl p-6 text-center"
+                style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+              >
+                <p className="text-2xl mb-2">🏆</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>No active challenges</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                  Assign a challenge above to give pupils an extension task after sentence building.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {challenges.map((c) => {
+                  const src = SOURCE_CONFIG[c.source] ?? SOURCE_CONFIG.teacher
+                  return (
+                    <div
+                      key={c.id}
+                      className="rounded-xl p-4 flex items-start justify-between gap-3"
+                      style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-xl mt-0.5">{CHALLENGE_TYPE_ICONS[c.challenge_type]}</span>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <span className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
+                              {CHALLENGE_TYPE_LABELS[c.challenge_type]}
+                            </span>
+                            <span
+                              className="text-xs px-2 py-0.5 rounded-full font-medium"
+                              style={{ backgroundColor: src.bg, color: src.colour }}
+                            >
+                              {src.label}
+                            </span>
+                          </div>
+                          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                            {c.pupil_id
+                              ? `👤 ${c.pupil_name ?? 'Individual pupil'}`
+                              : `🏫 Whole class`}
+                            {' · '}
+                            {new Date(c.assigned_at).toLocaleDateString('en-GB', {
+                              day: 'numeric', month: 'short',
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemove(c.id)}
+                        className="text-xs px-3 py-1.5 rounded-full flex-shrink-0 transition-opacity hover:opacity-70"
+                        style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }

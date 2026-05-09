@@ -150,7 +150,17 @@ export default function LoginPage() {
     setIsLoading(true)
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) { setErrors({ general: error.message }); return }
+      if (error) {
+        const msg = error.message.toLowerCase()
+        if (msg.includes('invalid login') || msg.includes('invalid credentials') || msg.includes('wrong password')) {
+          setErrors({ general: 'Incorrect email or password. Please try again.' })
+        } else if (msg.includes('email not confirmed')) {
+          setErrors({ general: 'Please verify your email before signing in. Check your inbox for the confirmation link.' })
+        } else {
+          setErrors({ general: 'Incorrect email or password. Please try again.' })
+        }
+        return
+      }
       if (data.user) {
         const { data: profile } = await supabase
           .from('profiles').select('role').eq('id', data.user.id).single()
@@ -302,7 +312,17 @@ export default function LoginPage() {
     setIsLoading(true)
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) { setErrors({ general: error.message }); return }
+      if (error) {
+        const msg = error.message.toLowerCase()
+        if (msg.includes('invalid login') || msg.includes('invalid credentials') || msg.includes('wrong password')) {
+          setErrors({ general: 'Incorrect email or password. Please try again.' })
+        } else if (msg.includes('email not confirmed')) {
+          setErrors({ general: 'Please verify your email before signing in. Check your inbox for the confirmation link.' })
+        } else {
+          setErrors({ general: 'Incorrect email or password. Please try again.' })
+        }
+        return
+      }
       if (data.user) navigate('/parent', { replace: true })
     } catch {
       setErrors({ general: 'An unexpected error occurred. Please try again.' })
