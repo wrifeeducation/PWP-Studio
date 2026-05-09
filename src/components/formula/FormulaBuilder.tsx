@@ -128,14 +128,6 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
     prevAllFilled.current = allFilled
   }, [allFilled]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Speak cap-step--done when both capitalisation and punctuation are chosen.
-  useEffect(() => {
-    if (sentenceComplete && !prevSentenceComplete.current) {
-      speak('cap-step--done')
-    }
-    prevSentenceComplete.current = sentenceComplete
-  }, [sentenceComplete]) // eslint-disable-line react-hooks/exhaustive-deps
-
   // Advance the active hint slot when the current slot is filled.
   // This drives the sequential tooltip reveal: once the pupil places a word
   // in slot N, the hint for slot N+1 becomes active.
@@ -222,6 +214,14 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
 
   // Whether the pupil has completed both finishing steps
   const sentenceComplete = isCapitalised && selectedPunctuation !== null
+
+  // Speak cap-step--done when both capitalisation and punctuation are chosen.
+  useEffect(() => {
+    if (sentenceComplete && !prevSentenceComplete.current) {
+      speak('cap-step--done')
+    }
+    prevSentenceComplete.current = sentenceComplete
+  }, [sentenceComplete]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Gather used words (for submission payload)
   const getUsedWords = (): string[] =>
