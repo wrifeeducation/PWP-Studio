@@ -29,7 +29,7 @@ function buildExampleNarration(level: FormulaLevel): string {
   // Build "My [word class] is [example word]" fragments
   const fragments = elements.map((el, i) => {
     const plainName = WORD_CLASS_DEFINITIONS[el.word_class]?.plainEnglishName ?? el.word_class.toLowerCase()
-    const word = el.example || level.word_banks[el.word_class]?.[0] ?? ''
+    const word = el.example ?? (level.word_banks[el.word_class]?.[0] ?? '')
     if (i === 0) return `My ${plainName} is ${word}`
     if (i === elements.length - 1) return `and my ${plainName} is ${word}`
     return `my ${plainName} is ${word}`
@@ -37,7 +37,7 @@ function buildExampleNarration(level: FormulaLevel): string {
 
   // Completed sentence
   const sentence = elements
-    .map(el => el.example || level.word_banks[el.word_class]?.[0] ?? '')
+    .map(el => el.example ?? (level.word_banks[el.word_class]?.[0] ?? ''))
     .join(' ')
 
   const listStr = fragments.length === 1
