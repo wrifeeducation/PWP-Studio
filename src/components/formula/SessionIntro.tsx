@@ -247,6 +247,7 @@ type IntroPhase = 'greeting' | 'example' | 'ready'
 export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSkip }: SessionIntroProps) {
   const [phase, setPhase] = useState<IntroPhase>('greeting')
   const phaseRef = useRef<IntroPhase>('greeting')
+  const exampleCompleteFiredRef = useRef(false)
   const [mascotPose, setMascotPose] = useState<'wave' | 'point' | 'cheer'>('wave')
   const { speak, stop } = useTTS()
 
@@ -285,6 +286,9 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
   }, [phase])
 
   const handleExampleComplete = () => {
+    // Guard against double-fire from animation callbacks or StrictMode
+    if (exampleCompleteFiredRef.current) return
+    exampleCompleteFiredRef.current = true
     setPhase('ready')
     setMascotPose('cheer')
     setTimeout(() => speak('session-intro--your-turn'), 300)

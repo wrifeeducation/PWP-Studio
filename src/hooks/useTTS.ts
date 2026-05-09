@@ -18,10 +18,17 @@ interface UseTTSReturn {
   isSpeaking: boolean
 }
 
+// Extend HTMLAudioElement with a cancellation flag so we can suppress
+// play().catch() firing after we intentionally stop an element.
+// The play() promise cannot be cancelled, but we can ignore its rejection.
+interface ManagedAudio extends HTMLAudioElement {
+  __cancelled?: boolean
+}
+
 export const useTTS = (): UseTTSReturn => {
   const { ttsEnabled, ttsRate } = useSettingsStore()
   const [isSpeakingState, setIsSpeakingState] = useState(false)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const audioRef = useRef<ManagedAudio | null>(null)
 
   // Poll Web Speech API state (unchanged from before)
   useEffect(() => {
@@ -44,17 +51,22 @@ export const useTTS = (): UseTTSReturn => {
       // ── Pre-generated ElevenLabs file? ────────────────────────────────────
       const url = TTS_MANIFEST[textOrKey]
       if (url) {
-        // Stop any in-flight audio — null handlers BEFORE clearing src to prevent
-        // onerror firing on the old element and triggering a spurious Web Speech fallback.
+        // Stop any in-flight audio — null handlers AND mark as cancelled BEFORE
+        // clearing src. The onerror/onended properties are nulled to prevent
+        // synchronous handler firing. The __cancelled flag prevents the async
+        // play().catch() rejection (AbortError) from triggering Web Speech —
+        // that promise cannot be cancelled so we must guard inside the handler.
         if (audioRef.current) {
           audioRef.current.onended = null
           audioRef.current.onerror = null
+          audioRef.current.__cancelled = true
           audioRef.current.pause()
           audioRef.current.src = ''
         }
         stopSpeaking()
 
-        const audio = new Audio(url)
+        const audio = new Audio(url) as ManagedAudio
+        audio.__cancelled = false
         audioRef.current = audio
         setIsSpeakingState(true)
 
@@ -63,6 +75,7 @@ export const useTTS = (): UseTTSReturn => {
           onEnd?.()
         }
         audio.onerror = () => {
+          if (audio.__cancelled) return
           // File missing or network error — fall through to Web Speech
           setIsSpeakingState(false)
           ttsSpeak(textOrKey, ttsRate, 1.1, onEnd)
@@ -70,6 +83,7 @@ export const useTTS = (): UseTTSReturn => {
         }
 
         audio.play().catch(() => {
+          if (audio.__cancelled) return
           // Autoplay blocked — fall through to Web Speech
           ttsSpeak(textOrKey, ttsRate, 1.1, onEnd)
           setIsSpeakingState(true)
@@ -88,6 +102,7 @@ export const useTTS = (): UseTTSReturn => {
     if (audioRef.current) {
       audioRef.current.onended = null
       audioRef.current.onerror = null
+      audioRef.current.__cancelled = true
       audioRef.current.pause()
       audioRef.current.src = ''
     }
