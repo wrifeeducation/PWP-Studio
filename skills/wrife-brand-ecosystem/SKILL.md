@@ -434,6 +434,77 @@ immediately, and the Play Store TWA picks it up on next app launch.
 
 ---
 
+
+---
+
+## Known Gotchas — Read Before Touching Auth or Schema
+
+### 1. `profiles.email` must remain nullable — or ALL first-time pupil logins break
+
+**Applied fix:** Migration `make_profiles_email_nullable` ran on 2026-05-08.
+```sql
+ALTER TABLE public.profiles ALTER COLUMN email DROP NOT NULL;
+```
+
+**Why this matters:**
+The `handle_new_user` Postgres trigger fires on every `auth.users` INSERT and
+creates a row in `profiles`. The trigger only populates:
+`id, first_name, role, membership_tier, is_active, created_at, updated_at`.
+It does **not** set `email` — pupils have synthetic emails and the trigger
+doesn't know them. If `profiles.email` ever regains a NOT NULL constraint with
+no default, the trigger fails → the entire `auth.users` INSERT rolls back →
+the pupil auth account is never created → login fails.
+
+**Symptom A — Direct PWP login (Route B):**
+`pupil-login` Edge Function returns HTTP 500. LoginPage shows:
+"Could not connect. Please try again."
+
+**Symptom B — Hub SSO bounce (Route A):**
+wrife.co.uk generates the `#access_token` link correctly. Pupil clicks "Write →".
+PWP loads, Supabase SDK fires `SIGNED_IN`. `AuthInitialiser` calls
+`fetchProfileWithTimeout` — but no profile row exists (trigger failed on account
+creation). `ProtectedRoute` sees `isInitialised && !isLoading && !profile` →
+`<Navigate to="/login" />`. Pupil lands on the PWP login page as if SSO never
+happened. Same root cause as Symptom A — two different surfaces, one bug.
+
+**Rule:** Any new column added to `profiles` must have a database-level DEFAULT
+or be nullable. If a new required field is needed for teacher/admin users,
+update the `handle_new_user` trigger at the same time — pupils will always have
+sparse profiles and the trigger must cope with that.
+
+---
+
+### 2. `handle_new_user` trigger — what it sets and what it doesn't
+
+```sql
+-- Current body (as of 2026-05-08):
+INSERT INTO public.profiles
+  (id, first_name, role, membership_tier, is_active, created_at, updated_at)
+VALUES (
+  NEW.id,
+  COALESCE(NEW.raw_user_meta_data->>'first_name', 'User'),
+  COALESCE(NEW.raw_user_meta_data->>'role', 'pupil'),
+  CASE WHEN school_id IS NOT NULL AND school_id <> '' THEN 'school' ELSE 'free' END,
+  true, now(), now()
+)
+ON CONFLICT (id) DO NOTHING;
+```
+
+Fields deliberately **not** set by the trigger: `email`, `last_name`,
+`avatar_url`. Any new NOT NULL column added to `profiles` without updating this
+trigger will silently break auth-user creation for all four Routes.
+
+---
+
+### 3. Scope of affected pupils at time of fix (2026-05-08)
+
+45 pupils had `auth_user_id IS NULL` (never logged in). All unblocked by the
+migration. No orphaned `auth.users` rows were created before the fix — because
+the trigger failure rolls back the entire `createUser` call atomically, so
+`pupils.auth_user_id` was never written back.
+
+---
+
 ## Reference — Supabase Projects
 
 | Project ID | Name | Used for |
