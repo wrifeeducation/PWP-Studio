@@ -11,7 +11,7 @@
  * on any existing character). Animations use Framer Motion.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { WORD_CLASS_DEFINITIONS } from '../../lib/definitions'
 import type { FormulaLevel } from '../../types/index'
@@ -246,8 +246,12 @@ type IntroPhase = 'greeting' | 'example' | 'ready'
 
 export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSkip }: SessionIntroProps) {
   const [phase, setPhase] = useState<IntroPhase>('greeting')
+  const phaseRef = useRef<IntroPhase>('greeting')
   const [mascotPose, setMascotPose] = useState<'wave' | 'point' | 'cheer'>('wave')
   const { speak, stop } = useTTS()
+
+  // Keep phaseRef in sync so closures in useEffect can read current phase
+  useEffect(() => { phaseRef.current = phase }, [phase])
 
   // Build formula description for visual display
   const wordClassNames = level.formula_elements
@@ -257,16 +261,20 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
   // ── Speak greeting on mount, then advance when speech ends ──────────────────
   useEffect(() => {
     speak(isReturning ? 'session-intro--returning' : 'session-intro--new-user', () => {
-      // Advance to example phase once greeting finishes (or after 2.5s max)
+      // Guard: if the 2s fallback already advanced the phase past 'greeting',
+      // don't regress it back. Only advance + play level-intro if still in greeting.
+      if (phaseRef.current !== 'greeting') return
       setPhase('example')
       setMascotPose('point')
       // Short pause, then narrate the full worked example (pre-generated Alistair MP3)
       setTimeout(() => speak(`level-intro--${level.id}`), 400)
     })
-    // Fallback: if TTS is disabled, auto-advance after 2s
+    // Fallback: if TTS is disabled or greeting is short, auto-advance after 2s
     const fallback = setTimeout(() => {
-      setPhase(p => p === 'greeting' ? 'example' : p)
-      setMascotPose('point')
+      if (phaseRef.current === 'greeting') {
+        setPhase('example')
+        setMascotPose('point')
+      }
     }, 2000)
     return () => { stop(); clearTimeout(fallback) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps

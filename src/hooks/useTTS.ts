@@ -44,8 +44,11 @@ export const useTTS = (): UseTTSReturn => {
       // ── Pre-generated ElevenLabs file? ────────────────────────────────────
       const url = TTS_MANIFEST[textOrKey]
       if (url) {
-        // Stop any in-flight audio
+        // Stop any in-flight audio — null handlers BEFORE clearing src to prevent
+        // onerror firing on the old element and triggering a spurious Web Speech fallback.
         if (audioRef.current) {
+          audioRef.current.onended = null
+          audioRef.current.onerror = null
           audioRef.current.pause()
           audioRef.current.src = ''
         }
@@ -83,6 +86,8 @@ export const useTTS = (): UseTTSReturn => {
 
   const stop = useCallback(() => {
     if (audioRef.current) {
+      audioRef.current.onended = null
+      audioRef.current.onerror = null
       audioRef.current.pause()
       audioRef.current.src = ''
     }
