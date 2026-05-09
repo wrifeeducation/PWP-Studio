@@ -288,8 +288,8 @@ export function SessionIntro({ level, todaysSubject, isReturning, onReady, onSki
       // Advance to example phase once greeting finishes (or after 2.5s max)
       setPhase('example')
       setMascotPose('point')
-      // Short pause, then narrate the full worked example
-      setTimeout(() => speak(buildExampleNarration(level)), 400)
+      // Short pause, then narrate the full worked example (pre-generated Alistair MP3)
+      setTimeout(() => speak(`level-intro--${level.id}`), 400)
     })
     // Fallback: if TTS is disabled, auto-advance after 2s
     const fallback = setTimeout(() => {
