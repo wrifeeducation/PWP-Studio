@@ -685,25 +685,25 @@ const StatsSidebar: React.FC<StatsSidebarProps> = ({ progress, profile, earnedBa
           {[
             {
               label: 'Level',
-              value: `L${progress.current_formula_level}`,
+              value: `L${progress.current_formula_level ?? 1}`,
               icon: <span style={{ fontSize: 20 }}>📈</span>,
               colour: C.brand,
             },
             {
               label: 'XP',
-              value: progress.total_xp.toLocaleString(),
+              value: (progress.total_xp ?? 0).toLocaleString(),
               icon: <span style={{ fontSize: 20 }}>⭐</span>,
               colour: '#F39C12',
             },
             {
               label: 'Streak',
-              value: progress.current_streak > 0 ? `${progress.current_streak}d` : '–',
+              value: (progress.current_streak ?? 0) > 0 ? `${progress.current_streak}d` : '–',
               icon: <span style={{ fontSize: 20 }}>🔥</span>,
-              colour: progress.current_streak > 0 ? '#E74C3C' : C.muted,
+              colour: (progress.current_streak ?? 0) > 0 ? '#E74C3C' : C.muted,
             },
             {
               label: 'Coins',
-              value: progress.coins.toLocaleString(),
+              value: (progress.coins ?? 0).toLocaleString(),
               icon: <CoinIcon size={22} />,
               colour: C.orange,
             },
