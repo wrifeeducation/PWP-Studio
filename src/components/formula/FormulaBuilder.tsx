@@ -186,9 +186,18 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
     return selectedPunctuation ? `${joined}${selectedPunctuation}` : joined
   }
 
-  // Punctuation options: Stage 1–2 = full stop only (establish habit);
-  // Stage 3–4 = all three (choose appropriately — AI assessor notes the choice)
-  const punctuationOptions = scaffoldStage <= 2 ? ['.'] : ['.', '?', '!']
+  // All pupils see all three options from the start — choosing sentence type
+  // is part of the core writing act, not an advanced skill.
+  const punctuationOptions = ['.', '?', '!']
+
+  // Human-readable label for the chosen punctuation
+  const punctuationLabel = selectedPunctuation === '.'
+    ? 'Statement'
+    : selectedPunctuation === '?'
+    ? 'Question'
+    : selectedPunctuation === '!'
+    ? 'Exclamation'
+    : null
 
   // Whether the pupil has completed both finishing steps
   const sentenceComplete = isCapitalised && selectedPunctuation !== null
@@ -536,7 +545,7 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
                     {selectedPunctuation ? '✓' : '2'}
                   </span>
                   <p className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
-                    {selectedPunctuation ? `Ending with "${selectedPunctuation}"` : 'How does the sentence end?'}
+                    {punctuationLabel ? `${punctuationLabel} — ending with "${selectedPunctuation}"` : 'How does your sentence end?'}
                   </p>
                 </div>
 
@@ -567,8 +576,8 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
                   ))}
                 </div>
 
-                {/* Hint for Stage 3+: which to choose */}
-                {scaffoldStage >= 3 && !selectedPunctuation && (
+                {/* Always show the hint — sentence type choice is for everyone */}
+                {!selectedPunctuation && (
                   <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
                     Use <strong>.</strong> for a statement · <strong>?</strong> for a question · <strong>!</strong> for excitement
                   </p>
@@ -636,7 +645,9 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
             data-tts={
               !allFilled ? 'Fill all slots to continue'
               : !isCapitalised ? 'Tap the first word to capitalise it'
-              : !selectedPunctuation ? 'Choose punctuation to submit'
+              : !selectedPunctuation ? 'Choose how your sentence ends'
+              : selectedPunctuation === '?' ? 'Submit your question'
+              : selectedPunctuation === '!' ? 'Submit your exclamation'
               : 'Submit your sentence'
             }
             aria-label="Submit formula for assessment"
@@ -645,6 +656,8 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
               : !allFilled ? 'Fill all slots'
               : !isCapitalised ? 'Tap the first word first'
               : !selectedPunctuation ? 'Choose how it ends'
+              : selectedPunctuation === '?' ? '✓ Submit Question'
+              : selectedPunctuation === '!' ? '✓ Submit Exclamation'
               : '✓ Submit Sentence'}
           </button>
         </div>
