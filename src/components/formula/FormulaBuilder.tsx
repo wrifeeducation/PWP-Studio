@@ -65,8 +65,18 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
 
   const { speak } = useTTS()
   const labelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Refs to detect allFilled / sentenceComplete transitions for TTS cues
-  const prevAllFilled = useRef(false)
+
+  // Compute allFilled HERE — before the prevAllFilled ref — so we can initialise
+  // the ref to the actual current state on mount. If we initialise prevAllFilled to
+  // false unconditionally and Zustand has already restored filled slots, the first
+  // render sees allFilled=true, prevAllFilled=false and incorrectly fires cap-step--intro
+  // before the pupil has done anything (WF-BUG: premature cap-step TTS).
+  const allFilled = level.formula_elements.every((el) => !!slotSelections[el.position])
+
+  // Refs to detect allFilled / sentenceComplete transitions for TTS cues.
+  // prevAllFilled is seeded with the real initial value so the transition detector
+  // only fires on genuine false→true transitions (not a stale initial-false vs true).
+  const prevAllFilled = useRef(allFilled)
   const prevSentenceComplete = useRef(false)
   // Track which word classes had hints used this session
   const [hintsUsed, setHintsUsed] = useState<WordClass[]>([])
@@ -107,11 +117,6 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
     setSelectedPunctuation(null)
   }, [level.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Compute allFilled directly from the subscribed slotSelections snapshot rather than
-  // going through areAllSlotsFilled()'s internal get() call, which can return stale state
-  // when the store is updated from outside React's event system (WF-BUG-003).
-  const allFilled = level.formula_elements.every((el) => !!slotSelections[el.position])
-
   // Reset finishing steps whenever a slot is cleared (allFilled → false).
   // Speak cap-step--intro the moment all slots become filled.
   useEffect(() => {
@@ -144,19 +149,40 @@ export const FormulaBuilder: React.FC<FormulaBuilderProps> = ({
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
   )
 
-  // Single-tap: place tile into the first empty matching slot
+  // Single-tap: place tile into the first empty matching slot.
+  // If all matching slots are already filled, REPLACE the first one —
+  // this lets pupils swap their choice without having to clear the slot first.
   const handleTileSingleClick = useCallback(
     (word: string, wordClass: WordClass, tileId: string) => {
-      if (usedWordIds.has(tileId)) return // already placed
-      const matchingSlot = level.formula_elements.find(
+      if (usedWordIds.has(tileId)) return // already placed — clicking it again does nothing
+
+      // Prefer an empty slot of the right word class
+      const emptySlot = level.formula_elements.find(
         (el) => el.word_class === wordClass && !slotSelections[el.position]
       )
-      if (matchingSlot) {
-        setSlotWord(matchingSlot.position, word, tileId)
+      if (emptySlot) {
+        setSlotWord(emptySlot.position, word, tileId)
+        sfx.drop()
+        return
+      }
+
+      // No empty slot — replace the existing word in the first filled slot of this word class.
+      // This lets pupils change their mind without manually clearing the slot first.
+      const filledSlot = level.formula_elements.find(
+        (el) => el.word_class === wordClass && !!slotSelections[el.position]
+      )
+      if (filledSlot) {
+        const oldWord = slotSelections[filledSlot.position]
+        // Recover the old tile's ID (pattern: wordClass-word-index) to free it from usedWordIds
+        const oldTileId = Array.from(usedWordIds).find((id) =>
+          id.startsWith(`${wordClass}-${oldWord}-`)
+        )
+        clearSlot(filledSlot.position, oldTileId ?? '')
+        setSlotWord(filledSlot.position, word, tileId)
         sfx.drop()
       }
     },
-    [level.formula_elements, slotSelections, usedWordIds, setSlotWord]
+    [level.formula_elements, slotSelections, usedWordIds, setSlotWord, clearSlot]
   )
 
   const handleDragEnd = useCallback(

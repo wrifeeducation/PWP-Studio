@@ -45,18 +45,20 @@ export const FormulaFeedback: React.FC<FormulaFeedbackProps> = ({
   onContinue,
 }) => {
   const isPass = result.overall_score >= 80
+  // 50–79%: sentence is correct but could use a better word choice
+  const isPartialPass = result.overall_score >= 50 && result.overall_score < 80
   const { speak } = useTTS()
 
   // Speak feedback phrase on mount, then chain XP phrase if earned
   useEffect(() => {
-    // Pick the most fitting feedback key based on score
+    // Pick the most fitting feedback key based on score.
+    // 50–79% gets 'feedback--correct' (the sentence IS correct) not 'try-again'
+    // — "not quite / keep practising" is confusing when the grammar is right.
     let feedbackKey: string
     if (result.overall_score === 100) {
       feedbackKey = 'feedback--great-sentence'
-    } else if (result.overall_score >= 80) {
-      feedbackKey = 'feedback--correct'
     } else if (result.overall_score >= 50) {
-      feedbackKey = 'feedback--try-again'
+      feedbackKey = 'feedback--correct'
     } else {
       // Low score — likely a word-order or structural problem
       feedbackKey = 'feedback--check-order'
@@ -100,9 +102,13 @@ export const FormulaFeedback: React.FC<FormulaFeedbackProps> = ({
         <p
           className="text-sm font-medium mb-3"
           style={{ color: 'var(--color-text-muted)' }}
-          data-tts={isPass ? 'Passed!' : 'Keep practising!'}
+          data-tts={isPass ? 'Passed!' : isPartialPass ? "That's good — can you do even better?" : 'Keep practising!'}
         >
-          {isPass ? '🎉 Passed!' : '📚 Keep practising!'}
+          {isPass
+            ? '🎉 Passed!'
+            : isPartialPass
+            ? "👍 That's good — can you do even better?"
+            : '📚 Keep practising!'}
         </p>
         {xpEarned > 0 && (
           <motion.div
