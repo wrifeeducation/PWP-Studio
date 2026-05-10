@@ -21,6 +21,7 @@ import { useSettingsStore } from './stores/settingsStore'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
+import PupilWelcomePage from './pages/PupilWelcomePage'
 import FormulaPage from './pages/FormulaPage'
 import ParagraphPage from './pages/ParagraphPage'
 import DailyPracticePage from './pages/DailyPracticePage'
@@ -253,6 +254,16 @@ function App() {
 
             {/* Landing page — redirects logged-in users to their dashboard */}
             <Route path="/" element={<HomePage />} />
+
+            {/* Pupil welcome screen — first thing pupils see after login */}
+            <Route
+              path="/welcome"
+              element={
+                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
+                  <PupilWelcomePage />
+                </ProtectedRoute>
+              }
+            />
 
             {/* WF-003: Pupil dashboard — pupils only */}
             <Route

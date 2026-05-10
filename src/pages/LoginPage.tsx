@@ -133,7 +133,7 @@ export default function LoginPage() {
   }
 
   const handleRoleRedirect = (role: Role) => {
-    if (role === Role.PUPIL) navigate('/dashboard', { replace: true })
+    if (role === Role.PUPIL) navigate('/welcome', { replace: true })
     else if (role === Role.TEACHER) navigate('/teacher', { replace: true })
     else if (role === Role.SCHOOL_ADMIN) navigate('/admin', { replace: true })
     else if (role === Role.PARENT) navigate('/parent', { replace: true })
@@ -267,7 +267,7 @@ export default function LoginPage() {
         return
       }
 
-      navigate('/dashboard', { replace: true })
+      navigate('/welcome', { replace: true })
     } catch {
       setErrors({ general: 'An unexpected error occurred. Please try again.' })
     } finally {
@@ -294,7 +294,7 @@ export default function LoginPage() {
         setErrors({ general: 'Incorrect home code. Ask your parent to check the code in their WriFe account.' })
         return
       }
-      if (data.user) navigate('/dashboard', { replace: true })
+      if (data.user) navigate('/welcome', { replace: true })
     } catch {
       setErrors({ general: 'An unexpected error occurred. Please try again.' })
     } finally {

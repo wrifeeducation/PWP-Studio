@@ -24,7 +24,7 @@ export const RoleRedirect = () => {
   switch (role) {
     case Role.SCHOOL_ADMIN: return <Navigate to="/admin" replace />
     case Role.TEACHER:      return <Navigate to="/teacher" replace />
-    case Role.PUPIL:        return <Navigate to="/dashboard" replace />
+    case Role.PUPIL:        return <Navigate to="/welcome" replace />
     case Role.PARENT:       return <Navigate to="/parent" replace />
     default:                return <Navigate to="/dashboard" replace />
   }
