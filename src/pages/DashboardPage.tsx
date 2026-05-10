@@ -1659,7 +1659,7 @@ export default function DashboardPage() {
           </div>
           <ContinueCard
             currentLevel={currentLevel}
-            onContinue={() => { sfx.prime(); sfx.unlockAudio(); navigate('/practice') }}
+            onContinue={() => { sfx.prime(); sfx.unlockAudio(); navigate('/practice?skip_intro=true') }}
           />
           <DailyPracticeCard
             completedToday={chainDoneToday}

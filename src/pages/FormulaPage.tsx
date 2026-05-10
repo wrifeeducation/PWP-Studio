@@ -68,6 +68,8 @@ export default function FormulaPage() {
   const reviewLevelParam = searchParams.get('level')
   const reviewLevelId = reviewLevelParam ? parseInt(reviewLevelParam, 10) : undefined
   const isReviewMode = searchParams.get('review') === 'true' && !!reviewLevelId
+  // ── Skip intro — set when navigating from "Continue Practice" on the dashboard ─
+  const skipIntro = searchParams.get('skip_intro') === 'true'
 
   // ── Stars gate (WF-050) ───────────────────────────────────────────────────
   const stars = useStars()
@@ -103,12 +105,26 @@ export default function FormulaPage() {
   // Track whether we've already notified the teacher about being stuck this level
   const stuckNotifiedRef = useRef(false)
 
-  // Reset to intro screen when level changes (WF-051)
+  // Reset to intro screen when level changes (WF-051).
   useEffect(() => {
     setScreen('intro')
     setSessionMistakes(0)
     stuckNotifiedRef.current = false
-  }, [data?.level.id])
+  }, [data?.level.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Skip intro when navigating from "Continue Practice" on the dashboard.
+  // Waits for mastery data to confirm the pupil has been here before (sessionsOnLevel > 0)
+  // — this prevents first-timers from accidentally missing the intro.
+  const skipIntroAppliedRef = useRef(false)
+  useEffect(() => {
+    if (!skipIntro) return
+    if (skipIntroAppliedRef.current) return
+    if (masteryState.sessionsOnLevel === undefined) return // still loading
+    if (masteryState.sessionsOnLevel > 0) {
+      skipIntroAppliedRef.current = true
+      setScreen('practice')
+    }
+  }, [skipIntro, masteryState.sessionsOnLevel]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // WF-010: badge state
   const [newBadge, setNewBadge] = useState<Badge | null>(null)
