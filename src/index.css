@@ -260,6 +260,20 @@ p {
 }
 
 /* ============================================================================
+   PWP Studio: left sidebar responsive visibility
+   Mobile  (< 768px):  sidebar hidden, hamburger visible in TopBar
+   Desktop (≥ 768px):  sidebar always shown, hamburger hidden
+   ============================================================================ */
+
+.pwp-sidebar-desktop { display: none; }
+.pwp-mobile-hamburger { display: flex !important; }
+
+@media (min-width: 768px) {
+  .pwp-sidebar-desktop { display: block; }
+  .pwp-mobile-hamburger { display: none !important; }
+}
+
+/* ============================================================================
    R-05: Dashboard grid breakpoints — moved here from DashboardPage inline <style>
    The previous inline <style> tag was re-injected on every render and also
    contained a global `button:hover` rule that overrode node animations.

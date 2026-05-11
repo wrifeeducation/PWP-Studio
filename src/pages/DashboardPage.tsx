@@ -610,6 +610,151 @@ const BadgesSection: React.FC<BadgesProps> = ({ earnedBadgeIds, currentLevel: _c
   )
 }
 
+// ─── Left navigation sidebar (IP-style) ──────────────────────────────────────
+
+interface PwpSidebarProps {
+  name: string
+  currentLevel: number
+  totalXp: number
+  streak: number
+  badgeCount: number
+  avatarId: AvatarVariantId
+  onOpenWardrobe: () => void
+  onLogout: () => void
+}
+
+const PwpSidebar: React.FC<PwpSidebarProps> = ({
+  name, currentLevel, totalXp, streak, badgeCount, avatarId, onOpenWardrobe, onLogout,
+}) => {
+  const cameFromHub = sessionStorage.getItem('entryViaHub') === '1'
+  const level = Math.floor(totalXp / 500) + 1
+  const xpIntoLevel = totalXp % 500
+  const xpProgress = (xpIntoLevel / 500) * 100
+
+  const statCards = [
+    { emoji: '⭐', label: 'Total XP',   value: totalXp.toLocaleString(), color: '#F5C500' },
+    { emoji: '🔥', label: 'Day Streak', value: streak > 0 ? `${streak}` : '–', color: '#FF6B35' },
+    { emoji: '🏅', label: 'Badges',     value: badgeCount,                color: 'var(--color-brand-secondary)' },
+    { emoji: '📖', label: 'Level',      value: `L${currentLevel}`,        color: 'rgba(255,255,255,0.9)' },
+  ]
+
+  return (
+    <aside style={{
+      width: 240, minHeight: '100vh',
+      background: 'var(--color-brand-primary)',
+      display: 'flex', flexDirection: 'column',
+      paddingTop: 8, boxSizing: 'border-box',
+    }}>
+      {/* ← WriFe Hub — Route A only */}
+      {cameFromHub && (
+        <a
+          href="https://wrife.co.uk/pupil/dashboard"
+          data-testid="pwp-sidebar-back-to-hub"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '10px 16px', textDecoration: 'none',
+            color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: 600,
+            background: 'rgba(255,255,255,0.12)',
+            borderBottom: '1px solid rgba(255,255,255,0.12)',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.20)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
+        >
+          <span>←</span> WriFe Hub
+        </a>
+      )}
+
+      {/* Pupil identity */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 12px 10px' }}>
+        <button
+          onClick={onOpenWardrobe}
+          data-testid="pwp-sidebar-avatar-btn"
+          style={{
+            width: 52, height: 52, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.15)',
+            border: '2.5px solid rgba(255,255,255,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', flexShrink: 0, padding: 0,
+          }}
+        >
+          <WritzAvatar variant={avatarId} size={38} animated />
+        </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            data-tts={name}>
+            {name}
+          </div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+            Level {currentLevel}
+          </div>
+        </div>
+      </div>
+
+      {/* XP progress bar */}
+      <div style={{ padding: '0 12px 12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 5 }}>
+          <span>Lv.{level}</span>
+          <span data-tts={`${xpIntoLevel} of 500 XP to next level`}>{xpIntoLevel} / 500 XP</span>
+        </div>
+        <div style={{ height: 5, background: 'rgba(255,255,255,0.2)', borderRadius: 999, overflow: 'hidden' }}>
+          <div style={{
+            height: '100%', width: `${xpProgress}%`,
+            background: 'var(--color-brand-secondary)',
+            borderRadius: 999, transition: 'width 0.8s ease',
+          }} />
+        </div>
+      </div>
+
+      {/* Stat cards */}
+      <div style={{ padding: '0 12px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {statCards.map(s => (
+          <div key={s.label} style={{
+            background: 'var(--color-background)', borderRadius: 'var(--radius-md)',
+            padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 10,
+          }} data-tts={`${s.label}: ${s.value}`}>
+            <span style={{ fontSize: 20, flexShrink: 0 }}>{s.emoji}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10, color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {s.label}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: s.color, lineHeight: 1.1 }}>
+                {s.value}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Bottom — sign out */}
+      <div style={{ marginTop: 'auto', padding: '12px 12px 16px' }}>
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.12)', marginBottom: 10 }} />
+        <button
+          onClick={onLogout}
+          data-testid="pwp-sidebar-logout"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '9px 12px', borderRadius: 'var(--radius-md)',
+            width: '100%', border: 'none', cursor: 'pointer',
+            color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: 500,
+            background: 'rgba(255,255,255,0.08)', textAlign: 'left',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.16)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+        >
+          <span style={{ fontSize: 16 }}>🚪</span> Sign out
+        </button>
+        <div style={{ textAlign: 'center', marginTop: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '1px' }}>
+            WRIFE
+          </span>
+        </div>
+      </div>
+    </aside>
+  )
+}
+
 // ─── Stats sidebar ────────────────────────────────────────────────────────────
 
 interface StatsSidebarProps {
@@ -1186,10 +1331,11 @@ interface TopBarProps {
   coins: number
   onOpenWardrobe: () => void
   onLogout: () => void
+  onOpenSidebar?: () => void
   isPro?: boolean
 }
 
-const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWardrobe, onLogout, isPro = true }) => {
+const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWardrobe, onLogout, onOpenSidebar, isPro = true }) => {
   const navigate = useNavigate()
   // Show "← WriFe" only when the pupil arrived via Route A (hub SSO hash token).
   // entryViaHub is set in App.tsx AuthInitialiser on SIGNED_IN + hash detection.
@@ -1206,6 +1352,25 @@ const TopBar: React.FC<TopBarProps> = ({ name, avatarId, streak, coins, onOpenWa
     alignItems: 'center',
     gap: 12,
   }}>
+    {/* Hamburger — mobile only (hidden on desktop where the left sidebar shows) */}
+    {onOpenSidebar && (
+      <button
+        onClick={onOpenSidebar}
+        aria-label="Open menu"
+        data-testid="pwp-mobile-hamburger"
+        className="pwp-mobile-hamburger"
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          fontSize: 22, color: '#fff', padding: 4,
+          minWidth: 40, minHeight: 40,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        ☰
+      </button>
+    )}
+
     {/* Back to WriFe main site — Route A only */}
     {showBackToHub && (
     <a
@@ -1357,6 +1522,7 @@ export default function DashboardPage() {
   // R-08: respect prefers-reduced-motion for all Framer Motion animations in this page
   const prefersReducedMotion = useReducedMotion()
   const [wardrobeOpen, setWardrobeOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   // Profile is typed without the new selected_avatar column; cast through any
   const profileAny = profile as (typeof profile & { selected_avatar?: string }) | null
   const [selectedAvatar, setSelectedAvatar] = useState<AvatarVariantId>(
@@ -1559,9 +1725,55 @@ export default function DashboardPage() {
   return (
     // R-06: fontFamily:'Inter' removed — Inter is not loaded; Nunito cascades from :root
     <div
-      style={{ minHeight: '100dvh', background: C.bg }}
+      style={{ minHeight: '100dvh', background: C.bg, display: 'flex' }}
       data-testid="dashboard-page"
     >
+      {/* Desktop left sidebar — hidden on mobile via CSS */}
+      <div className="pwp-sidebar-desktop" style={{ position: 'sticky', top: 0, height: '100vh', flexShrink: 0, overflowY: 'auto' }}>
+        <PwpSidebar
+          name={name}
+          currentLevel={currentLevel}
+          totalXp={totalXp}
+          streak={streak}
+          badgeCount={earnedBadgeIds.length}
+          avatarId={avatarId}
+          onOpenWardrobe={() => setWardrobeOpen(true)}
+          onLogout={handleLogout}
+        />
+      </div>
+
+      {/* Mobile sidebar overlay */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setSidebarOpen(false)}
+              style={{ position: 'fixed', inset: 0, background: 'var(--color-overlay)', zIndex: 40 }}
+            />
+            <motion.div
+              initial={{ x: -240 }} animate={{ x: 0 }} exit={{ x: -240 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              style={{ position: 'fixed', left: 0, top: 0, bottom: 0, width: 240, zIndex: 50 }}
+            >
+              <PwpSidebar
+                name={name}
+                currentLevel={currentLevel}
+                totalXp={totalXp}
+                streak={streak}
+                badgeCount={earnedBadgeIds.length}
+                avatarId={avatarId}
+                onOpenWardrobe={() => { setWardrobeOpen(true); setSidebarOpen(false) }}
+                onLogout={handleLogout}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Main content area */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+
       {/* Top bar */}
       <TopBar
         name={name}
@@ -1570,6 +1782,7 @@ export default function DashboardPage() {
         coins={coins}
         onOpenWardrobe={() => setWardrobeOpen(true)}
         onLogout={handleLogout}
+        onOpenSidebar={() => setSidebarOpen(true)}
         isPro={isProUser}
       />
 
@@ -1748,6 +1961,8 @@ export default function DashboardPage() {
            - .dashboard-grid breakpoints are now in the WF-051 responsive section
            - gradientShift keyframe is now in index.css with a prefers-reduced-motion override
            - global `button:hover` rule was REMOVED — it overrode node animations globally */}
+
+      </div>{/* end main content area */}
 
       {/* Wardrobe modal */}
       <AnimatePresence>
