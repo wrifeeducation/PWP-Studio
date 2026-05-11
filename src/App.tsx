@@ -175,15 +175,8 @@ function AuthInitialiser() {
         } else {
           // SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED, etc.
 
-          // ── Route A detection: pupil arrived via wrife.co.uk hub SSO ─────────
-          // The hub embeds the JWT in the URL hash. Detect it here (synchronous,
-          // before the SDK strips the hash) and stamp sessionStorage so the
-          // "← WriFe" back button can be shown only for this tab/session.
-          if (event === 'SIGNED_IN' && window.location.hash.includes('access_token')) {
-            sessionStorage.setItem('entryViaHub', '1')
-            // Strip the token from the URL bar immediately
-            window.history.replaceState(null, '', window.location.pathname)
-          }
+          // Route A detection is handled in lib/supabase.ts (before createClient),
+          // which is the only synchronous moment the hash is still present.
 
           // Delay 300ms so signInWithPassword's auth-token lock fully releases
           // before the profile query tries to read the session token.
