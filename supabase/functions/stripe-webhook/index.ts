@@ -1,13 +1,20 @@
 /**
  * stripe-webhook — POST /stripe-webhook
  *
- * Receives and verifies Stripe webhook events. Updates the user's
- * membership_tier in the profiles table and writes to the subscriptions table.
+ * Receives and verifies Stripe webhook events. Updates the user's subscription
+ * state in either home_accounts (Route C/D: parents, independent teachers) or
+ * profiles (school teachers), depending on which table holds the matching
+ * stripe_customer_id.
  *
  * Events handled:
- *   checkout.session.completed        → set tier, upsert subscription
- *   customer.subscription.updated     → update tier on upgrade/downgrade/renewal
- *   customer.subscription.deleted     → reset tier to 'free'
+ *   checkout.session.completed        → set tier/status, upsert subscription
+ *   customer.subscription.updated     → update tier/status on renewal/upgrade/downgrade
+ *   customer.subscription.deleted     → reset tier to 'free', status to 'inactive'
+ *
+ * Table routing:
+ *   We try home_accounts first (by stripe_customer_id). If found, we update
+ *   subscription_tier and subscription_status there. Otherwise we fall back
+ *   to profiles.membership_tier (for school teachers).
  *
  * Environment variables required:
  *   STRIPE_SECRET_KEY
@@ -23,17 +30,14 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import Stripe from 'npm:stripe@^14';
 import { createClient } from 'npm:@supabase/supabase-js@^2';
 
-// ── Tier resolution ─────────────────────────────────────────────────────────
+// ── Tier resolution ──────────────────────────────────────────────────────────
 //
 // Prefer product metadata (set `wrife_tier` = 'pro' on each Stripe product).
-// This map is the belt-and-braces fallback — update with real Price IDs once
-// products are created in the Stripe Dashboard.
+// This map is the belt-and-braces fallback using real Price IDs from Stripe.
 //
-// Format: 'price_XXXX': 'tier'
 const PRICE_ID_TO_TIER: Record<string, string> = {
-  // Monthly + yearly pro prices — replace with real IDs from Stripe Dashboard
-  // price_pro_monthly: 'pro',
-  // price_pro_yearly: 'pro',
+  'price_1TRIq0Jw0OrBSQhGNomVeHsO': 'pro',   // Pro monthly £4.99
+  'price_1TRa8qJw0OrBSQhGp9bQ1sMq': 'pro',   // Pro annual  £30
 };
 
 const VALID_TIERS = ['free', 'pro'];
@@ -43,22 +47,59 @@ function resolveTier(priceId: string, productMetadataTier?: string): string {
   if (productMetadataTier && VALID_TIERS.includes(productMetadataTier)) {
     return productMetadataTier;
   }
-  // Fall back to hardcoded map
+  // Fall back to hardcoded price ID map
   return PRICE_ID_TO_TIER[priceId] ?? 'free';
 }
 
-// ── Supabase helpers ─────────────────────────────────────────────────────────
+// ── Account updater: home_accounts first, profiles fallback ─────────────────
 
-async function setUserTier(
+async function updateAccountTier(
   supabase: ReturnType<typeof createClient>,
   stripeCustomerId: string,
   tier: string,
+  status: 'active' | 'inactive',
+  stripeSubscriptionId?: string,
 ): Promise<void> {
+  // Try home_accounts first (Route C/D: parents and independent teachers)
+  const { data: homeAccount } = await supabase
+    .from('home_accounts')
+    .select('id')
+    .eq('stripe_customer_id', stripeCustomerId)
+    .maybeSingle();
+
+  if (homeAccount) {
+    const updatePayload: Record<string, unknown> = {
+      subscription_tier: tier,
+      subscription_status: status,
+      updated_at: new Date().toISOString(),
+    };
+    // Persist the subscription ID when we have it (set on checkout, clear on delete)
+    if (stripeSubscriptionId !== undefined) {
+      updatePayload.stripe_subscription_id = stripeSubscriptionId;
+    }
+    await supabase
+      .from('home_accounts')
+      .update(updatePayload)
+      .eq('stripe_customer_id', stripeCustomerId);
+
+    console.log(
+      `stripe-webhook: updated home_accounts — customer ${stripeCustomerId} → tier=${tier} status=${status}`,
+    );
+    return;
+  }
+
+  // Fall back to profiles (school teachers subscribed via wrife.co.uk)
   await supabase
     .from('profiles')
     .update({ membership_tier: tier })
     .eq('stripe_customer_id', stripeCustomerId);
+
+  console.log(
+    `stripe-webhook: updated profiles — customer ${stripeCustomerId} → membership_tier=${tier}`,
+  );
 }
+
+// ── subscriptions table upsert (unified audit record) ───────────────────────
 
 async function upsertSubscription(
   supabase: ReturnType<typeof createClient>,
@@ -77,6 +118,16 @@ async function upsertSubscription(
     cancel_at_period_end: sub.cancel_at_period_end,
     updated_at: new Date().toISOString(),
   });
+}
+
+// ── Resolve Stripe subscription status → our status field ───────────────────
+//
+// Stripe subscription statuses: trialing | active | incomplete | incomplete_expired
+//                                past_due | canceled | unpaid | paused
+// We collapse to 'active' for paying statuses, 'inactive' for everything else.
+//
+function resolveStatus(stripeStatus: string): 'active' | 'inactive' {
+  return stripeStatus === 'active' || stripeStatus === 'trialing' ? 'active' : 'inactive';
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────
@@ -117,13 +168,15 @@ Deno.serve(async (req: Request) => {
   // ── Handle events ─────────────────────────────────────────────────────────
   try {
     switch (event.type) {
-      // ── checkout.session.completed ───────────────────────────────────────
+
+      // ── checkout.session.completed ─────────────────────────────────────────
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.mode !== 'subscription') break;
 
         const customerId = session.customer as string;
         const userId = session.metadata?.supabase_user_id;
+        const subscriptionId = session.subscription as string | undefined;
 
         // Expand line items to get product metadata for tier resolution
         const lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
@@ -135,25 +188,27 @@ Deno.serve(async (req: Request) => {
         const priceId = firstItem?.price?.id ?? '';
         const tier = resolveTier(priceId, product?.metadata?.wrife_tier);
 
-        // Update profile tier
-        await setUserTier(supabase, customerId, tier);
+        // Update the account tier and status
+        await updateAccountTier(supabase, customerId, tier, 'active', subscriptionId);
 
-        // Upsert subscription record
-        if (session.subscription) {
-          const sub = await stripe.subscriptions.retrieve(session.subscription as string);
+        // Upsert the subscription row for audit/reporting
+        if (subscriptionId) {
+          const sub = await stripe.subscriptions.retrieve(subscriptionId);
           await upsertSubscription(supabase, sub, userId);
         }
 
-        console.log(`stripe-webhook: checkout completed — customer ${customerId} → tier ${tier}`);
+        console.log(
+          `stripe-webhook: checkout completed — customer ${customerId} → tier ${tier}`,
+        );
         break;
       }
 
-      // ── customer.subscription.updated ───────────────────────────────────
+      // ── customer.subscription.updated ─────────────────────────────────────
       case 'customer.subscription.updated': {
         const sub = event.data.object as Stripe.Subscription;
         const customerId = sub.customer as string;
 
-        // Expand to get product metadata
+        // Expand to get product metadata for tier resolution
         const expandedSub = await stripe.subscriptions.retrieve(sub.id, {
           expand: ['items.data.price.product'],
         });
@@ -162,28 +217,33 @@ Deno.serve(async (req: Request) => {
         const product = item?.price?.product as Stripe.Product | undefined;
         const priceId = item?.price?.id ?? '';
         const tier = resolveTier(priceId, product?.metadata?.wrife_tier);
+        const status = resolveStatus(expandedSub.status);
 
-        await setUserTier(supabase, customerId, tier);
+        await updateAccountTier(supabase, customerId, tier, status, sub.id);
         await upsertSubscription(supabase, expandedSub);
 
-        console.log(`stripe-webhook: subscription updated — customer ${customerId} → tier ${tier}`);
+        console.log(
+          `stripe-webhook: subscription updated — customer ${customerId} → tier ${tier} status ${status}`,
+        );
         break;
       }
 
-      // ── customer.subscription.deleted ────────────────────────────────────
+      // ── customer.subscription.deleted ─────────────────────────────────────
       case 'customer.subscription.deleted': {
         const sub = event.data.object as Stripe.Subscription;
         const customerId = sub.customer as string;
 
-        await setUserTier(supabase, customerId, 'free');
+        // Reset to free / inactive; keep stripe_subscription_id for audit trail
+        await updateAccountTier(supabase, customerId, 'free', 'inactive');
         await upsertSubscription(supabase, sub);
 
-        console.log(`stripe-webhook: subscription deleted — customer ${customerId} → free`);
+        console.log(
+          `stripe-webhook: subscription deleted — customer ${customerId} → free/inactive`,
+        );
         break;
       }
 
       default:
-        // Unhandled event type — ignore silently
         console.log(`stripe-webhook: unhandled event type ${event.type}`);
     }
   } catch (err) {
