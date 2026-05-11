@@ -94,6 +94,33 @@ function clearCachedProfile(): void {
   try { localStorage.removeItem(PROFILE_CACHE_KEY) } catch { /* ignore */ }
 }
 
+/** Backfill name from JWT user_metadata when the profiles row is absent or lacks first_name.
+ *  School pupils (Route A) arrive with first_name in user_metadata since the B1 fix
+ *  in wrife-website — but their profiles row may be null or have a null first_name. */
+function applyMetadataFallback(
+  profile: Profile | null,
+  userId: string,
+  meta: Record<string, unknown>,
+): Profile | null {
+  if (profile) {
+    if (!profile.first_name && meta.first_name) {
+      return { ...profile, first_name: meta.first_name as string }
+    }
+    return profile
+  }
+  // No profiles row at all — school pupils authenticated via Route A
+  if (meta.first_name || meta.display_name) {
+    return {
+      id: userId,
+      role: Role.PUPIL,
+      first_name: (meta.first_name as string | undefined) ?? null,
+      display_name: null,
+      created_at: '',
+    } as unknown as Profile
+  }
+  return null
+}
+
 /** Fetch a user profile; give up after 8 s (extended from 5 s for slow connections). */
 async function fetchProfileWithTimeout(userId: string): Promise<Profile | null> {
   const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000))
@@ -162,9 +189,11 @@ function AuthInitialiser() {
 
           // 2. Fetch fresh profile async — no await inside callback
           fetchProfileWithTimeout(userId).then(fresh => {
-            if (fresh) {
-              setProfile(fresh)
-              saveCachedProfile(fresh)
+            const meta = session.user?.user_metadata ?? {}
+            const resolved = applyMetadataFallback(fresh, userId, meta)
+            if (resolved) {
+              setProfile(resolved)
+              saveCachedProfile(resolved)
             }
             // 3. First-ever visit: mark ready after fetch completes
             if (!cached) {
@@ -183,9 +212,11 @@ function AuthInitialiser() {
           setLoading(true)
           setTimeout(() => {
             fetchProfileWithTimeout(userId).then(profile => {
-              if (profile) {
-                setProfile(profile)
-                saveCachedProfile(profile)
+              const meta = session.user?.user_metadata ?? {}
+              const resolved = applyMetadataFallback(profile, userId, meta)
+              if (resolved) {
+                setProfile(resolved)
+                saveCachedProfile(resolved)
               }
               setLoading(false)
               setInitialised(true)
