@@ -378,6 +378,53 @@ Assess each slot in the formula definition, calculate the overall score, and pro
       score: Math.max(0, Math.min(3, Math.round(el.score))),
     }));
 
+    // S6-4: Log this AI call to ai_attempts (fire-and-forget — never blocks the response).
+    // Extracts the pupil_id from the Authorization JWT so RLS-bypassed service-role insert
+    // can associate the row with the correct pupil.
+    ;(async () => {
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL');
+        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        if (!supabaseUrl || !serviceKey) return;
+
+        // Parse pupil_id from the Bearer JWT in the Authorization header
+        const authHeader = req.headers.get('Authorization') ?? '';
+        const token = authHeader.replace(/^Bearer\s+/i, '');
+        let pupilId: string | null = null;
+        if (token) {
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            pupilId = payload.sub ?? null;
+          } catch { /* ignore malformed token */ }
+        }
+        if (!pupilId) return;
+
+        // Parse difficulty_level from the level_id string (e.g. 'L5' → 5, '5' → 5)
+        const levelNum = parseInt(level_id.replace(/^L/i, ''), 10);
+        if (isNaN(levelNum)) return;
+
+        await fetch(`${supabaseUrl}/rest/v1/ai_attempts`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': serviceKey,
+            'Authorization': `Bearer ${serviceKey}`,
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify({
+            pupil_id: pupilId,
+            level_id,
+            difficulty_level: levelNum,
+            attempt_number: attempt_number ?? 1,
+            overall_score: result.overall_score,
+            common_error_type: result.common_error_type ?? null,
+            confidence: result.confidence,
+            model: 'claude-haiku-4-5-20251001',
+          }),
+        });
+      } catch { /* Non-critical — logging failure must never affect the assessment response */ }
+    })();
+
     return new Response(JSON.stringify(result), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

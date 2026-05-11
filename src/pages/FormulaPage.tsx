@@ -538,8 +538,16 @@ export default function FormulaPage() {
         }
       }
 
-      // Persist progress update
-      await supabase.from('formula_progress').update(progressionUpdates).eq('pupil_id', user.id)
+      // Persist progress update — upsert so new pupils without an existing row are handled
+      const { error: progressUpsertError } = await supabase
+        .from('formula_progress')
+        .upsert(
+          { pupil_id: user.id, ...progressionUpdates },
+          { onConflict: 'pupil_id' }
+        )
+      if (progressUpsertError) {
+        console.error('[FormulaPage] formula_progress save error:', progressUpsertError)
+      }
 
       // S5-4: save best sentence to portfolio (only writes if score beats the stored one)
       try {
@@ -759,7 +767,15 @@ export default function FormulaPage() {
         }
       }
 
-      await supabase.from('formula_progress').update(progressionUpdates).eq('pupil_id', user.id)
+      const { error: lensProgressError } = await supabase
+        .from('formula_progress')
+        .upsert(
+          { pupil_id: user.id, ...progressionUpdates },
+          { onConflict: 'pupil_id' }
+        )
+      if (lensProgressError) {
+        console.error('[FormulaPage:LensLab] formula_progress save error:', lensProgressError)
+      }
 
       // WF-010: evaluate badges
       const { data: allBadges } = await supabase.from('badges').select('*')
