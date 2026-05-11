@@ -315,6 +315,9 @@ export interface PupilProgress extends WithTimestamps {
   stars_remaining: number;          // 0–3, depletes on mistakes
   stars_last_replenished: Nullable<string>; // ISO date — resets to 3 each new day
   star_shield_active: boolean;      // absorbs next mistake without deducting a star
+  // S6-2: Adaptive difficulty tracking
+  difficulty_profile: Nullable<number[]>; // Rolling window of last 5 overall_score values
+  ready_to_advance: boolean;              // True when last 3 scores all > 95
 }
 
 export interface PupilBadge extends WithTimestamps {

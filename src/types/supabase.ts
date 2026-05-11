@@ -967,6 +967,8 @@ export type Database = {
           consecutive_mastery_sessions: number
           created_at: string | null
           current_formula_level: number
+          difficulty_profile: Json
+          ready_to_advance: boolean
           current_paragraph_phase: string | null
           current_streak: number | null
           double_xp_until: string | null
@@ -997,6 +999,7 @@ export type Database = {
           current_formula_level?: number
           current_paragraph_phase?: string | null
           current_streak?: number | null
+          difficulty_profile?: Json
           double_xp_until?: string | null
           id?: string
           last_session_date?: string | null
@@ -1006,6 +1009,7 @@ export type Database = {
           paragraph_genres_started?: Json
           phases_completed?: Json
           pupil_id: string
+          ready_to_advance?: boolean
           scaffold_stage_formula?: number
           sessions_on_current_level?: number
           star_shield_active?: boolean
@@ -1025,6 +1029,7 @@ export type Database = {
           current_formula_level?: number
           current_paragraph_phase?: string | null
           current_streak?: number | null
+          difficulty_profile?: Json
           double_xp_until?: string | null
           id?: string
           last_session_date?: string | null
@@ -1034,6 +1039,7 @@ export type Database = {
           paragraph_genres_started?: Json
           phases_completed?: Json
           pupil_id?: string
+          ready_to_advance?: boolean
           scaffold_stage_formula?: number
           sessions_on_current_level?: number
           star_shield_active?: boolean

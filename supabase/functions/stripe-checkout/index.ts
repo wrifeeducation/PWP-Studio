@@ -69,10 +69,6 @@ Deno.serve(async (req: Request) => {
   }
 
   // ── Stripe init ───────────────────────────────────────────────────────────
-  const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
-    apiVersion: '2024-06-20',
-  });
-
   const siteUrl = Deno.env.get('SITE_URL') ?? 'https://pwp-studio.wrife.co.uk';
 
   // ── Resolve account: home_accounts first, profiles fallback ──────────────
@@ -121,51 +117,65 @@ Deno.serve(async (req: Request) => {
     existingCustomerId = profile.stripe_customer_id ?? '';
   }
 
+  // ── Guard: Stripe key must be present ────────────────────────────────────
+  const stripeKey = Deno.env.get('STRIPE_SECRET_KEY') ?? '';
+  if (!stripeKey) {
+    console.error('stripe-checkout: STRIPE_SECRET_KEY is not set');
+    return json({ error: 'Payment service not configured' }, 500);
+  }
+  const stripe = new Stripe(stripeKey, { apiVersion: '2024-06-20' });
+
   // ── Retrieve or create Stripe customer ────────────────────────────────────
   let stripeCustomerId = existingCustomerId;
 
-  if (!stripeCustomerId) {
-    const customer = await stripe.customers.create({
-      email: user.email,
-      name: displayName,
+  try {
+    if (!stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        name: displayName,
+        metadata: {
+          supabase_user_id: user.id,
+          account_table: accountTable,
+        },
+      });
+      stripeCustomerId = customer.id;
+
+      // Persist the customer ID back to the correct table
+      if (accountTable === 'home_accounts') {
+        await supabase
+          .from('home_accounts')
+          .update({ stripe_customer_id: stripeCustomerId })
+          .eq('id', accountId);
+      } else {
+        await supabase
+          .from('profiles')
+          .update({ stripe_customer_id: stripeCustomerId })
+          .eq('id', accountId);
+      }
+    }
+
+    // ── Create Stripe Checkout session ──────────────────────────────────────
+    const session = await stripe.checkout.sessions.create({
+      customer: stripeCustomerId,
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${siteUrl}/parent?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/pricing?checkout=cancelled`,
+      allow_promotion_codes: true,
       metadata: {
         supabase_user_id: user.id,
         account_table: accountTable,
       },
     });
-    stripeCustomerId = customer.id;
 
-    // Persist the customer ID back to the correct table
-    if (accountTable === 'home_accounts') {
-      await supabase
-        .from('home_accounts')
-        .update({ stripe_customer_id: stripeCustomerId })
-        .eq('id', accountId);
-    } else {
-      await supabase
-        .from('profiles')
-        .update({ stripe_customer_id: stripeCustomerId })
-        .eq('id', accountId);
-    }
+    console.log(
+      `stripe-checkout: session created for ${accountTable} user ${user.id} — customer ${stripeCustomerId}`,
+    );
+
+    return json({ url: session.url });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('stripe-checkout: Stripe API error:', message);
+    return json({ error: `Stripe error: ${message}` }, 500);
   }
-
-  // ── Create Stripe Checkout session ────────────────────────────────────────
-  const session = await stripe.checkout.sessions.create({
-    customer: stripeCustomerId,
-    mode: 'subscription',
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${siteUrl}/parent?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${siteUrl}/pricing?checkout=cancelled`,
-    allow_promotion_codes: true,
-    metadata: {
-      supabase_user_id: user.id,
-      account_table: accountTable,
-    },
-  });
-
-  console.log(
-    `stripe-checkout: session created for ${accountTable} user ${user.id} — customer ${stripeCustomerId}`,
-  );
-
-  return json({ url: session.url });
 });

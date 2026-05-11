@@ -102,6 +102,9 @@ export default function FormulaPage() {
     fallbackSubject: data?.todaysSubject,
   })
 
+  // S6-2: Scaffolded retry mode — activated when rolling avg score < 60% over ≥2 sessions
+  const [scaffoldedRetryActive, setScaffoldedRetryActive] = useState(false)
+
   // Track whether we've already notified the teacher about being stuck this level
   const stuckNotifiedRef = useRef(false)
 
@@ -508,6 +511,33 @@ export default function FormulaPage() {
         }
       }
 
+      // S6-2: Update difficulty_profile rolling window and ready_to_advance flag.
+      // difficulty_profile stores the last 5 overall_score values for this pupil.
+      // ready_to_advance = true when the last 3 scores are ALL > 95 (mastery signal).
+      // Rolling average < 60% with ≥2 recorded sessions → activate scaffolded retry mode.
+      {
+        const existingProfile = (progress?.difficulty_profile as number[] | null) ?? []
+        const updatedProfile = [...existingProfile, raw.overall_score].slice(-5)
+        const rollingAvg =
+          updatedProfile.length > 0
+            ? updatedProfile.reduce((a, b) => a + b, 0) / updatedProfile.length
+            : raw.overall_score
+        const last3 = updatedProfile.slice(-3)
+        const newReadyToAdvance =
+          last3.length === 3 && last3.every((s) => s > 95)
+
+        progressionUpdates = {
+          ...progressionUpdates,
+          difficulty_profile: updatedProfile,
+          ready_to_advance: newReadyToAdvance,
+        }
+
+        // Activate scaffolded retry mode when the rolling average signals struggle
+        if (updatedProfile.length >= 2 && rollingAvg < 60) {
+          setScaffoldedRetryActive(true)
+        }
+      }
+
       // Persist progress update
       await supabase.from('formula_progress').update(progressionUpdates).eq('pupil_id', user.id)
 
@@ -700,10 +730,33 @@ export default function FormulaPage() {
       const totalXpEarned = levelXp + streakBonus
       setXpEarned(totalXpEarned)
 
-      const progressionUpdates: Record<string, unknown> = {
+      let progressionUpdates: Record<string, unknown> = {
         total_xp: (progress?.total_xp ?? 0) + totalXpEarned,
         last_session_date: today,
         ...streakUpdate,
+      }
+
+      // S6-2: Update difficulty_profile rolling window and ready_to_advance flag
+      {
+        const existingProfile = (progress?.difficulty_profile as number[] | null) ?? []
+        const updatedProfile = [...existingProfile, score].slice(-5)
+        const rollingAvg =
+          updatedProfile.length > 0
+            ? updatedProfile.reduce((a, b) => a + b, 0) / updatedProfile.length
+            : score
+        const last3 = updatedProfile.slice(-3)
+        const newReadyToAdvance =
+          last3.length === 3 && last3.every((s) => s > 95)
+
+        progressionUpdates = {
+          ...progressionUpdates,
+          difficulty_profile: updatedProfile,
+          ready_to_advance: newReadyToAdvance,
+        }
+
+        if (updatedProfile.length >= 2 && rollingAvg < 60) {
+          setScaffoldedRetryActive(true)
+        }
       }
 
       await supabase.from('formula_progress').update(progressionUpdates).eq('pupil_id', user.id)
@@ -1172,6 +1225,28 @@ export default function FormulaPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35 }}
           >
+            {/* S6-2: Scaffolded retry banner — shown when rolling average < 60% */}
+            {scaffoldedRetryActive && !isReviewMode && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4 p-3 rounded-xl text-sm flex items-start gap-2"
+                style={{
+                  backgroundColor: '#FFF7ED',
+                  border: '1px solid #FED7AA',
+                  color: '#92400E',
+                }}
+                data-testid="scaffolded-retry-banner"
+                data-tts="Keep going! Take your time and use the word bank to help you build your sentence."
+                role="status"
+              >
+                <span aria-hidden="true" className="text-base">💡</span>
+                <span>
+                  <strong>Take your time.</strong> Use the word bank to build your sentence step by step — you've got this!
+                </span>
+              </motion.div>
+            )}
+
             {/* WF-028: Phase D uses Lens Lab recognition mode */}
             {data.level.phase === 'D' ? (
               <LensLab

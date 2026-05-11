@@ -74,7 +74,7 @@ const PHRASES = [
   { key: 'feedback--check-order',     voice: 'alistair', text: "Check the order of your words — does it match the pattern?" },
 
   // Capitalisation / punctuation step — Alistair
-  { key: 'cap-step--intro',           voice: 'alistair', text: 'Now add a capital letter and a full stop.' },
+  { key: 'cap-step--intro',           voice: 'alistair', text: 'Now add the correct punctuation marks.' },
   { key: 'cap-step--done',            voice: 'alistair', text: 'Perfect punctuation!' },
 
   // XP / gamification — Amelia

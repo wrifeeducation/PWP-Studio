@@ -144,13 +144,16 @@ pupil_activity_log   — login events, audit trail
 
 ### `wrifeapp` (PWP Studio) owns
 ```
-formula_levels       — the 67 formula definitions
-formula_progress     — per-pupil formula completion state
-formula_sessions     — individual practice session records
-pwp_pupil_levels     — current level assignment per pupil
-pwp_chain_streaks    — daily chain practice streak data
+formula_levels             — the 67 formula definitions
+formula_progress           — per-pupil formula completion state
+formula_sessions           — individual practice session records
+pwp_pupil_levels           — current level assignment per pupil
+pwp_chain_streaks          — daily chain practice streak data
 pwp_free_practice_sentences — free practice sentence history
-pwp_weekly_themes    — active theme per class per week
+pwp_weekly_themes          — active theme per class per week
+pwp_challenge_assignments  — extension challenges assigned to classes/pupils
+                             (source: teacher | parent | independent | ai_suggested | ai_auto)
+                             (types: sentence_type | add_list | compound | complex)
 ```
 
 ### `InteractivePracticeApp` owns
@@ -206,6 +209,7 @@ CREATE INDEX ON learning_events (class_id, created_at DESC);
 | `chain_session_completed` | `level`, `sentences_built`, `streak_day` | Daily chain session done |
 | `free_practice_session` | `sentences_built`, `theme` | Free practice session done |
 | `pwp_level_advanced` | `from_level`, `to_level` | Teacher or system advanced pupil |
+| `challenge_completed` | `challenge_type`, `source`, `skipped` | Pupil attempted or skipped an extension challenge. `source` mirrors `pwp_challenge_assignments.source`. `skipped: true` if pupil pressed Skip. |
 
 ### IP Event Types
 | event_type | event_data keys | Meaning |

@@ -21,7 +21,7 @@ import type { PupilProgress } from '../types/index'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type TabId = 'progress' | 'writing'
+type TabId = 'progress' | 'writing' | 'challenges'
 
 interface LinkedPupil {
   id: string
@@ -333,7 +333,7 @@ function PupilProgressPanel({ pupil, isPro }: { pupil: LinkedPupil; isPro: boole
         style={{ borderColor: 'var(--color-border)' }}
         role="tablist"
       >
-        {([['progress', '📈 Progress'], ['writing', '✍️ Writing']] as [TabId, string][]).map(
+        {([['progress', '📈 Progress'], ['writing', '✍️ Writing'], ['challenges', '🏆 Challenges']] as [TabId, string][]).map(
           ([id, label]) => (
             <button
               key={id}
@@ -429,6 +429,18 @@ function PupilProgressPanel({ pupil, isPro }: { pupil: LinkedPupil; isPro: boole
                   <WritingCard key={piece.id} piece={piece} isPro={isPro} />
                 ))
               )}
+            </motion.div>
+          )}
+
+          {activeTab === 'challenges' && (
+            <motion.div
+              key="challenges"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <PupilChallengesPanel pupilProfileId={pupil.id} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -990,6 +1002,268 @@ export default function ParentPage() {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+// ── Pupil Challenges Panel ────────────────────────────────────────────────────
+// Rendered inside PupilProgressPanel's 'challenges' tab.
+// pupilProfileId = profiles.id for this child (= auth_user_id on the pupils table).
+
+type ParentChallengeType = 'sentence_type' | 'add_list' | 'compound' | 'complex'
+
+const PARENT_CHALLENGE_LABELS: Record<ParentChallengeType, string> = {
+  sentence_type: 'Change Sentence Type',
+  add_list:      'Add a List',
+  compound:      'Compound Sentence',
+  complex:       'Complex Sentence',
+}
+
+const PARENT_CHALLENGE_ICONS: Record<ParentChallengeType, string> = {
+  sentence_type: '❓',
+  add_list:      '📝',
+  compound:      '🔗',
+  complex:       '🌿',
+}
+
+const PARENT_CHALLENGE_DESCRIPTIONS: Record<ParentChallengeType, string> = {
+  sentence_type: 'Transform the statement into a question, imperative, or exclamatory sentence',
+  add_list:      'Extend a noun phrase with a comma-separated list of adjectives or nouns',
+  compound:      'Join two clauses with a coordinating conjunction (FANBOYS)',
+  complex:       'Add a subordinate clause using a subordinating conjunction',
+}
+
+interface ParentChallengeRow {
+  id: string
+  class_id: string | null
+  pupil_id: string | null
+  challenge_type: ParentChallengeType
+  source: string
+  assigned_at: string
+  active: boolean
+}
+
+function PupilChallengesPanel({ pupilProfileId }: { pupilProfileId: string }) {
+  const [pupilsId, setPupilsId] = useState<string | null>(null)
+  const [classId, setClassId] = useState<string | null>(null)
+  const [challenges, setChallenges] = useState<ParentChallengeRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [newType, setNewType] = useState<ParentChallengeType>('sentence_type')
+
+  const flash = (msg: string, isError = false) => {
+    if (isError) { setError(msg); setTimeout(() => setError(null), 4000) }
+    else { setSuccess(msg); setTimeout(() => setSuccess(null), 3000) }
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      // 1. Find the pupils table row for this child (auth_user_id = profiles.id)
+      const { data: pupilRow } = await supabase
+        .from('pupils')
+        .select('id')
+        .eq('auth_user_id', pupilProfileId)
+        .single()
+
+      if (!pupilRow || cancelled) { setLoading(false); return }
+      const pid = pupilRow.id as string
+      setPupilsId(pid)
+
+      // 2. Find their class via class_members
+      const { data: memberRow } = await supabase
+        .from('class_members')
+        .select('class_id')
+        .eq('pupil_id', pid)
+        .limit(1)
+        .single()
+
+      const cid = (memberRow?.class_id as string) ?? null
+      setClassId(cid)
+
+      // 3. Load active challenges: class-wide + individual
+      const orFilter = cid
+        ? `pupil_id.eq.${pid},class_id.eq.${cid}`
+        : `pupil_id.eq.${pid}`
+
+      const { data: rows } = await supabase
+        .from('pwp_challenge_assignments')
+        .select('*')
+        .or(orFilter)
+        .eq('active', true)
+        .order('assigned_at', { ascending: false })
+
+      if (!cancelled) {
+        setChallenges((rows ?? []) as ParentChallengeRow[])
+        setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [pupilProfileId])
+
+  const handleAssign = async () => {
+    if (!pupilsId) return
+    setSaving(true)
+    const payload: Record<string, unknown> = {
+      challenge_type: newType,
+      source: 'parent',
+      active: true,
+      pupil_id: pupilsId,
+    }
+    if (classId) payload.class_id = classId
+
+    const { data, error: err } = await supabase
+      .from('pwp_challenge_assignments')
+      .insert(payload)
+      .select()
+      .single()
+
+    if (err) {
+      if (err.code === '23505') {
+        flash('That challenge is already active for your child.', true)
+      } else {
+        flash(err.message, true)
+      }
+    } else {
+      setChallenges((prev) => [data as ParentChallengeRow, ...prev])
+      flash(`✓ ${PARENT_CHALLENGE_LABELS[newType]} challenge assigned`)
+    }
+    setSaving(false)
+  }
+
+  const handleRemove = async (challengeId: string) => {
+    const { error: err } = await supabase
+      .from('pwp_challenge_assignments')
+      .update({ active: false })
+      .eq('id', challengeId)
+    if (err) { flash(err.message, true); return }
+    setChallenges((prev) => prev.filter((c) => c.id !== challengeId))
+    flash('Challenge removed')
+  }
+
+  if (loading) {
+    return <p className="text-sm text-center py-4" style={{ color: 'var(--color-text-muted)' }}>Loading challenges…</p>
+  }
+
+  if (!pupilsId) {
+    return (
+      <div className="text-center py-4">
+        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+          Challenges are available once your child has logged in to WriFe PWP at least once.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Feedback */}
+      {error && (
+        <div className="px-3 py-2 rounded-lg text-xs" style={{ backgroundColor: '#FEF2F2', color: '#991B1B', border: '1px solid #FECACA' }}>
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="px-3 py-2 rounded-lg text-xs" style={{ backgroundColor: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0' }}>
+          {success}
+        </div>
+      )}
+
+      {/* Active challenges */}
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-muted)' }}>
+          Active Challenges
+        </p>
+        {challenges.length === 0 ? (
+          <div
+            className="rounded-xl p-4 text-center"
+            style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)' }}
+          >
+            <p className="text-xl mb-1">🏆</p>
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              No active challenges. Assign one below to give your child an extension task.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {challenges.map((c) => (
+              <div
+                key={c.id}
+                className="rounded-xl p-3 flex items-center justify-between gap-2"
+                style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)' }}
+              >
+                <div className="flex items-center gap-2">
+                  <span>{PARENT_CHALLENGE_ICONS[c.challenge_type]}</span>
+                  <div>
+                    <p className="text-xs font-semibold" style={{ color: 'var(--color-text)' }}>
+                      {PARENT_CHALLENGE_LABELS[c.challenge_type]}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      {c.pupil_id && !c.class_id ? '👤 Individual' : '🏫 Class'}
+                      {' · '}{new Date(c.assigned_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    </p>
+                  </div>
+                </div>
+                {c.source === 'parent' && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(c.id)}
+                    className="text-xs px-2.5 py-1 rounded-full flex-shrink-0 hover:opacity-70 transition-opacity"
+                    style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Assign new */}
+      <div
+        className="rounded-xl p-4 space-y-3"
+        style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)' }}
+      >
+        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+          Assign New Challenge
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {(Object.keys(PARENT_CHALLENGE_LABELS) as ParentChallengeType[]).map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => setNewType(type)}
+              className="text-left rounded-lg p-2.5 transition-all"
+              style={{
+                backgroundColor: newType === type ? '#EDE9FE' : 'var(--color-surface)',
+                border: `2px solid ${newType === type ? '#7C3AED' : 'var(--color-border)'}`,
+              }}
+            >
+              <p className="text-sm mb-0.5">{PARENT_CHALLENGE_ICONS[type]}</p>
+              <p className="text-xs font-semibold" style={{ color: 'var(--color-text)' }}>
+                {PARENT_CHALLENGE_LABELS[type]}
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)', fontSize: '0.65rem' }}>
+                {PARENT_CHALLENGE_DESCRIPTIONS[type]}
+              </p>
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={handleAssign}
+          disabled={saving}
+          className="w-full py-2.5 rounded-full text-sm font-semibold transition-opacity disabled:opacity-50"
+          style={{ backgroundColor: '#6C5CE7', color: '#fff' }}
+        >
+          {saving ? 'Assigning…' : `Assign ${PARENT_CHALLENGE_LABELS[newType]}`}
+        </button>
+      </div>
     </div>
   )
 }
