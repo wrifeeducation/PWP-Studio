@@ -4,7 +4,7 @@
  * Shows published writing pieces, badges strip, and progress charts.
  */
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
@@ -430,6 +430,184 @@ function ProgressSection({ pupilId }: ProgressSectionProps) {
   )
 }
 
+// ─── S5-5: My Best Sentences (portfolio table rows) ───────────────────────────
+
+interface PortfolioRow {
+  id: string
+  app: string
+  level_or_lesson: string
+  content: string
+  ai_score: number | null
+  share_token: string | null
+  updated_at: string
+}
+
+interface BestSentenceCardProps {
+  row: PortfolioRow
+}
+
+function scoreColour(score: number | null): string {
+  if (score === null) return 'var(--color-text-muted)'
+  if (score >= 80) return '#16A34A'
+  if (score >= 60) return '#CA8A04'
+  return '#DC2626'
+}
+
+function BestSentenceCard({ row }: BestSentenceCardProps) {
+  const [copied, setCopied] = useState(false)
+
+  const handleShare = useCallback(async () => {
+    if (!row.share_token) return
+    const url = `${window.location.origin}/share/${row.share_token}`
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch {
+      // fallback: select text
+      window.prompt('Copy this link to share your sentence:', url)
+    }
+  }, [row.share_token])
+
+  const appLabel = row.app === 'pwp' ? 'Formula Practice' : 'Interactive Practice'
+  const levelLabel = row.app === 'pwp' ? `Level ${row.level_or_lesson}` : `Lesson ${row.level_or_lesson}`
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl p-4"
+      style={{
+        backgroundColor: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+      }}
+      data-testid={`portfolio-sentence-${row.id}`}
+    >
+      {/* Meta row */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span
+            className="text-xs font-semibold px-2 py-0.5 rounded-full"
+            style={{
+              backgroundColor: row.app === 'pwp' ? '#7C3AED22' : '#0369A122',
+              color: row.app === 'pwp' ? '#7C3AED' : '#0369A1',
+            }}
+            data-tts={appLabel}
+          >
+            {appLabel}
+          </span>
+          <span
+            className="text-xs font-medium"
+            style={{ color: 'var(--color-text-muted)' }}
+            data-tts={levelLabel}
+          >
+            {levelLabel}
+          </span>
+        </div>
+        {row.ai_score !== null && (
+          <span
+            className="text-xs font-bold tabular-nums"
+            style={{ color: scoreColour(row.ai_score) }}
+            data-tts={`Score: ${row.ai_score} percent`}
+            aria-label={`Score: ${row.ai_score}%`}
+          >
+            {row.ai_score}%
+          </span>
+        )}
+      </div>
+
+      {/* Sentence */}
+      <p
+        className="text-sm leading-relaxed mb-3"
+        style={{ color: 'var(--color-text)' }}
+        data-tts={row.content}
+      >
+        {row.content}
+      </p>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          {new Date(row.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+        </span>
+        {row.share_token && (
+          <button
+            type="button"
+            onClick={handleShare}
+            className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors focus:outline-none focus-visible:ring-2"
+            style={{
+              backgroundColor: copied ? '#16A34A22' : 'var(--color-brand-primary)',
+              color: copied ? '#16A34A' : '#fff',
+              border: copied ? '1px solid #16A34A' : 'none',
+            }}
+            data-testid={`share-btn-${row.id}`}
+            data-tts={copied ? 'Link copied!' : 'Copy share link'}
+            aria-label={copied ? 'Link copied to clipboard' : 'Copy shareable link'}
+          >
+            {copied ? '✓ Copied!' : '🔗 Share'}
+          </button>
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
+interface MyBestSentencesSectionProps {
+  pupilId: string
+}
+
+function MyBestSentencesSection({ pupilId }: MyBestSentencesSectionProps) {
+  const { data: rows, isLoading } = useQuery<PortfolioRow[]>({
+    queryKey: ['portfolio_sentences', pupilId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('portfolio')
+        .select('id, app, level_or_lesson, content, ai_score, share_token, updated_at')
+        .eq('pupil_id', pupilId)
+        .order('app', { ascending: true })
+        .order('level_or_lesson', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as PortfolioRow[]
+    },
+    enabled: !!pupilId,
+    staleTime: 1000 * 60 * 5,
+  })
+
+  if (isLoading) {
+    return (
+      <section aria-label="My Best Sentences" data-testid="portfolio-sentences-section">
+        <h2
+          className="text-sm font-semibold uppercase tracking-wider mb-3"
+          style={{ color: 'var(--color-text-muted)' }}
+          data-tts="My Best Sentences"
+        >
+          My Best Sentences
+        </h2>
+        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
+      </section>
+    )
+  }
+
+  if (!rows || rows.length === 0) return null
+
+  return (
+    <section aria-label="My Best Sentences" data-testid="portfolio-sentences-section">
+      <h2
+        className="text-sm font-semibold uppercase tracking-wider mb-3"
+        style={{ color: 'var(--color-text-muted)' }}
+        data-tts="My Best Sentences"
+      >
+        My Best Sentences
+      </h2>
+      <div className="space-y-3">
+        {rows.map((row) => (
+          <BestSentenceCard key={row.id} row={row} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
 // ─── Main Portfolio Page ───────────────────────────────────────────────────────
 
 export default function PortfolioPage() {
@@ -537,6 +715,9 @@ export default function PortfolioPage() {
       </header>
 
       <main className="max-w-xl mx-auto px-4 pt-6 space-y-8">
+        {/* S5-5: Best sentences from portfolio table (PWP + IP) */}
+        {user?.id && <MyBestSentencesSection pupilId={user.id} />}
+
         {/* Published pieces section */}
         <section aria-label="Published Writing" data-testid="portfolio-pieces-section">
           <h2

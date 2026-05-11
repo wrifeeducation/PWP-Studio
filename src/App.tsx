@@ -36,6 +36,7 @@ const TeacherSignupPage = lazy(() => import('./pages/TeacherSignupPage'))
 
 // WF-040: Heavy pages — lazy loaded to reduce initial bundle
 const WritingStudioPage = lazy(() => import('./pages/WritingStudioPage'))
+const SharePage = lazy(() => import('./pages/SharePage'))
 const TeacherPage = lazy(() => import('./pages/TeacherPage'))
 const TeacherReviewPage = lazy(() => import('./pages/TeacherReviewPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
@@ -405,6 +406,9 @@ function App() {
 
             {/* WF-058: Pricing page — accessible to authenticated parents + public */}
             <Route path="/pricing" element={<PricingPage />} />
+
+            {/* S5-7: Public share page — no login required */}
+            <Route path="/share/:token" element={<SharePage />} />
 
             {/* WF-029: Pupil portfolio — pupils only */}
             <Route

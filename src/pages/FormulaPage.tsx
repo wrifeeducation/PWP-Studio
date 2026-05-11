@@ -511,6 +511,34 @@ export default function FormulaPage() {
       // Persist progress update
       await supabase.from('formula_progress').update(progressionUpdates).eq('pupil_id', user.id)
 
+      // S5-4: save best sentence to portfolio (only writes if score beats the stored one)
+      try {
+        const { data: existingPortfolio } = await supabase
+          .from('portfolio')
+          .select('ai_score')
+          .eq('pupil_id', user.id)
+          .eq('app', 'pwp')
+          .eq('level_or_lesson', String(data.level.id))
+          .maybeSingle()
+
+        const existingScore = existingPortfolio?.ai_score ?? -1
+        if (raw.overall_score >= existingScore) {
+          await supabase.from('portfolio').upsert(
+            {
+              pupil_id: user.id,
+              app: 'pwp',
+              level_or_lesson: String(data.level.id),
+              content: sentence,
+              ai_score: raw.overall_score,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'pupil_id,app,level_or_lesson' }
+          )
+        }
+      } catch {
+        // Non-critical — portfolio save failure should not block the session
+      }
+
       // WF-010: evaluate badges
       const { data: allBadges } = await supabase.from('badges').select('*')
       const { data: earnedBadgesRows } = await supabase

@@ -624,6 +624,42 @@ export type Database = {
           },
         ]
       }
+      portfolio: {
+        Row: {
+          ai_score: number | null
+          app: string
+          content: string
+          created_at: string
+          id: string
+          level_or_lesson: string
+          pupil_id: string
+          share_token: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_score?: number | null
+          app: string
+          content: string
+          created_at?: string
+          id?: string
+          level_or_lesson: string
+          pupil_id: string
+          share_token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_score?: number | null
+          app?: string
+          content?: string
+          created_at?: string
+          id?: string
+          level_or_lesson?: string
+          pupil_id?: string
+          share_token?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       paragraph_sessions: {
         Row: {
           ai_feedback: Json | null
