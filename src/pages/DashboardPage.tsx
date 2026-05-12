@@ -1883,6 +1883,47 @@ export default function DashboardPage() {
             chainStreak={chainStreak}
           />
 
+          {/* PWP Studio — new formula chain session */}
+          <motion.button
+            onClick={() => { sfx.prime(); sfx.unlockAudio(); navigate('/pwp/session') }}
+            whileTap={{ scale: 0.97 }}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.1 }}
+            data-testid="pwp-studio-card"
+            data-tts="PWP Studio — write a formula chain then build a paragraph"
+            style={{
+              width: '100%',
+              background: 'linear-gradient(135deg, #7C6FF7cc, #6C5CE7aa)',
+              border: '2px solid #6C5CE755',
+              borderRadius: 18,
+              padding: '10px 20px',
+              marginBottom: 16,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              cursor: 'pointer',
+              textAlign: 'left',
+              boxShadow: '0 2px 12px rgba(108,92,231,0.2)',
+            }}
+          >
+            <span style={{ fontSize: 20 }}>✍️</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 1 }}>
+                PWP Studio
+              </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.88)', fontWeight: 600 }}>
+                Formula chain · paragraph builder · mastery quiz
+              </div>
+            </div>
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.22)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 13, color: '#fff', flexShrink: 0,
+            }} aria-hidden="true">▶</div>
+          </motion.button>
+
           {/* Free Practice entry — always available */}
           <motion.button
             onClick={() => { sfx.prime(); sfx.unlockAudio(); navigate('/free-practice') }}

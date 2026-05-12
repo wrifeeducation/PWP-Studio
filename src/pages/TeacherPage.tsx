@@ -16,6 +16,7 @@ import type { ConsolidationPackData } from '../lib/consolidationPack'
 import type { PendingWritingReview, PupilTransferRate, InterventionLog, InterventionTrigger } from '../types/index'
 import { Genre, MasteryEventType, TeacherNotificationType } from '../types/index'
 import { NCProgressReport } from '../components/dashboard/NCProgressReport'
+import { PWPTeacherTab } from '../components/pwp/teacher/PWPTeacherTab'
 
 // ─── Local types for views ─────────────────────────────────────────────────────
 
@@ -39,11 +40,12 @@ interface WritingTask {
   prompt_text: string
 }
 
-type TabId = 'pending' | 'progress' | 'assign' | 'interventions' | 'wordbanks' | 'analytics' | 'classes' | 'programme' | 'nc-report' | 'notifications' | 'challenges'
+type TabId = 'pending' | 'progress' | 'assign' | 'interventions' | 'wordbanks' | 'analytics' | 'classes' | 'programme' | 'nc-report' | 'notifications' | 'challenges' | 'pwp'
 
 const TAB_LABELS: Record<TabId, string> = {
   classes: 'My Classes',
   programme: 'Programme',
+  pwp: 'PWP',
   pending: 'Pending Review',
   progress: 'Class Progress',
   assign: 'Assign Task',
@@ -197,6 +199,7 @@ export default function TeacherPage() {
         {activeTab === 'wordbanks' && <WordBankEditor />}
         {activeTab === 'analytics' && <AnalyticsTab />}
         {activeTab === 'nc-report' && <NCProgressReport />}
+        {activeTab === 'pwp' && <PWPTeacherTab />}
         {activeTab === 'notifications' && (
           <NotificationsTab
             teacherId={profile?.id ?? ''}
