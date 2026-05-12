@@ -473,7 +473,10 @@ const PWPSessionPage: React.FC = () => {
           </div>
         )}
 
-        <AnimatePresence mode="wait">
+        {/* Note: mode="wait" removed — React 19 + Framer Motion WAAPI bug causes exit
+            animations to "finish" without firing the completion callback, leaving the
+            exiting element in the DOM and blocking the entering element from mounting. */}
+        <AnimatePresence>
 
           {/* Entry — with optional resume prompt */}
           {store.phase === 'entry' && (
