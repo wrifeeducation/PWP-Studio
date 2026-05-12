@@ -160,8 +160,8 @@ export const ChainStep: React.FC<ChainStepProps> = ({
         </button>
       )}
 
-      {/* AI feedback */}
-      <AnimatePresence mode="wait">
+      {/* AI feedback — mode="wait" removed (React 19 + Framer Motion WAAPI bug) */}
+      <AnimatePresence>
         {stepState.assessment && (
           <motion.div
             key={stepState.status}

@@ -137,7 +137,8 @@ export const QuizPhase: React.FC<QuizPhaseProps> = ({ onComplete }) => {
           ))}
         </div>
 
-        <AnimatePresence mode="wait">
+        {/* mode="wait" removed (React 19 + Framer Motion WAAPI bug) */}
+        <AnimatePresence>
           <motion.div
             key={currentPrompt.id}
             initial={{ opacity: 0, x: 20 }}
