@@ -29,7 +29,10 @@ import {
   AVATAR_VARIANTS,
   getChapterForLevel,
   getLevelsForChapter,
+  getMilestoneType,
+  MILESTONE_META,
   type Chapter,
+  type MilestoneType,
 } from '../lib/chapters'
 
 // ─── types ────────────────────────────────────────────────────────────────────
@@ -167,6 +170,7 @@ const NodeConnector: React.FC<ConnSVGProps> = ({ x1, y1, r1, x2, y2, r2, tier })
 interface LevelNodeProps {
   level: number
   tier: LevelTier
+  milestoneType: MilestoneType
   chapterColour: string
   chapterEmoji: string
   avatarVariant: AvatarVariantId
@@ -176,7 +180,7 @@ interface LevelNodeProps {
 }
 
 const LevelNode: React.FC<LevelNodeProps> = ({
-  level, tier, chapterColour, chapterEmoji, avatarVariant, cx, cy, onClick,
+  level, tier, milestoneType, chapterColour, chapterEmoji, avatarVariant, cx, cy, onClick,
 }) => {
   const r        = tierRadius(tier)
   const isActive = tier === 'active'
@@ -184,24 +188,28 @@ const LevelNode: React.FC<LevelNodeProps> = ({
   const isNext   = tier === 'next'
   const isFuture = tier === 'future'
 
+  // Milestone nodes use their own colour when not yet done
+  const milestone = MILESTONE_META[milestoneType]
+  const nodeColour = (!isDone && milestone.colour) ? milestone.colour : chapterColour
+
   const bg =
     isDone     ? C.green :
-    isActive   ? chapterColour :
-    isNext     ? `${chapterColour}55` :
-    tier === 'upcoming' ? `${chapterColour}25` :
+    isActive   ? nodeColour :
+    isNext     ? `${nodeColour}55` :
+    tier === 'upcoming' ? `${nodeColour}25` :
     '#E8ECF0'
 
   const border =
     isDone     ? '#1e8449' :
-    isActive   ? chapterColour :
-    isNext     ? `${chapterColour}99` :
-    tier === 'upcoming' ? `${chapterColour}55` :
+    isActive   ? nodeColour :
+    isNext     ? `${nodeColour}99` :
+    tier === 'upcoming' ? `${nodeColour}55` :
     '#D0D5DD'
 
+  // Done nodes always show ✓; milestone nodes show their own emoji; others show chapter emoji
   const emoji =
-    isDone   ? '✓' :
-    isActive ? chapterEmoji :
-    isNext   ? chapterEmoji :
+    isDone             ? '✓' :
+    milestoneType !== 'practice' ? milestone.emoji :
     chapterEmoji
 
   const labelRight = cx <= 150
@@ -216,21 +224,33 @@ const LevelNode: React.FC<LevelNodeProps> = ({
 
   const labelColour =
     isDone   ? C.muted :
-    isActive ? chapterColour :
-    isNext   ? chapterColour :
+    isActive ? nodeColour :
+    isNext   ? nodeColour :
     C.muted
 
   const subLabel =
+    isActive && milestoneType === 'quiz'      ? 'Quiz 🎯' :
+    isActive && milestoneType === 'paragraph' ? 'Paragraph 📝' :
     isActive ? 'You are here' :
     isNext   ? 'Up next ✨' :
     ''
+
+  // Milestone badge label shown below node (for non-active milestone nodes so pupils know what's coming)
+  const milestoneLabel =
+    !isDone && !isActive && milestoneType !== 'practice' ? milestone.label : ''
 
   return (
     <g data-testid={`level-node-${level}`} style={{ cursor: isActive || isDone ? 'pointer' : 'default' }}
       onClick={isActive || isDone ? onClick : undefined}>
 
-      {/* Pulsing glow rings behind active node */}
-      {isActive && (
+      {/* Pulsing glow rings — milestone nodes get a distinct accent ring */}
+      {isActive && milestoneType !== 'practice' && milestone.accent && (
+        <>
+          <circle cx={cx} cy={cy} r={r + 16} fill={`${milestone.accent}18`} />
+          <circle cx={cx} cy={cy} r={r + 10} fill={`${milestone.accent}28`} />
+        </>
+      )}
+      {isActive && milestoneType === 'practice' && (
         <>
           <circle cx={cx} cy={cy} r={r + 14} fill={`${chapterColour}14`} />
           <circle cx={cx} cy={cy} r={r +  8} fill={`${chapterColour}24`} />
@@ -250,8 +270,8 @@ const LevelNode: React.FC<LevelNodeProps> = ({
       <text
         x={cx} y={cy + (isDone ? 5 : 6)}
         textAnchor="middle"
-        fontSize={isDone ? r * 0.8 : isActive ? r * 0.72 : r * 0.72}
-        fill={isDone ? '#fff' : isActive ? '#fff' : isFuture ? '#B2BEC3' : `${chapterColour}cc`}
+        fontSize={isDone ? r * 0.8 : r * 0.72}
+        fill={isDone ? '#fff' : isActive ? '#fff' : isFuture ? '#B2BEC3' : `${nodeColour}cc`}
         fontWeight={isDone ? 900 : 700}
       >
         {emoji}
@@ -268,8 +288,16 @@ const LevelNode: React.FC<LevelNodeProps> = ({
       {subLabel !== '' && (
         <text x={labelX} y={cy + 13} textAnchor={labelAnchor}
           fontSize={10} fontWeight={600}
-          fill={isNext ? `${chapterColour}99` : chapterColour} opacity={0.9}>
+          fill={isNext ? `${nodeColour}99` : nodeColour} opacity={0.9}>
           {subLabel}
+        </text>
+      )}
+      {/* Upcoming milestone label — e.g. "Quiz" or "Paragraph" faintly under future node */}
+      {milestoneLabel !== '' && !isFuture && (
+        <text x={labelX} y={cy + 13} textAnchor={labelAnchor}
+          fontSize={9} fontWeight={700}
+          fill={nodeColour} opacity={0.7}>
+          {milestoneLabel}
         </text>
       )}
 
@@ -277,10 +305,9 @@ const LevelNode: React.FC<LevelNodeProps> = ({
       {isActive && (
         <foreignObject x={cx - 44} y={cy - AVATAR_LIFT - 44} width={88} height={88}>
           <div style={{ position: 'relative', width: 88, height: 88 }}>
-            {/* Radial glow disc */}
             <div style={{
               position: 'absolute', inset: 0, borderRadius: '50%',
-              background: `radial-gradient(circle, ${chapterColour}50 0%, transparent 68%)`,
+              background: `radial-gradient(circle, ${nodeColour}50 0%, transparent 68%)`,
             }} />
             <motion.div
               animate={{ y: [0, -8, 0] }}
@@ -954,13 +981,14 @@ const LearningPath: React.FC<LearningPathProps> = ({ currentLevel, avatarVariant
         const chapterLocked = currentLevel < chapterMin
         const chapterCurrent = !chapterDone && !chapterLocked
 
-        type LevelEntry = { level: number; tier: LevelTier; cx: number; cy: number }
+        type LevelEntry = { level: number; tier: LevelTier; milestoneType: MilestoneType; cx: number; cy: number }
         const hasActive = chapterLevels.includes(currentLevel)
         const topPad    = hasActive ? AVATAR_LIFT + 28 : 36
 
         const entries: LevelEntry[] = chapterLevels.map((level, li): LevelEntry => ({
           level,
           tier: levelTier(level, currentLevel),
+          milestoneType: getMilestoneType(level),
           cx: colX(li),
           cy: topPad + li * NODE_STEP,
         }))
@@ -1007,6 +1035,7 @@ const LearningPath: React.FC<LearningPathProps> = ({ currentLevel, avatarVariant
                     key={entry.level}
                     level={entry.level}
                     tier={entry.tier}
+                    milestoneType={entry.milestoneType}
                     chapterColour={chapter.textColour}
                     chapterEmoji={chapter.emoji}
                     avatarVariant={avatarVariant}

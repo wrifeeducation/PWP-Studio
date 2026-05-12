@@ -101,6 +101,45 @@ export function getLevelsForChapter(chapter: Chapter): number[] {
   return levels
 }
 
+// ─── Milestone types ──────────────────────────────────────────────────────────
+
+export type MilestoneType = 'practice' | 'quiz' | 'paragraph'
+
+/**
+ * Quiz milestones — end of each chapter.
+ * Pupil must pass a mastery quiz before the chapter is marked complete.
+ */
+const QUIZ_LEVELS = new Set([8, 20, 35, 50, 60, 67])
+
+/**
+ * Paragraph milestones — entry point of chapters 2, 3, 4.
+ * Pupil writes a short paragraph (Lead → Support → Close) using the formula
+ * sentence they have mastered as the topic sentence.
+ */
+const PARAGRAPH_LEVELS = new Set([9, 21, 36])
+
+/** Returns the milestone type for a given world-map level number. */
+export function getMilestoneType(level: number): MilestoneType {
+  if (PARAGRAPH_LEVELS.has(level)) return 'paragraph'
+  if (QUIZ_LEVELS.has(level))      return 'quiz'
+  return 'practice'
+}
+
+export interface MilestoneMeta {
+  emoji: string
+  label: string
+  /** Override node colour (undefined = use chapter colour) */
+  colour?: string
+  /** Ring accent colour */
+  accent?: string
+}
+
+export const MILESTONE_META: Record<MilestoneType, MilestoneMeta> = {
+  practice:  { emoji: '✏️',  label: 'Writing' },
+  quiz:      { emoji: '🎯',  label: 'Quiz',      colour: '#E84393', accent: '#FF6EB4' },
+  paragraph: { emoji: '📝',  label: 'Paragraph', colour: '#27AE60', accent: '#52D68A' },
+}
+
 /** Node labels and emojis per type */
 export const NODE_META: Record<NodeType, { label: string; emoji: string }> = {
   learn:    { label: 'Learn',    emoji: '📖' },
