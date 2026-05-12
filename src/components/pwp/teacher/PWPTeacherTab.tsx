@@ -6,6 +6,11 @@
  *   theme      — Weekly theme setter (theme_noun + genre_hint)
  *   sessions   — Recent session review with step-level detail
  *   positions  — Curriculum position editor (update highest_lesson per pupil)
+ *
+ * Teacher→class resolution:
+ *   Teachers are linked to classes via classes.teacher_id, NOT profiles.class_id.
+ *   This component fetches all of a teacher's classes and lets them pick one
+ *   if they teach more than one.
  */
 
 import React, { useEffect, useState, useCallback } from 'react'
@@ -15,6 +20,12 @@ import { supabase } from '../../../lib/supabase'
 import { useAuthStore } from '../../../stores/authStore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface TeacherClass {
+  id: string
+  name: string
+  year_group: number | null
+}
 
 interface PupilPWPRow {
   pupil_id: string
@@ -39,7 +50,6 @@ interface RecentSession {
 interface SessionDetail {
   id: string
   step_number: number
-  element_id: string
   formula_label: string
   sentence: string
   ai_passed: boolean
@@ -48,7 +58,6 @@ interface SessionDetail {
 }
 
 interface WeeklyTheme {
-  id?: string
   theme_noun: string
   genre_hint: string
 }
@@ -60,6 +69,11 @@ const SUB_TABS: { id: SubTab; label: string }[] = [
   { id: 'theme', label: 'Weekly Theme' },
   { id: 'sessions', label: 'Session Review' },
   { id: 'positions', label: 'Curriculum Positions' },
+]
+
+const GENRE_HINTS = [
+  'narrative', 'non-fiction', 'persuasive',
+  'descriptive', 'recount', 'explanation', 'poetry',
 ]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -86,10 +100,63 @@ function lessonBadgeColour(lesson: number): string {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export const PWPTeacherTab: React.FC = () => {
+  const { profile } = useAuthStore()
+  const teacherId = profile?.id ?? null
   const [subTab, setSubTab] = useState<SubTab>('overview')
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
+
+  // Fetch all classes this teacher owns
+  const { data: classes, isLoading: classesLoading } = useQuery({
+    queryKey: ['teacher_classes', teacherId],
+    queryFn: async (): Promise<TeacherClass[]> => {
+      if (!teacherId) return []
+      const { data } = await supabase
+        .from('classes')
+        .select('id, name, year_group')
+        .eq('teacher_id', teacherId)
+        .order('year_group', { ascending: true })
+      return (data ?? []) as TeacherClass[]
+    },
+    enabled: !!teacherId,
+  })
+
+  // Auto-select first class once loaded
+  useEffect(() => {
+    if (classes?.length && !selectedClassId) {
+      setSelectedClassId(classes[0].id)
+    }
+  }, [classes, selectedClassId])
+
+  if (classesLoading) return <LoadingPanel label="Loading your classes…" />
+  if (!classes?.length) return <EmptyPanel message="No classes linked to your account." />
 
   return (
     <div className="w-full" data-testid="pwp-teacher-tab">
+
+      {/* Class selector — shown only when teacher has multiple classes */}
+      {classes.length > 1 && (
+        <div className="flex gap-2 mb-4 flex-wrap">
+          <span className="text-xs font-bold uppercase tracking-wide self-center"
+            style={{ color: 'var(--color-text-muted)' }}>Class:</span>
+          {classes.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setSelectedClassId(c.id)}
+              data-testid={`class-selector-${c.id}`}
+              className="px-3 py-1.5 rounded-full text-sm font-medium"
+              style={{
+                backgroundColor: selectedClassId === c.id ? 'var(--color-brand-primary)' : 'transparent',
+                color: selectedClassId === c.id ? '#fff' : 'var(--color-text-muted)',
+                border: `1.5px solid ${selectedClassId === c.id ? 'var(--color-brand-primary)' : 'var(--color-border)'}`,
+              }}
+            >
+              {c.name} {c.year_group ? `(Y${c.year_group})` : ''}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Sub-tab nav */}
       <div className="flex gap-1 mb-6 flex-wrap">
         {SUB_TABS.map((t) => (
@@ -118,10 +185,14 @@ export const PWPTeacherTab: React.FC = () => {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
         >
-          {subTab === 'overview' && <ClassOverviewPanel />}
-          {subTab === 'theme' && <WeeklyThemePanel />}
-          {subTab === 'sessions' && <SessionReviewPanel />}
-          {subTab === 'positions' && <CurriculumPositionsPanel />}
+          {selectedClassId && (
+            <>
+              {subTab === 'overview' && <ClassOverviewPanel classId={selectedClassId} />}
+              {subTab === 'theme' && <WeeklyThemePanel classId={selectedClassId} />}
+              {subTab === 'sessions' && <SessionReviewPanel classId={selectedClassId} />}
+              {subTab === 'positions' && <CurriculumPositionsPanel classId={selectedClassId} />}
+            </>
+          )}
         </motion.div>
       </AnimatePresence>
     </div>
@@ -130,17 +201,12 @@ export const PWPTeacherTab: React.FC = () => {
 
 // ─── Class Overview Panel ─────────────────────────────────────────────────────
 
-function ClassOverviewPanel() {
-  const { profile } = useAuthStore()
-  const classId = profile?.class_id ?? null
+function ClassOverviewPanel({ classId }: { classId: string }) {
   const weekStart = getMonday(new Date())
 
   const { data: pupils, isLoading } = useQuery({
     queryKey: ['pwp_class_overview', classId, weekStart],
     queryFn: async (): Promise<PupilPWPRow[]> => {
-      if (!classId) return []
-
-      // Fetch pupils in this class
       const { data: pupilProfiles } = await supabase
         .from('profiles')
         .select('id, first_name')
@@ -148,25 +214,22 @@ function ClassOverviewPanel() {
         .eq('role', 'pupil')
 
       if (!pupilProfiles?.length) return []
-
       const pupilIds = pupilProfiles.map((p) => p.id)
 
-      // Fetch curriculum positions
       const { data: positions } = await supabase
         .from('pwp_pupil_positions')
         .select('pupil_id, highest_lesson')
         .in('pupil_id', pupilIds)
 
-      // Fetch sessions this week
       const { data: sessions } = await supabase
         .from('pwp_sessions')
-        .select('pupil_id, created_at, completed_at, subject_noun')
+        .select('pupil_id, created_at, subject_noun')
         .in('pupil_id', pupilIds)
         .gte('created_at', weekStart)
         .order('created_at', { ascending: false })
 
       const posMap = Object.fromEntries((positions ?? []).map((p) => [p.pupil_id, p.highest_lesson]))
-      const sessionsByPupil: Record<string, typeof sessions> = {}
+      const sessionsByPupil: Record<string, { created_at: string; subject_noun: string }[]> = {}
       for (const s of sessions ?? []) {
         if (!sessionsByPupil[s.pupil_id]) sessionsByPupil[s.pupil_id] = []
         sessionsByPupil[s.pupil_id]!.push(s)
@@ -185,12 +248,10 @@ function ClassOverviewPanel() {
         }
       }).sort((a, b) => (a.first_name ?? '').localeCompare(b.first_name ?? ''))
     },
-    enabled: !!classId,
   })
 
   if (isLoading) return <LoadingPanel label="Loading class overview…" />
-  if (!classId) return <EmptyPanel message="No class linked to your account." />
-  if (!pupils?.length) return <EmptyPanel message="No pupils found in your class." />
+  if (!pupils?.length) return <EmptyPanel message="No pupils found in this class." />
 
   const withSessions = pupils.filter((p) => p.sessions_this_week > 0).length
   const avgLesson = Math.round(pupils.reduce((sum, p) => sum + p.highest_lesson, 0) / pupils.length)
@@ -215,52 +276,31 @@ function ClassOverviewPanel() {
         ))}
       </div>
 
-      {/* Pupil table */}
       <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
         <table className="w-full text-sm">
           <thead>
             <tr style={{ backgroundColor: 'var(--color-surface)' }}>
-              <th className="px-4 py-3 text-left font-semibold" style={{ color: 'var(--color-text-muted)' }}>Pupil</th>
-              <th className="px-4 py-3 text-center font-semibold" style={{ color: 'var(--color-text-muted)' }}>Lesson</th>
-              <th className="px-4 py-3 text-center font-semibold" style={{ color: 'var(--color-text-muted)' }}>Sessions this wk</th>
-              <th className="px-4 py-3 text-left font-semibold" style={{ color: 'var(--color-text-muted)' }}>Last session</th>
-              <th className="px-4 py-3 text-left font-semibold" style={{ color: 'var(--color-text-muted)' }}>Subject</th>
+              {['Pupil', 'Lesson', 'Sessions this wk', 'Last session', 'Subject'].map((h) => (
+                <th key={h} className="px-4 py-3 text-left font-semibold" style={{ color: 'var(--color-text-muted)' }}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {pupils.map((p, i) => (
-              <tr
-                key={p.pupil_id}
-                style={{
-                  borderTop: i > 0 ? '1px solid var(--color-border)' : 'none',
-                  backgroundColor: 'var(--color-background)',
-                }}
-              >
-                <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>
-                  {p.first_name ?? '—'}
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <span
-                    className="text-xs font-bold px-2 py-1 rounded-full text-white"
-                    style={{ backgroundColor: lessonBadgeColour(p.highest_lesson) }}
-                  >
+              <tr key={p.pupil_id} style={{ borderTop: i > 0 ? '1px solid var(--color-border)' : 'none', backgroundColor: 'var(--color-background)' }}>
+                <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>{p.first_name ?? '—'}</td>
+                <td className="px-4 py-3">
+                  <span className="text-xs font-bold px-2 py-1 rounded-full text-white"
+                    style={{ backgroundColor: lessonBadgeColour(p.highest_lesson) }}>
                     L{p.highest_lesson}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-center">
-                  <span
-                    className="text-sm font-semibold"
-                    style={{ color: p.sessions_this_week > 0 ? '#27ae60' : 'var(--color-text-muted)' }}
-                  >
-                    {p.sessions_this_week}
-                  </span>
+                <td className="px-4 py-3 text-sm font-semibold"
+                  style={{ color: p.sessions_this_week > 0 ? '#27ae60' : 'var(--color-text-muted)' }}>
+                  {p.sessions_this_week}
                 </td>
-                <td className="px-4 py-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                  {formatDate(p.last_session_at)}
-                </td>
-                <td className="px-4 py-3 text-sm italic" style={{ color: 'var(--color-text-muted)' }}>
-                  {p.last_subject_noun ?? '—'}
-                </td>
+                <td className="px-4 py-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>{formatDate(p.last_session_at)}</td>
+                <td className="px-4 py-3 text-sm italic" style={{ color: 'var(--color-text-muted)' }}>{p.last_subject_noun ?? '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -272,22 +312,9 @@ function ClassOverviewPanel() {
 
 // ─── Weekly Theme Panel ───────────────────────────────────────────────────────
 
-const GENRE_HINTS = [
-  'narrative',
-  'non-fiction',
-  'persuasive',
-  'descriptive',
-  'recount',
-  'explanation',
-  'poetry',
-]
-
-function WeeklyThemePanel() {
-  const { profile } = useAuthStore()
-  const classId = profile?.class_id ?? null
+function WeeklyThemePanel({ classId }: { classId: string }) {
   const weekStart = getMonday(new Date())
   const queryClient = useQueryClient()
-
   const [themeNoun, setThemeNoun] = useState('')
   const [genreHint, setGenreHint] = useState('narrative')
   const [saved, setSaved] = useState(false)
@@ -295,16 +322,14 @@ function WeeklyThemePanel() {
   const { data: existing, isLoading } = useQuery({
     queryKey: ['pwp_class_theme_teacher', classId, weekStart],
     queryFn: async (): Promise<WeeklyTheme | null> => {
-      if (!classId) return null
       const { data } = await supabase
         .from('pwp_class_themes')
-        .select('id, theme_noun, genre_hint')
+        .select('theme_noun, genre_hint')
         .eq('class_id', classId)
         .eq('week_start', weekStart)
         .maybeSingle()
       return data
     },
-    enabled: !!classId,
   })
 
   useEffect(() => {
@@ -316,7 +341,6 @@ function WeeklyThemePanel() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!classId) return
       await supabase
         .from('pwp_class_themes')
         .upsert(
@@ -333,7 +357,6 @@ function WeeklyThemePanel() {
   })
 
   if (isLoading) return <LoadingPanel label="Loading theme…" />
-  if (!classId) return <EmptyPanel message="No class linked to your account." />
 
   return (
     <div className="max-w-md">
@@ -405,9 +428,7 @@ function WeeklyThemePanel() {
         </button>
 
         {saveMutation.isError && (
-          <p className="text-sm text-center" style={{ color: '#c0392b' }}>
-            Failed to save — please try again.
-          </p>
+          <p className="text-sm text-center" style={{ color: '#c0392b' }}>Failed to save — please try again.</p>
         )}
       </div>
 
@@ -424,9 +445,7 @@ function WeeklyThemePanel() {
 
 // ─── Session Review Panel ─────────────────────────────────────────────────────
 
-function SessionReviewPanel() {
-  const { profile } = useAuthStore()
-  const classId = profile?.class_id ?? null
+function SessionReviewPanel({ classId }: { classId: string }) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [stepDetails, setStepDetails] = useState<Record<string, SessionDetail[]>>({})
   const [loadingSteps, setLoadingSteps] = useState<Record<string, boolean>>({})
@@ -434,8 +453,6 @@ function SessionReviewPanel() {
   const { data: sessions, isLoading } = useQuery({
     queryKey: ['pwp_recent_sessions', classId],
     queryFn: async (): Promise<RecentSession[]> => {
-      if (!classId) return []
-
       const { data: pupilProfiles } = await supabase
         .from('profiles')
         .select('id, first_name')
@@ -455,35 +472,26 @@ function SessionReviewPanel() {
         .order('created_at', { ascending: false })
         .limit(50)
 
-      return (sessionRows ?? []).map((s) => ({
-        ...s,
-        first_name: nameMap[s.pupil_id] ?? null,
-      }))
+      return (sessionRows ?? []).map((s) => ({ ...s, first_name: nameMap[s.pupil_id] ?? null }))
     },
-    enabled: !!classId,
   })
 
   const toggleSession = useCallback(async (sessionId: string) => {
-    if (expandedId === sessionId) {
-      setExpandedId(null)
-      return
-    }
+    if (expandedId === sessionId) { setExpandedId(null); return }
     setExpandedId(sessionId)
     if (stepDetails[sessionId]) return
 
     setLoadingSteps((prev) => ({ ...prev, [sessionId]: true }))
     const { data } = await supabase
       .from('pwp_session_steps')
-      .select('id, step_number, element_id, formula_label, sentence, ai_passed, attempts, ai_feedback')
+      .select('id, step_number, formula_label, sentence, ai_passed, attempts, ai_feedback')
       .eq('session_id', sessionId)
       .order('step_number', { ascending: true })
-
     setStepDetails((prev) => ({ ...prev, [sessionId]: (data ?? []) as SessionDetail[] }))
     setLoadingSteps((prev) => ({ ...prev, [sessionId]: false }))
   }, [expandedId, stepDetails])
 
   if (isLoading) return <LoadingPanel label="Loading sessions…" />
-  if (!classId) return <EmptyPanel message="No class linked to your account." />
   if (!sessions?.length) return <EmptyPanel message="No sessions in the last 7 days." />
 
   return (
@@ -492,12 +500,7 @@ function SessionReviewPanel() {
         Sessions from the last 7 days — click any row to see step-level detail.
       </p>
       {sessions.map((s) => (
-        <div
-          key={s.id}
-          className="rounded-2xl overflow-hidden"
-          style={{ border: '1px solid var(--color-border)' }}
-        >
-          {/* Session row */}
+        <div key={s.id} className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
           <button
             type="button"
             onClick={() => toggleSession(s.id)}
@@ -527,7 +530,6 @@ function SessionReviewPanel() {
             </span>
           </button>
 
-          {/* Step detail */}
           {expandedId === s.id && (
             <div style={{ borderTop: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
               {loadingSteps[s.id] ? (
@@ -537,13 +539,11 @@ function SessionReviewPanel() {
                   {stepDetails[s.id].map((step) => (
                     <div key={step.id} className="px-4 py-3">
                       <div className="flex items-start gap-3">
-                        <span
-                          className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
                           style={{
                             backgroundColor: step.ai_passed ? 'rgba(39,174,96,0.12)' : 'rgba(231,76,60,0.1)',
                             color: step.ai_passed ? '#27ae60' : '#c0392b',
-                          }}
-                        >
+                          }}>
                           {step.ai_passed ? '✓' : '✗'} Step {step.step_number}
                         </span>
                         <div className="min-w-0">
@@ -554,9 +554,7 @@ function SessionReviewPanel() {
                             "{step.sentence}"
                           </div>
                           {step.ai_feedback && (
-                            <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                              {step.ai_feedback}
-                            </div>
+                            <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>{step.ai_feedback}</div>
                           )}
                           <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                             {step.attempts} attempt{step.attempts !== 1 ? 's' : ''}
@@ -567,9 +565,7 @@ function SessionReviewPanel() {
                   ))}
                 </div>
               ) : (
-                <div className="px-4 py-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                  No step data saved yet.
-                </div>
+                <div className="px-4 py-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>No step data saved yet.</div>
               )}
             </div>
           )}
@@ -581,9 +577,7 @@ function SessionReviewPanel() {
 
 // ─── Curriculum Positions Panel ────────────────────────────────────────────────
 
-function CurriculumPositionsPanel() {
-  const { profile } = useAuthStore()
-  const classId = profile?.class_id ?? null
+function CurriculumPositionsPanel({ classId }: { classId: string }) {
   const queryClient = useQueryClient()
   const [editValues, setEditValues] = useState<Record<string, number>>({})
   const [saving, setSaving] = useState<Record<string, boolean>>({})
@@ -592,8 +586,6 @@ function CurriculumPositionsPanel() {
   const { data: pupils, isLoading } = useQuery({
     queryKey: ['pwp_positions_editor', classId],
     queryFn: async () => {
-      if (!classId) return []
-
       const { data: pupilProfiles } = await supabase
         .from('profiles')
         .select('id, first_name')
@@ -608,7 +600,9 @@ function CurriculumPositionsPanel() {
         .select('pupil_id, highest_lesson, updated_at')
         .in('pupil_id', pupilIds)
 
-      const posMap = Object.fromEntries((positions ?? []).map((p) => [p.pupil_id, p]))
+      const posMap = Object.fromEntries(
+        (positions ?? []).map((p) => [p.pupil_id, { highest_lesson: p.highest_lesson, updated_at: p.updated_at }])
+      )
 
       return pupilProfiles.map((p) => ({
         pupil_id: p.id,
@@ -617,10 +611,8 @@ function CurriculumPositionsPanel() {
         updated_at: posMap[p.id]?.updated_at ?? null,
       })).sort((a, b) => (a.first_name ?? '').localeCompare(b.first_name ?? ''))
     },
-    enabled: !!classId,
   })
 
-  // Initialise edit values from fetched data
   useEffect(() => {
     if (pupils) {
       const vals: Record<string, number> = {}
@@ -635,7 +627,10 @@ function CurriculumPositionsPanel() {
     setSaving((prev) => ({ ...prev, [pupilId]: true }))
     await supabase
       .from('pwp_pupil_positions')
-      .upsert({ pupil_id: pupilId, highest_lesson: lesson, updated_at: new Date().toISOString() }, { onConflict: 'pupil_id' })
+      .upsert(
+        { pupil_id: pupilId, highest_lesson: lesson, updated_at: new Date().toISOString() },
+        { onConflict: 'pupil_id' },
+      )
     setSaving((prev) => ({ ...prev, [pupilId]: false }))
     setSaved((prev) => ({ ...prev, [pupilId]: true }))
     setTimeout(() => setSaved((prev) => ({ ...prev, [pupilId]: false })), 2000)
@@ -644,39 +639,29 @@ function CurriculumPositionsPanel() {
   }
 
   if (isLoading) return <LoadingPanel label="Loading positions…" />
-  if (!classId) return <EmptyPanel message="No class linked to your account." />
-  if (!pupils?.length) return <EmptyPanel message="No pupils found in your class." />
+  if (!pupils?.length) return <EmptyPanel message="No pupils found in this class." />
 
   return (
     <div>
       <p className="text-sm mb-4" style={{ color: 'var(--color-text-muted)' }}>
         Update a pupil's highest lesson to change which formula elements appear in their sessions.
-        Lessons 1–25 = chain only. Lessons 26+ = chain + paragraph phase.
+        L26+ unlocks the paragraph builder phase.
       </p>
 
       <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
         <table className="w-full text-sm">
           <thead>
             <tr style={{ backgroundColor: 'var(--color-surface)' }}>
-              <th className="px-4 py-3 text-left font-semibold" style={{ color: 'var(--color-text-muted)' }}>Pupil</th>
-              <th className="px-4 py-3 text-center font-semibold" style={{ color: 'var(--color-text-muted)' }}>Highest Lesson (1–67)</th>
-              <th className="px-4 py-3 text-left font-semibold" style={{ color: 'var(--color-text-muted)' }}>Last updated</th>
-              <th className="px-4 py-3"></th>
+              {['Pupil', 'Highest Lesson (1–67)', 'Last updated', ''].map((h) => (
+                <th key={h} className="px-4 py-3 text-left font-semibold" style={{ color: 'var(--color-text-muted)' }}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {pupils.map((p, i) => (
-              <tr
-                key={p.pupil_id}
-                style={{
-                  borderTop: i > 0 ? '1px solid var(--color-border)' : 'none',
-                  backgroundColor: 'var(--color-background)',
-                }}
-              >
-                <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>
-                  {p.first_name ?? '—'}
-                </td>
-                <td className="px-4 py-2 text-center">
+              <tr key={p.pupil_id} style={{ borderTop: i > 0 ? '1px solid var(--color-border)' : 'none', backgroundColor: 'var(--color-background)' }}>
+                <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>{p.first_name ?? '—'}</td>
+                <td className="px-4 py-2">
                   <input
                     type="number"
                     min={1}
@@ -694,14 +679,12 @@ function CurriculumPositionsPanel() {
                     }}
                   />
                 </td>
-                <td className="px-4 py-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                  {formatDate(p.updated_at)}
-                </td>
+                <td className="px-4 py-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>{formatDate(p.updated_at)}</td>
                 <td className="px-4 py-3">
                   <button
                     type="button"
                     onClick={() => handleSave(p.pupil_id)}
-                    disabled={saving[p.pupil_id] || (editValues[p.pupil_id] === p.highest_lesson && !saved[p.pupil_id])}
+                    disabled={saving[p.pupil_id]}
                     data-testid={`save-position-${p.pupil_id}`}
                     className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-40"
                     style={{
@@ -719,8 +702,7 @@ function CurriculumPositionsPanel() {
       </div>
 
       <p className="text-xs mt-3" style={{ color: 'var(--color-text-muted)' }}>
-        Tip: L26+ unlocks the paragraph builder phase in each session.
-        L40+ is suitable for most Year 5–6 pupils.
+        Tip: L26+ unlocks the paragraph builder. L40+ is suitable for most Y5–6 pupils.
       </p>
     </div>
   )
