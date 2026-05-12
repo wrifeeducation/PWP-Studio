@@ -46,7 +46,6 @@ const PWPSessionPage: React.FC = () => {
   const [initialising, setInitialising] = useState(false)
   const [resuming, setResuming] = useState(false)
   const [initError, setInitError] = useState<string | null>(null)
-  const [_sessionSaved, setSessionSaved] = useState(false)
 
   // ── Fetch pupil curriculum position ──────────────────────────────────────────
   const { data: positionData } = useQuery({
@@ -216,7 +215,7 @@ const PWPSessionPage: React.FC = () => {
     } finally {
       setResuming(false)
     }
-  }, [existingSession, pupilId, positionData, store]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [existingSession, pupilId, positionData, store])
 
   // ── Discard saved session and start fresh ─────────────────────────────────────
   const handleDiscardAndNew = useCallback(async () => {
@@ -317,7 +316,7 @@ const PWPSessionPage: React.FC = () => {
         },
       })
     }
-  }, [store]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [store])
 
   // ── Advance to next step ──────────────────────────────────────────────────────
   const handleAdvanceStep = useCallback(() => {
@@ -339,7 +338,7 @@ const PWPSessionPage: React.FC = () => {
       }, { onConflict: 'session_id' })
     }
     store.setPhase('quiz')
-  }, [store]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [store])
 
   // ── Quiz complete → session complete ──────────────────────────────────────────
   const handleQuizComplete = useCallback(async () => {
@@ -360,9 +359,8 @@ const PWPSessionPage: React.FC = () => {
         }, { onConflict: 'session_id' })
       }
     }
-    setSessionSaved(true)
     store.setPhase('complete')
-  }, [store, pupilId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [store, pupilId])
 
   // ── Reset on unmount ──────────────────────────────────────────────────────────
   useEffect(() => {

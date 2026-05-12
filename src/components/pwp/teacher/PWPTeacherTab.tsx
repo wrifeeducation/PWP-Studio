@@ -13,7 +13,7 @@
  *   if they teach more than one.
  */
 
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
@@ -103,7 +103,9 @@ export const PWPTeacherTab: React.FC = () => {
   const { profile } = useAuthStore()
   const teacherId = profile?.id ?? null
   const [subTab, setSubTab] = useState<SubTab>('overview')
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
+  // manualClassId is set only when the teacher explicitly picks a class;
+  // selectedClassId falls back to the first class returned by the query.
+  const [manualClassId, setManualClassId] = useState<string | null>(null)
 
   // Fetch all classes this teacher owns
   const { data: classes, isLoading: classesLoading } = useQuery({
@@ -120,12 +122,8 @@ export const PWPTeacherTab: React.FC = () => {
     enabled: !!teacherId,
   })
 
-  // Auto-select first class once loaded
-  useEffect(() => {
-    if (classes?.length && !selectedClassId) {
-      setSelectedClassId(classes[0].id)
-    }
-  }, [classes, selectedClassId])
+  // Derived: use the manual pick if set, otherwise default to the first class
+  const selectedClassId = manualClassId ?? classes?.[0]?.id ?? null
 
   if (classesLoading) return <LoadingPanel label="Loading your classes…" />
   if (!classes?.length) return <EmptyPanel message="No classes linked to your account." />
@@ -142,7 +140,7 @@ export const PWPTeacherTab: React.FC = () => {
             <button
               key={c.id}
               type="button"
-              onClick={() => setSelectedClassId(c.id)}
+              onClick={() => setManualClassId(c.id)}
               data-testid={`class-selector-${c.id}`}
               className="px-3 py-1.5 rounded-full text-sm font-medium"
               style={{
@@ -315,8 +313,9 @@ function ClassOverviewPanel({ classId }: { classId: string }) {
 function WeeklyThemePanel({ classId }: { classId: string }) {
   const weekStart = getMonday(new Date())
   const queryClient = useQueryClient()
-  const [themeNoun, setThemeNoun] = useState('')
-  const [genreHint, setGenreHint] = useState('narrative')
+  // Override state: null means "not yet edited by teacher — fall back to the DB value"
+  const [themeNounOverride, setThemeNounOverride] = useState<string | null>(null)
+  const [genreHintOverride, setGenreHintOverride] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
   const { data: existing, isLoading } = useQuery({
@@ -332,12 +331,9 @@ function WeeklyThemePanel({ classId }: { classId: string }) {
     },
   })
 
-  useEffect(() => {
-    if (existing) {
-      setThemeNoun(existing.theme_noun)
-      setGenreHint(existing.genre_hint)
-    }
-  }, [existing])
+  // Derived values: show whatever the teacher typed, falling back to the saved DB value
+  const themeNoun = themeNounOverride ?? existing?.theme_noun ?? ''
+  const genreHint = genreHintOverride ?? existing?.genre_hint ?? 'narrative'
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -377,7 +373,7 @@ function WeeklyThemePanel({ classId }: { classId: string }) {
           <input
             type="text"
             value={themeNoun}
-            onChange={(e) => setThemeNoun(e.target.value)}
+            onChange={(e) => setThemeNounOverride(e.target.value)}
             placeholder="e.g. the ancient warrior"
             maxLength={60}
             data-testid="theme-noun-input"
@@ -401,7 +397,7 @@ function WeeklyThemePanel({ classId }: { classId: string }) {
               <button
                 key={g}
                 type="button"
-                onClick={() => setGenreHint(g)}
+                onClick={() => setGenreHintOverride(g)}
                 data-testid={`genre-${g}`}
                 className="px-3 py-1.5 rounded-full text-sm font-medium capitalize"
                 style={{
@@ -579,7 +575,9 @@ function SessionReviewPanel({ classId }: { classId: string }) {
 
 function CurriculumPositionsPanel({ classId }: { classId: string }) {
   const queryClient = useQueryClient()
-  const [editValues, setEditValues] = useState<Record<string, number>>({})
+  // editOverrides: tracks values the teacher has actively changed. Rows not in
+  // this map use the DB value from the `pupils` query (avoids useEffect sync).
+  const [editOverrides, setEditOverrides] = useState<Record<string, number>>({})
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [saved, setSaved] = useState<Record<string, boolean>>({})
 
@@ -613,16 +611,9 @@ function CurriculumPositionsPanel({ classId }: { classId: string }) {
     },
   })
 
-  useEffect(() => {
-    if (pupils) {
-      const vals: Record<string, number> = {}
-      pupils.forEach((p) => { vals[p.pupil_id] = p.highest_lesson })
-      setEditValues(vals)
-    }
-  }, [pupils])
-
   const handleSave = async (pupilId: string) => {
-    const lesson = editValues[pupilId]
+    // Use the override value if the teacher changed it, otherwise fall back to the DB value
+    const lesson = editOverrides[pupilId] ?? pupils?.find((p) => p.pupil_id === pupilId)?.highest_lesson
     if (!lesson || lesson < 1 || lesson > 67) return
     setSaving((prev) => ({ ...prev, [pupilId]: true }))
     await supabase
@@ -666,9 +657,9 @@ function CurriculumPositionsPanel({ classId }: { classId: string }) {
                     type="number"
                     min={1}
                     max={67}
-                    value={editValues[p.pupil_id] ?? p.highest_lesson}
+                    value={editOverrides[p.pupil_id] ?? p.highest_lesson}
                     onChange={(e) =>
-                      setEditValues((prev) => ({ ...prev, [p.pupil_id]: parseInt(e.target.value, 10) || 10 }))
+                      setEditOverrides((prev) => ({ ...prev, [p.pupil_id]: parseInt(e.target.value, 10) || 10 }))
                     }
                     data-testid={`lesson-input-${p.pupil_id}`}
                     className="w-20 px-3 py-1.5 rounded-lg text-center text-sm outline-none"
