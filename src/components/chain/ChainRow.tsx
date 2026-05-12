@@ -62,6 +62,8 @@ interface ChainRowProps {
   formula: ChainFormulaDefinition
   subjectNoun: string
   onSubmit: (sentence: string) => void
+  /** Called when pupil confirms capitalisation + punctuation */
+  onPunctuationConfirmed: (punctuatedSentence: string) => void
   autoFocus?: boolean
   helpMode?: boolean
 }
@@ -71,6 +73,7 @@ export const ChainRow: React.FC<ChainRowProps> = ({
   formula,
   subjectNoun,
   onSubmit,
+  onPunctuationConfirmed,
   autoFocus = false,
   helpMode = false,
 }) => {
@@ -78,6 +81,18 @@ export const ChainRow: React.FC<ChainRowProps> = ({
   const [hintOpen, setHintOpen] = useState(false)
   const [wordBankOpen, setWordBankOpen] = useState(formula.level <= WORD_BANK_ALWAYS_OPEN_MAX)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Punctuation step state
+  const [capitalised, setCapitalised] = useState(false)
+  const [chosenPunct, setChosenPunct] = useState<'.' | '!' | '?' | null>(null)
+
+  // Reset punctuation state whenever the row enters 'punctuating'
+  useEffect(() => {
+    if (rowState.status === 'punctuating') {
+      setCapitalised(false)
+      setChosenPunct(null)
+    }
+  }, [rowState.status])
 
   useEffect(() => {
     if (autoFocus && rowState.status === 'active' && inputRef.current) {
@@ -102,12 +117,31 @@ export const ChainRow: React.FC<ChainRowProps> = ({
     inputRef.current?.focus()
   }
 
-  const isAccepted = rowState.status === 'accepted'
-  const isActive   = rowState.status === 'active'
-  const isError    = rowState.status === 'error'
-  const isPending  = rowState.status === 'pending'
+  const isAccepted     = rowState.status === 'accepted'
+  const isActive       = rowState.status === 'active'
+  const isError        = rowState.status === 'error'
+  const isPending      = rowState.status === 'pending'
+  const isPunctuating  = rowState.status === 'punctuating'
 
-  const borderColour = isAccepted ? '#27AE60' : isError ? '#E74C3C' : isActive ? '#6C5CE7' : '#D0D5DD'
+  const borderColour =
+    isAccepted    ? '#27AE60' :
+    isPunctuating ? '#F5A623' :
+    isError       ? '#E74C3C' :
+    isActive      ? '#6C5CE7' :
+    '#D0D5DD'
+
+  // Build the display sentence for the punctuation step
+  const rawSentence = rowState.sentence
+  const firstLetter = rawSentence.charAt(0)
+  const rest        = rawSentence.slice(1)
+  const displayFirst = capitalised ? firstLetter.toUpperCase() : firstLetter.toLowerCase()
+  const punctuatedPreview = `${displayFirst}${rest}${chosenPunct ?? '…'}`
+
+  const handlePunctuationSave = () => {
+    if (!chosenPunct) return
+    const final = `${displayFirst}${rest}${chosenPunct}`
+    onPunctuationConfirmed(final)
+  }
 
   const hasWordBank = !!formula.wordBank && formula.level <= WORD_BANK_TOGGLE_MAX
   const showWordBankToggle = hasWordBank && formula.level > WORD_BANK_ALWAYS_OPEN_MAX
@@ -239,9 +273,98 @@ export const ChainRow: React.FC<ChainRowProps> = ({
       {/* ── Accepted sentence ── */}
       {isAccepted && (
         <p style={{ fontSize: 17, fontWeight: 600, color: '#1A7A45', margin: 0 }}
-          data-tts={`Your accepted sentence: ${rowState.sentence}`}>
-          {rowState.sentence}
+          data-tts={`Your sentence: ${rowState.punctuatedSentence ?? rowState.sentence}`}>
+          {rowState.punctuatedSentence ?? rowState.sentence}
         </p>
+      )}
+
+      {/* ── Punctuation step ── */}
+      {isPunctuating && (
+        <motion.div
+          key="punctuate"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+          data-testid={`punctuate-panel-l${formula.level}`}
+        >
+          {/* Instruction */}
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#7A5800', marginBottom: 10,
+            padding: '6px 12px', borderRadius: 10, backgroundColor: '#FFF8E7', textAlign: 'center' }}
+            data-tts="Now fix your sentence! Tap the first letter to make it a capital, then choose the correct punctuation.">
+            ✏️ Fix your sentence — tap the first letter, then choose the punctuation!
+          </p>
+
+          {/* Sentence display: first letter is tappable */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 0, marginBottom: 14,
+            padding: '10px 16px', borderRadius: 14, backgroundColor: '#fff',
+            border: '2px solid #F5A62355', fontSize: 20, fontWeight: 600, color: '#2D3436',
+            flexWrap: 'wrap' }}
+            data-tts={`Sentence preview: ${punctuatedPreview}`}>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setCapitalised((c) => !c)}
+              data-testid="capitalise-btn"
+              data-tts={capitalised ? 'First letter is capital — tap to make it lowercase' : 'Tap to capitalise the first letter'}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
+                fontSize: 20, fontWeight: 900,
+                backgroundColor: capitalised ? '#6C5CE7' : '#EDE7F6',
+                color: capitalised ? '#fff' : '#6C5CE7',
+                marginRight: 2, transition: 'background-color 0.15s',
+              }}
+              title="Tap to toggle capital letter"
+            >
+              {displayFirst}
+            </motion.button>
+            <span>{rest}</span>
+            <span style={{ color: chosenPunct ? '#27AE60' : '#D0D5DD', marginLeft: 2 }}>
+              {chosenPunct ?? '…'}
+            </span>
+          </div>
+
+          {/* Punctuation picker */}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 14, justifyContent: 'center' }}>
+            {(['.', '!', '?'] as const).map((p) => (
+              <motion.button
+                key={p}
+                type="button"
+                whileTap={{ scale: 0.92 }}
+                onClick={() => setChosenPunct(p)}
+                data-testid={`punct-btn-${p}`}
+                data-tts={p === '.' ? 'Full stop' : p === '!' ? 'Exclamation mark' : 'Question mark'}
+                style={{
+                  width: 64, height: 64, borderRadius: 16, border: 'none', cursor: 'pointer',
+                  fontSize: 30, fontWeight: 900,
+                  backgroundColor: chosenPunct === p ? '#6C5CE7' : '#F0ECFF',
+                  color: chosenPunct === p ? '#fff' : '#6C5CE7',
+                  transition: 'background-color 0.15s',
+                  boxShadow: chosenPunct === p ? '0 4px 12px rgba(108,92,231,0.4)' : 'none',
+                }}
+              >
+                {p}
+              </motion.button>
+            ))}
+          </div>
+
+          {/* Save button */}
+          <button
+            type="button"
+            onClick={handlePunctuationSave}
+            disabled={!chosenPunct}
+            data-testid="punctuation-save-btn"
+            data-tts="Save my sentence"
+            style={{
+              width: '100%', padding: '12px', borderRadius: 14, border: 'none',
+              fontSize: 16, fontWeight: 800, cursor: chosenPunct ? 'pointer' : 'not-allowed',
+              backgroundColor: chosenPunct ? '#27AE60' : '#D0D5DD',
+              color: '#fff', transition: 'background-color 0.2s',
+            }}
+          >
+            {chosenPunct ? `Save — "${punctuatedPreview}" ✓` : 'Choose the punctuation first'}
+          </button>
+        </motion.div>
       )}
 
       {/* ── Active input ── */}

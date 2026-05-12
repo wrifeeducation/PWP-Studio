@@ -349,6 +349,7 @@ const FreePracticePage: React.FC = () => {
                   formula={getChainFormula(challengeLevel)!}
                   subjectNoun={subjectNoun}
                   onSubmit={handleChallengeSubmit}
+                  onPunctuationConfirmed={() => {}}
                   autoFocus
                   helpMode
                 />

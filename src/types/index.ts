@@ -1087,10 +1087,16 @@ export const SCHOOL_DAYS_PER_YEAR = 190;
 export interface ChainRowState {
   /** Formula level number (1–67) */
   level: number
-  /** Status of this row in the current session */
-  status: 'pending' | 'active' | 'accepted' | 'error'
-  /** The sentence the pupil typed (empty until attempted) */
+  /**
+   * Status of this row in the current session.
+   * 'punctuating' = sentence accepted by validator; pupil now fixes capitalisation + punctuation.
+   * 'accepted'    = pupil confirmed capitalisation + punctuation; row is complete.
+   */
+  status: 'pending' | 'active' | 'punctuating' | 'accepted' | 'error'
+  /** The raw sentence the pupil typed (no capital, no punctuation) */
   sentence: string
+  /** The final sentence after capitalisation + punctuation step */
+  punctuatedSentence?: string
   /** Number of attempts made at this row */
   attempts: number
   /** The last validation result, if any */
