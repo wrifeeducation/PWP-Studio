@@ -1133,9 +1133,9 @@ export default function FormulaPage() {
           <span
             className="font-bold text-lg"
             style={{ color: 'var(--color-text)' }}
-            data-tts={isReviewMode ? `Reviewing Level ${data.level.id}` : 'Formula Practice'}
+            data-tts={isReviewMode ? `Reviewing Level ${data.level.id}` : 'Writing Practice'}
           >
-            {isReviewMode ? `Reviewing L${data.level.id}` : 'Formula Practice'}
+            {isReviewMode ? `Reviewing L${data.level.id}` : 'Writing Practice'}
           </span>
         </div>
 

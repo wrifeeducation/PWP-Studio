@@ -50,8 +50,8 @@ For each prompt-response pair:
 THEN make an OVERALL qualitative mastery judgement:
 - Not a simple count of passes — look at the PATTERN across responses
 - Consider: consistency across permutations, confidence, whether any errors were systematic
-- overallPassed = true if the pupil demonstrates reliable, consistent control across the majority of varied prompts
-- readyForNextElement = true if the pupil shows strong mastery AND no systematic errors — they're ready to add the next formula step to their chain
+- overallPassed = true if the pupil demonstrates reasonable control across the majority of varied prompts
+- readyForNextElement = true if the pupil passes at least 3 out of 5 prompts (approximately 60%) with no systematic pattern of errors — they are ready to add the next formula step to their chain. You do NOT need to see exceptional performance; consistent basic control across most prompts is sufficient
 
 FEEDBACK LANGUAGE (MANDATORY)
 - NEVER use: "wrong", "incorrect", "mistake", "error"
