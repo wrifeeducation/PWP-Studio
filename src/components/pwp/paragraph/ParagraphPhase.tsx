@@ -12,11 +12,12 @@ import { usePWPSessionStore } from '../../../stores/pwpSessionStore'
 
 interface ParagraphPhaseProps {
   onComplete: () => void
+  genreHint?: string
 }
 
 type ParaSubPhase = 'lead' | 'support' | 'close' | 'done'
 
-export const ParagraphPhase: React.FC<ParagraphPhaseProps> = ({ onComplete }) => {
+export const ParagraphPhase: React.FC<ParagraphPhaseProps> = ({ onComplete, genreHint }) => {
   const { paragraph, updateParagraph, highestLesson } = usePWPSessionStore()
 
   const [subPhase, setSubPhase] = useState<ParaSubPhase>('lead')
@@ -48,6 +49,7 @@ export const ParagraphPhase: React.FC<ParagraphPhaseProps> = ({ onComplete }) =>
         supportSentences,
         closeSentence: closeText.trim(),
         scaffoldMode,
+        genreHint,
       })
       updateParagraph({
         closeSentence: closeText.trim(),

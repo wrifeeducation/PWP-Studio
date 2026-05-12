@@ -595,11 +595,15 @@ function CurriculumPositionsPanel({ classId }: { classId: string }) {
 
       const { data: positions } = await supabase
         .from('pwp_pupil_positions')
-        .select('pupil_id, highest_lesson, updated_at')
+        .select('pupil_id, highest_lesson, updated_at, ready_to_advance')
         .in('pupil_id', pupilIds)
 
       const posMap = Object.fromEntries(
-        (positions ?? []).map((p) => [p.pupil_id, { highest_lesson: p.highest_lesson, updated_at: p.updated_at }])
+        (positions ?? []).map((p) => [p.pupil_id, {
+          highest_lesson: p.highest_lesson,
+          updated_at: p.updated_at,
+          ready_to_advance: p.ready_to_advance ?? false,
+        }])
       )
 
       return pupilProfiles.map((p) => ({
@@ -607,6 +611,7 @@ function CurriculumPositionsPanel({ classId }: { classId: string }) {
         first_name: p.first_name,
         highest_lesson: posMap[p.id]?.highest_lesson ?? 10,
         updated_at: posMap[p.id]?.updated_at ?? null,
+        ready_to_advance: posMap[p.id]?.ready_to_advance ?? false,
       })).sort((a, b) => (a.first_name ?? '').localeCompare(b.first_name ?? ''))
     },
   })
@@ -619,7 +624,8 @@ function CurriculumPositionsPanel({ classId }: { classId: string }) {
     await supabase
       .from('pwp_pupil_positions')
       .upsert(
-        { pupil_id: pupilId, highest_lesson: lesson, updated_at: new Date().toISOString() },
+        // Clear ready_to_advance when the teacher manually sets a new lesson
+        { pupil_id: pupilId, highest_lesson: lesson, updated_at: new Date().toISOString(), ready_to_advance: false },
         { onConflict: 'pupil_id' },
       )
     setSaving((prev) => ({ ...prev, [pupilId]: false }))
@@ -651,7 +657,19 @@ function CurriculumPositionsPanel({ classId }: { classId: string }) {
           <tbody>
             {pupils.map((p, i) => (
               <tr key={p.pupil_id} style={{ borderTop: i > 0 ? '1px solid var(--color-border)' : 'none', backgroundColor: 'var(--color-background)' }}>
-                <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>{p.first_name ?? '—'}</td>
+                <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>
+                  <span>{p.first_name ?? '—'}</span>
+                  {p.ready_to_advance && (
+                    <span
+                      className="ml-2 text-xs font-bold px-2 py-0.5 rounded-full"
+                      style={{ backgroundColor: 'rgba(245,166,35,0.15)', color: '#e67e22' }}
+                      title="This pupil is ready to advance to the next lesson level"
+                      data-testid={`ready-badge-${p.pupil_id}`}
+                    >
+                      ⬆ Ready
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-2">
                   <input
                     type="number"

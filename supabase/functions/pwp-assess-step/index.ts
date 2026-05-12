@@ -19,6 +19,8 @@ interface AssessStepRequest {
   previousSentence?: string;
   subjectNoun: string;
   attemptNumber?: number;
+  /** Teacher's genre direction for this week, e.g. "narrative", "persuasive" */
+  genreHint?: string;
 }
 
 interface AssessStepResponse {
@@ -83,6 +85,7 @@ Deno.serve(async (req: Request) => {
       previousSentence,
       subjectNoun,
       attemptNumber = 1,
+      genreHint,
     } = body;
 
     if (!sentence || !formulaLabel || !elementCode || !subjectNoun) {
@@ -110,13 +113,17 @@ Deno.serve(async (req: Request) => {
       ? `\nThe pupil's previous sentence (for reference): "${previousSentence}"\n`
       : '';
 
+    const genreContext = genreHint
+      ? `Genre direction for this session: ${genreHint} — bear this in mind when evaluating vocabulary choices and suggesting revisions, but do not penalise the pupil for genre if the grammatical formula is correctly applied.\n`
+      : '';
+
     const userMessage = `Please assess this formula chain step.
 
 Formula instruction: ${formulaLabel}
 Element being practised: ${elementCode}
 Subject noun for this session: "${subjectNoun}"
 Attempt number: ${attemptNumber}
-${previousContext}
+${genreContext}${previousContext}
 Pupil's sentence: "${sentence}"
 
 Assess whether the sentence correctly applies the formula element described above.`;

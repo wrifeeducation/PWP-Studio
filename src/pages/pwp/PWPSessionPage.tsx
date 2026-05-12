@@ -19,7 +19,7 @@ import { ChainStep } from '../../components/pwp/session/ChainStep'
 import { ParagraphPhase } from '../../components/pwp/paragraph/ParagraphPhase'
 import { QuizPhase } from '../../components/pwp/quiz/QuizPhase'
 import { supabase } from '../../lib/supabase'
-import { generateChain, assessStep } from '../../lib/pwp/pwpApi'
+import { generateChain, assessStep, suggestSubjects } from '../../lib/pwp/pwpApi'
 import { useAuthStore } from '../../stores/authStore'
 import { usePWPSessionStore } from '../../stores/pwpSessionStore'
 import type { ResumePayload, SessionStepState } from '../../stores/pwpSessionStore'
@@ -46,6 +46,7 @@ const PWPSessionPage: React.FC = () => {
   const [initialising, setInitialising] = useState(false)
   const [resuming, setResuming] = useState(false)
   const [initError, setInitError] = useState<string | null>(null)
+  const [readyToAdvance, setReadyToAdvance] = useState(false)
 
   // ── Fetch pupil curriculum position ──────────────────────────────────────────
   const { data: positionData } = useQuery({
@@ -81,6 +82,22 @@ const PWPSessionPage: React.FC = () => {
       return data
     },
     enabled: !!classId,
+  })
+
+  // ── AI subject noun suggestions (based on teacher theme + recent sessions) ────
+  const { data: subjectSuggestions } = useQuery({
+    queryKey: ['pwp_subject_suggestions', pupilId, themeData?.theme_noun, themeData?.genre_hint],
+    queryFn: async () => {
+      if (!pupilId || !themeData?.theme_noun) return []
+      const result = await suggestSubjects({
+        pupilId,
+        themeNoun: themeData.theme_noun,
+        genreHint: themeData.genre_hint ?? undefined,
+      })
+      return result.suggestions
+    },
+    enabled: !!pupilId && !!themeData?.theme_noun,
+    staleTime: 5 * 60 * 1000,
   })
 
   // ── Check for today's active session (resume candidate) ───────────────────────
@@ -279,6 +296,7 @@ const PWPSessionPage: React.FC = () => {
         previousSentence,
         subjectNoun: store.subjectNoun,
         attemptNumber: stepState.attempts + 1,
+        genreHint: themeData?.genre_hint ?? undefined,
       })
 
       const attempts = stepState.attempts + 1
@@ -316,7 +334,7 @@ const PWPSessionPage: React.FC = () => {
         },
       })
     }
-  }, [store])
+  }, [store, themeData])
 
   // ── Advance to next step ──────────────────────────────────────────────────────
   const handleAdvanceStep = useCallback(() => {
@@ -359,6 +377,23 @@ const PWPSessionPage: React.FC = () => {
         }, { onConflict: 'session_id' })
       }
     }
+
+    // ── Readiness check: ≥80% of steps passed on first attempt ───────────────
+    if (store.steps.length > 0 && pupilId) {
+      const firstAttemptPasses = store.steps.filter(
+        (s) => s.status === 'passed' && s.attempts === 1
+      ).length
+      const isReady = firstAttemptPasses / store.steps.length >= 0.8
+
+      if (isReady) {
+        setReadyToAdvance(true)
+        void supabase
+          .from('pwp_pupil_positions')
+          .update({ ready_to_advance: true })
+          .eq('pupil_id', pupilId)
+      }
+    }
+
     store.setPhase('complete')
   }, [store, pupilId])
 
@@ -505,7 +540,7 @@ const PWPSessionPage: React.FC = () => {
                   onChange={store.setSubjectNoun}
                   onConfirm={handleSubjectConfirm}
                   weeklyTheme={themeData?.theme_noun ?? null}
-                  themeSuggestions={[]}
+                  themeSuggestions={subjectSuggestions ?? []}
                   disabled={initialising || checkingExisting}
                 />
               )}
@@ -529,7 +564,10 @@ const PWPSessionPage: React.FC = () => {
           {/* Paragraph */}
           {store.phase === 'paragraph' && (
             <motion.div key="paragraph" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <ParagraphPhase onComplete={handleParagraphComplete} />
+              <ParagraphPhase
+                onComplete={handleParagraphComplete}
+                genreHint={themeData?.genre_hint ?? undefined}
+              />
             </motion.div>
           )}
 
@@ -553,6 +591,28 @@ const PWPSessionPage: React.FC = () => {
                   You wrote <strong>{store.steps.length}</strong> formula sentence{store.steps.length !== 1 ? 's' : ''}
                   {store.paragraph ? ', built a paragraph,' : ''} and completed the quiz.
                 </p>
+
+                {/* Ready to level up banner */}
+                {readyToAdvance && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
+                    className="mb-6 px-5 py-4 rounded-2xl text-center"
+                    style={{
+                      background: 'linear-gradient(135deg, #F5A623 0%, #f39c12 100%)',
+                      boxShadow: '0 4px 20px rgba(245,166,35,0.4)',
+                    }}
+                    data-testid="ready-to-advance-banner"
+                    data-tts="Ready to level up! You passed most steps first time."
+                  >
+                    <div className="text-3xl mb-1">⬆️</div>
+                    <div className="text-lg font-extrabold text-white mb-0.5">Ready to level up!</div>
+                    <div className="text-sm text-white" style={{ opacity: 0.9 }}>
+                      You passed most steps on the first try. Your teacher can unlock the next formula level for you.
+                    </div>
+                  </motion.div>
+                )}
 
                 {/* Sentence review */}
                 <div className="text-left space-y-2 mb-8">

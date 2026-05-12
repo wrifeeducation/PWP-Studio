@@ -17,6 +17,8 @@ interface AssessParagraphCloseRequest {
   supportSentences: string[];
   closeSentence: string;
   scaffoldMode?: boolean;
+  /** Teacher's genre direction, e.g. "narrative", "persuasive" */
+  genreHint?: string;
 }
 
 interface AssessParagraphCloseResponse {
@@ -87,7 +89,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body: AssessParagraphCloseRequest = await req.json();
-    const { leadSentence, supportSentences, closeSentence, scaffoldMode = false } = body;
+    const { leadSentence, supportSentences, closeSentence, scaffoldMode = false, genreHint } = body;
 
     if (!leadSentence || !supportSentences?.length || !closeSentence) {
       return new Response(
@@ -113,9 +115,13 @@ Deno.serve(async (req: Request) => {
       .map((s, i) => `  Support ${i + 1}: "${s}"`)
       .join('\n');
 
+    const genreContext = genreHint
+      ? `Genre direction: ${genreHint} — use genre-appropriate vocabulary in any revision suggestions, but assess grammatical complexity regardless of genre.\n\n`
+      : '';
+
     const userMessage = `Please assess the closing sentence of this pupil's paragraph.
 
-Lead (topic sentence, already written): "${leadSentence}"
+${genreContext}Lead (topic sentence, already written): "${leadSentence}"
 
 Support sentences (free writing):
 ${supportFormatted}

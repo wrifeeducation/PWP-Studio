@@ -63,6 +63,10 @@ export interface AssessQuizResponse {
   readyForNextElement: boolean
 }
 
+export interface SuggestSubjectsResponse {
+  suggestions: string[]
+}
+
 // ─── EF1: Generate formula chain ─────────────────────────────────────────────
 
 export async function generateChain(
@@ -87,6 +91,7 @@ export async function assessStep(params: {
   previousSentence?: string
   subjectNoun: string
   attemptNumber?: number
+  genreHint?: string
 }): Promise<AssessStepResponse> {
   const { data, error } = await supabase.functions.invoke<AssessStepResponse>(
     'pwp-assess-step',
@@ -103,6 +108,7 @@ export async function assessParagraphClose(params: {
   supportSentences: string[]
   closeSentence: string
   scaffoldMode?: boolean
+  genreHint?: string
 }): Promise<AssessParagraphCloseResponse> {
   const { data, error } = await supabase.functions.invoke<AssessParagraphCloseResponse>(
     'pwp-assess-paragraph-close',
@@ -124,6 +130,21 @@ export async function generateQuiz(params: {
     { body: params }
   )
   if (error || !data) throw new Error(error?.message ?? 'Quiz generation unavailable')
+  return data
+}
+
+// ─── EF6: Suggest subject nouns ───────────────────────────────────────────────
+
+export async function suggestSubjects(params: {
+  pupilId: string
+  themeNoun: string
+  genreHint?: string
+}): Promise<SuggestSubjectsResponse> {
+  const { data, error } = await supabase.functions.invoke<SuggestSubjectsResponse>(
+    'pwp-suggest-subjects',
+    { body: params }
+  )
+  if (error || !data) return { suggestions: [] }
   return data
 }
 
