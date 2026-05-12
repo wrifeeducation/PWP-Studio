@@ -51,6 +51,9 @@ const AuthConfirmPage = lazy(() => import('./pages/AuthConfirmPage'))
 const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage'))
 const UpdatePasswordPage = lazy(() => import('./pages/UpdatePasswordPage'))
 
+// PWP new session — lazy loaded (heavy AI + paragraph builder)
+const PWPSessionPage = lazy(() => import('./pages/pwp/PWPSessionPage'))
+
 // Role constants
 import { Role } from './types/index'
 
@@ -358,6 +361,19 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={[Role.PUPIL]}>
                   <WritingStudioPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* PWP new formula chain session — pupils only */}
+            {/* Note: no inner Suspense — outer Suspense handles the lazy load.
+                Inner Suspense caused React 19 + React Router v7 to fall through
+                to the catch-all route while PWPSessionPage was loading. */}
+            <Route
+              path="/pwp/session"
+              element={
+                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
+                  <PWPSessionPage />
                 </ProtectedRoute>
               }
             />
