@@ -1,0 +1,210 @@
+@import 'tailwindcss';
+
+/* ─── WriFe Brand Tokens ─────────────────────────────────────────────────── */
+:root {
+  /* Core brand */
+  --color-primary:       #6C5CE7;
+  --color-primary-soft:  #a29bf5;
+  --color-primary-pale:  #EDE9FE;
+  --color-orange:        #F5A623;
+  --color-gold:          #F5C500;
+  --color-teal:          #00b894;
+  --color-cream:         #FDF8EE;
+  --color-text:          #2D3436;
+
+  /* Word-class chip colours */
+  --chip-determiner:   #3B82F6;
+  --chip-noun:         #6C5CE7;
+  --chip-verb:         #F97316;
+  --chip-adjective:    #22C55E;
+  --chip-adverb:       #00b894;
+  --chip-pronoun:      #F43F5E;
+  --chip-preposition:  #6B7280;
+  --chip-conjunction:  #EAB308;
+
+  /* Subject chip */
+  --chip-subject:      #F59E0B;
+
+  /* Feedback states */
+  --color-correct:     #16a34a;
+  --color-retry:       #d97706;
+  --color-error:       #dc2626;
+
+  /* UI */
+  --radius-chip:   9999px;
+  --radius-card:   1rem;
+  --focus-ring:    0 0 0 2px #6C5CE7;
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background-color: var(--color-cream);
+  color: var(--color-text);
+  min-height: 100dvh;
+}
+
+/* ─── Focus rings ────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ─── Writing area ───────────────────────────────────────────────────────── */
+.writing-area {
+  font-size: 1.125rem; /* 18px min */
+  line-height: 1.6;
+  padding: 1rem;
+  border-radius: var(--radius-card);
+  border: 2px solid #e5e7eb;
+  background: #ffffff;
+  width: 100%;
+  resize: none;
+  transition: border-color 0.15s;
+}
+
+.writing-area:focus {
+  border-color: var(--color-primary);
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* ─── Word-class chips ───────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-chip);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #fff;
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.1s, opacity 0.1s;
+}
+
+.chip:active { transform: scale(0.96); }
+.chip[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+
+.chip-D    { background: var(--chip-determiner); }
+.chip-N    { background: var(--chip-noun); }
+.chip-V    { background: var(--chip-verb); }
+.chip-Adj  { background: var(--chip-adjective); }
+.chip-Adv  { background: var(--chip-adverb); }
+.chip-Pro  { background: var(--chip-pronoun); }
+.chip-Prep { background: var(--chip-preposition); }
+.chip-Conj { background: var(--chip-conjunction); }
+.chip-subject { background: var(--chip-subject); color: #fff; cursor: default; }
+
+/* ─── Gap slots (Phase B) ────────────────────────────────────────────────── */
+.gap-slot {
+  display: inline-flex;
+  align-items: center;
+  min-width: 80px;
+  height: 44px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 2px solid currentColor;
+  background: transparent;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: inherit;
+  transition: box-shadow 0.15s, min-width 0.1s;
+}
+
+.gap-slot:focus {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.gap-slot.empty {
+  animation: gap-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes gap-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(108,92,231,0.4); }
+  50%       { box-shadow: 0 0 0 4px rgba(108,92,231,0.15); }
+}
+
+/* ─── Sentence tray ──────────────────────────────────────────────────────── */
+.sentence-tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px;
+  min-height: 60px;
+  background: #f9fafb;
+  border-radius: var(--radius-card);
+  border: 2px dashed #d1d5db;
+}
+
+/* ─── Path node pulse ────────────────────────────────────────────────────── */
+@keyframes node-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(108,92,231,0.5); }
+  50%       { box-shadow: 0 0 0 10px rgba(108,92,231,0); }
+}
+
+.node-pulse {
+  animation: node-pulse 2s ease-in-out infinite;
+}
+
+/* ─── Skip navigation link ───────────────────────────────────────────────── */
+/* Hidden until focused — allows keyboard users to jump past repeated nav */
+.skip-nav {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  padding: 8px 16px;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.875rem;
+  border-radius: 0 0 8px 0;
+  z-index: 9999;
+  transition: top 0.1s;
+}
+.skip-nav:focus {
+  top: 0;
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+/* ─── Prefers-reduced-motion ─────────────────────────────────────────────── */
+/* Disable CSS keyframe animations and transitions for users who request
+   reduced motion. Framer Motion handles JS animations via useReducedMotion();
+   CSS animations must be stopped here explicitly. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration:        0.01ms !important;
+    animation-iteration-count: 1      !important;
+    transition-duration:       0.01ms !important;
+    scroll-behavior:           auto   !important;
+  }
+
+  /* Explicitly stop named infinite animations */
+  .node-pulse,
+  .gap-slot.empty {
+    animation: none !important;
+  }
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
