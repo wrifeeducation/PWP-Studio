@@ -478,18 +478,21 @@ function InLevelScreen({
             </div>
           )}
 
-          {/* Subject prompt */}
-          <div className="mb-3">
-            <div className="text-[14px] text-[#2D3436] font-semibold mb-2">
-              Write your sentence using this subject:
+          {/* Subject prompt — only shown for free-write phases (C/D).
+              Phase A/B: pupil picks their own noun from the bank below. */}
+          {!isWordBankPhase && !isParagraphStep && (
+            <div className="mb-3">
+              <div className="text-[14px] text-[#2D3436] font-semibold mb-2">
+                Write your sentence using this subject:
+              </div>
+              <div
+                className="inline-block bg-[#fff3cd] rounded-[8px] px-3 py-2 text-[13px] font-semibold text-[#856404]"
+                data-tts={`Subject: ${step.subject_prompt}`}
+              >
+                {step.subject_prompt}
+              </div>
             </div>
-            <div
-              className="inline-block bg-[#fff3cd] rounded-[8px] px-3 py-2 text-[13px] font-semibold text-[#856404]"
-              data-tts={`Subject: ${step.subject_prompt}`}
-            >
-              {step.subject_prompt}
-            </div>
-          </div>
+          )}
 
           {/* Guidance panel — hidden while feedback is showing */}
           {!feedback && (

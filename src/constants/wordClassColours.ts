@@ -52,15 +52,38 @@ const ADVERBS      = new Set(['quickly','slowly','hard','yesterday','today','tom
 const ADJECTIVES   = new Set(['tall','short','red','blue','old','new','big','small','fast','slow','strong','weak','clever','brave','happy','sad','dark','bright','long','beautiful','exhausted','battered','determined','fierce','gentle','cold','warm','busy','quiet','loud','thin','young'])
 const HELPING_VERBS = new Set(['is','are','was','were','has','have','had','will','would','could','should','can','may','might','shall','did','does','do'])
 
+/**
+ * Irregular past-tense verbs that don't end in -ed and would otherwise be
+ * misclassified as nouns (e.g. "fell", "ran", "swam", "went").
+ */
+const PAST_IRREGULAR_VERBS = new Set([
+  // common irregular pasts used in PWP word banks
+  'fell','ran','swam','flew','grew','drew','threw','blew','knew',
+  'saw','ate','drank','sang','rang','sat','bit','hit','cut','put',
+  'set','got','let','lit','met','led','fed','bled','fled','sped',
+  'held','felt','dealt','kept','slept','wept','crept','swept',
+  'left','meant','sent','spent','bent','lent','built','went',
+  'came','gave','made','took','told','sold','lost','beat',
+  'burst','cast','shut','hurt','rode','rose','wore','bore',
+  'tore','swore','chose','froze','drove','strove','wove',
+  'shone','spun','won','ran','hid','laid','paid','said',
+  'read','stood','understood','found','bound','ground','wound',
+  'brought','bought','caught','taught','thought','fought','sought',
+  'break','broke','climb','climbed','skipped','jumped','walked',
+  'played','shouted','carried','dropped','kicked','threw',
+])
+
 export function guessWordClass(word: string): string {
   const w = word.toLowerCase().replace(/[.!?,;]$/, '')
-  if (DETERMINERS.has(w))   return 'determiner'
-  if (PRONOUNS.has(w))      return 'pronoun'
-  if (PREPOSITIONS.has(w))  return 'preposition'
-  if (CONJUNCTIONS.has(w))  return 'conjunction'
-  if (ADVERBS.has(w))       return 'adverb'
-  if (ADJECTIVES.has(w))    return 'adjective'
-  if (HELPING_VERBS.has(w)) return 'verb'
+  if (DETERMINERS.has(w))          return 'determiner'
+  if (PRONOUNS.has(w))             return 'pronoun'
+  if (PREPOSITIONS.has(w))         return 'preposition'
+  if (CONJUNCTIONS.has(w))         return 'conjunction'
+  if (ADVERBS.has(w))              return 'adverb'
+  if (ADJECTIVES.has(w))           return 'adjective'
+  if (HELPING_VERBS.has(w))        return 'verb'
+  if (PAST_IRREGULAR_VERBS.has(w)) return 'verb'
+  // Morphological patterns: -ing, -ed, -s verb forms
   if (w.endsWith('ing') || w.endsWith('ed') || (w.endsWith('s') && w.length > 4)) return 'verb'
   return 'noun'
 }
