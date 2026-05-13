@@ -30,8 +30,8 @@ import type { AssessStepResponse } from '../../lib/pwp/pwpApi'
 interface ExistingSession {
   id: string
   subject_noun: string
-  chain_length: number
-  created_at: string
+  chain_length: number | null
+  created_at: string | null
   stepsCompleted: number
 }
 
@@ -150,7 +150,7 @@ const PWPSessionPage: React.FC = () => {
         .eq('session_id', existingSession.id)
         .order('step_number', { ascending: true })
 
-      const stepMap: Record<number, { sentence: string; ai_passed: boolean; ai_feedback: string | null; attempts: number }> =
+      const stepMap: Record<number, { sentence: string; ai_passed: boolean | null; ai_feedback: string | null; attempts: number }> =
         Object.fromEntries((savedSteps ?? []).map((s) => [s.step_number, s]))
 
       // 3. Reconstruct step states
@@ -165,7 +165,7 @@ const PWPSessionPage: React.FC = () => {
           ? 'soft_passed'
           : 'needs_revision'
         const assessment: AssessStepResponse = {
-          passed: saved.ai_passed,
+          passed: saved.ai_passed ?? false,
           feedback: saved.ai_feedback ?? '',
           suggestedRevision: null,
           confidence: 0.8,
@@ -196,7 +196,7 @@ const PWPSessionPage: React.FC = () => {
             // Paragraph done — go straight to quiz
             phase = 'quiz'
             paragraph = {
-              leadSentence: savedParagraph.lead_sentence,
+              leadSentence: savedParagraph.lead_sentence ?? '',
               supportSentences: (savedParagraph.support_sentences as string[]) ?? [],
               closeSentence: savedParagraph.close_sentence ?? '',
               closeAssessment: savedParagraph.close_ai_passed !== null
@@ -312,7 +312,7 @@ const PWPSessionPage: React.FC = () => {
         void supabase.from('pwp_session_steps').upsert({
           session_id: store.sessionId,
           step_number: idx + 1,
-          element_id: stepState.step.elementId,
+          element_id: stepState.step.elementId ? Number(stepState.step.elementId) : null,
           formula_label: stepState.step.formulaLabel,
           sentence,
           ai_passed: result.passed,
@@ -369,9 +369,9 @@ const PWPSessionPage: React.FC = () => {
       if (store.quiz) {
         void supabase.from('pwp_quiz_results').upsert({
           session_id: store.sessionId,
-          pupil_id: pupilId,
-          prompts: store.quiz.results,
-          overall_passed: store.quiz.overallPassed,
+          pupil_id: pupilId!,
+          prompts: store.quiz.results as unknown as import('../../types/supabase').Json,
+          overall_passed: store.quiz.overallPassed ?? false,
           ai_summary: store.quiz.summary,
           completed_at: new Date().toISOString(),
         }, { onConflict: 'session_id' })

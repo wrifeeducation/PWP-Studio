@@ -192,7 +192,7 @@ const DailyPracticePage: React.FC = () => {
 
       const sessionPayload: ChainSessionSave = {
         pupil_id: pupilId,
-        class_id: classId,
+        class_id: classId ?? '',
         session_date: today,
         subject_noun: subjectNoun,
         level_reached: currentLevel,
@@ -377,7 +377,7 @@ const DailyPracticePage: React.FC = () => {
             onChange={setSubjectNoun}
             onConfirm={handleSubjectConfirm}
             weeklyTheme={themeData?.theme ?? null}
-            themeSuggestions={themeData?.suggestions ?? []}
+            themeSuggestions={(themeData?.suggestions as unknown as string[]) ?? []}
           />
         )}
 

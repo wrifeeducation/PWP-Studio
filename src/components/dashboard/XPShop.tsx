@@ -56,7 +56,7 @@ export const XPShop: React.FC<XPShopProps> = ({ progress, onPurchase }) => {
     if (totalXP < item.cost || purchasing) return
     setPurchasing(item.id)
     try {
-      const updates: Record<string, unknown> = {
+      const updates: { total_xp: number; streak_shield_active?: boolean; double_xp_until?: string } = {
         total_xp: totalXP - item.cost,
       }
 

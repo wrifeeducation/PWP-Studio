@@ -79,7 +79,7 @@ export function OverviewTab({ schoolId }: { schoolId: string }) {
           : null
 
       setStats({
-        school: (schoolRes.data as School) ?? null,
+        school: (schoolRes.data as unknown as School) ?? null,
         totalPupils: pupils.length,
         totalTeachers: teachers.length,
         totalClasses: (classesRes.data ?? []).length,

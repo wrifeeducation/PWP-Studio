@@ -96,7 +96,7 @@ export async function generateConsolidationPack(
     }>
 
     // Generate up to 5 example sentences using the example words
-    const subjectBank: string[] = levelData.subject_rotation_bank ?? ['The dog', 'A bird', 'The cat']
+    const subjectBank: string[] = (levelData.subject_rotation_bank as string[]) ?? ['The dog', 'A bird', 'The cat']
     for (let i = 0; i < Math.min(5, subjectBank.length + 2); i++) {
       const sentence = elements
         .sort((a, b) => a.position - b.position)

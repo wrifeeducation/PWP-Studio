@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { ProtectedRoute } from '@/components/ui/ProtectedRoute'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
+import { Role } from '@/types/index'
+import type { Profile } from '@/types/index'
 
 // ── Eager-loaded pages (small, always needed) ────────────────────────────────
 import LoginPage        from '@/pages/LoginPage'
@@ -42,7 +44,7 @@ function AuthInitialiser() {
           supabase.from('profiles').select('*').eq('id', userId).single()
             .then(({ data }) => {
               if (data) {
-                setProfile(data)
+                setProfile(data as unknown as Profile)
                 localStorage.setItem('pwp_profile_v1', JSON.stringify(data))
               }
               if (!cached) { setLoading(false); setInitialised(true) }
@@ -55,7 +57,7 @@ function AuthInitialiser() {
             supabase.from('profiles').select('*').eq('id', userId).single()
               .then(({ data }) => {
                 if (data) {
-                  setProfile(data)
+                  setProfile(data as unknown as Profile)
                   localStorage.setItem('pwp_profile_v1', JSON.stringify(data))
                 }
                 setLoading(false)
@@ -95,7 +97,7 @@ export default function App() {
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute allowedRoles={['pupil']}>
+              <ProtectedRoute allowedRoles={[Role.PUPIL]}>
                 <DashboardPage />
               </ProtectedRoute>
             }
@@ -105,7 +107,7 @@ export default function App() {
           <Route
             path="/level/:levelId"
             element={
-              <ProtectedRoute allowedRoles={['pupil']}>
+              <ProtectedRoute allowedRoles={[Role.PUPIL]}>
                 <LevelPage />
               </ProtectedRoute>
             }
@@ -115,7 +117,7 @@ export default function App() {
           <Route
             path="/quiz/:quizId"
             element={
-              <ProtectedRoute allowedRoles={['pupil']}>
+              <ProtectedRoute allowedRoles={[Role.PUPIL]}>
                 <QuizPage />
               </ProtectedRoute>
             }
@@ -125,7 +127,7 @@ export default function App() {
           <Route
             path="/onboarding"
             element={
-              <ProtectedRoute allowedRoles={['pupil']}>
+              <ProtectedRoute allowedRoles={[Role.PUPIL]}>
                 <OnboardingPage />
               </ProtectedRoute>
             }
@@ -135,7 +137,7 @@ export default function App() {
           <Route
             path="/teacher"
             element={
-              <ProtectedRoute allowedRoles={['teacher', 'school_admin']}>
+              <ProtectedRoute allowedRoles={[Role.TEACHER, Role.SCHOOL_ADMIN]}>
                 <TeacherPage />
               </ProtectedRoute>
             }

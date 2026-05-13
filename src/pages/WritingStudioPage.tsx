@@ -252,7 +252,7 @@ export default function WritingStudioPage() {
       if (progressRow) {
         await supabase
           .from('formula_progress')
-          .update({ total_xp: progressRow.total_xp + xp })
+          .update({ total_xp: (progressRow.total_xp ?? 0) + xp })
           .eq('pupil_id', profile.id)
       }
     } catch (err) {

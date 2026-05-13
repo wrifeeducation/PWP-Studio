@@ -302,7 +302,7 @@ const FreePracticePage: React.FC = () => {
             onChange={setSubjectNoun}
             onConfirm={handleSubjectConfirm}
             weeklyTheme={themeData?.theme ?? null}
-            themeSuggestions={themeData?.suggestions ?? []}
+            themeSuggestions={(themeData?.suggestions as unknown as string[]) ?? []}
           />
         )}
 

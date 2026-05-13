@@ -188,9 +188,9 @@ export const useGameStore = create<GameState>((set) => ({
     set({ streakDays: days }),
 
   setHighestLevel: (level) =>
-    set(s => ({
+    set({
       highestLevelReached: level,
       levelTitle: getLevelTitle(level),
       wordBankPhase: getWordBankPhase(level, null),
-    })),
+    }),
 }))

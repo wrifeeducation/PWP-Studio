@@ -9,6 +9,7 @@
  */
 
 import { supabase } from './supabase'
+import type { Json } from '../types/supabase'
 
 /**
  * Insert a single learning_events row for PWP Studio.
@@ -29,7 +30,7 @@ export async function insertLearningEvent(
       pupil_id: pupilId,
       app: 'pwp',
       event_type: eventType,
-      event_data: eventData,
+      event_data: eventData as unknown as Json,
       class_id: classId ?? null,
     })
 

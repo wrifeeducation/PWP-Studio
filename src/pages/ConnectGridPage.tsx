@@ -16,6 +16,7 @@ import { ConnectGrid } from '../components/chain/ConnectGrid'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import type { GridSessionState, GridSessionSave, GridTemplate } from '../types/index'
+import type { Json } from '../types/supabase'
 import { Genre } from '../types/index'
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -49,7 +50,7 @@ export default function ConnectGridPage() {
         .eq('id', classId)
         .single()
       if (error) throw error
-      return data as { w_level: number; active_genre: string }
+      return data as unknown as { w_level: number; active_genre: string }
     },
     enabled: !!classId,
   })
@@ -99,7 +100,7 @@ export default function ConnectGridPage() {
         xp_earned: 10,
       }
 
-      const { error } = await supabase.from('grid_sessions').insert(payload)
+      const { error } = await supabase.from('grid_sessions').insert({ ...payload, rows: payload.rows as unknown as Json })
       if (error) {
         console.warn('ConnectGridPage: grid_sessions insert failed (non-fatal):', error)
       }

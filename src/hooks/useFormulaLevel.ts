@@ -66,7 +66,7 @@ export const useFormulaLevel = (overrideLevelId?: number) => {
         .maybeSingle()
       if (error) throw error
 
-      if (data) return data as PupilProgress
+      if (data) return data as unknown as PupilProgress
 
       // No row yet — auto-provision for home learners (school pupils get their row
       // created by a server-side trigger or the onboarding flow)
@@ -76,7 +76,7 @@ export const useFormulaLevel = (overrideLevelId?: number) => {
         .select('*')
         .single()
       if (insertError) throw insertError
-      return inserted as PupilProgress
+      return inserted as unknown as PupilProgress
     },
     enabled: !!pupilId,
     staleTime: 1000 * 60 * 5,
@@ -95,7 +95,7 @@ export const useFormulaLevel = (overrideLevelId?: number) => {
         .eq('id', levelId)
         .single()
       if (error) throw error
-      return data as FormulaLevel
+      return data as unknown as FormulaLevel
     },
     // When overriding, we don't need to wait for progressQuery to succeed
     enabled: overrideLevelId ? true : progressQuery.isSuccess,

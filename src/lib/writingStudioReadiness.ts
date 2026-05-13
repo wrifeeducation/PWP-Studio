@@ -13,6 +13,7 @@
  */
 
 import { supabase } from './supabase'
+import type { Json } from '../types/supabase'
 import { Genre, MasteryEventType, TeacherNotificationType } from '../types/index'
 
 // ─── Thresholds (mirrors §5.2) ────────────────────────────────────────────────
@@ -203,7 +204,7 @@ export async function triggerWritingStudioSuggestion(
     pupil_id: pupilId,
     event_type: MasteryEventType.WRITING_STUDIO_SUGGESTED,
     triggered_by: 'system' as const,
-    evidence: evidence as unknown as Record<string, unknown>,
+    evidence: evidence as unknown as Json,
   })
 
   // 3. Teacher notification — action required (teacher must confirm before WS unlocks)
@@ -238,7 +239,7 @@ export async function triggerWritingStudioSuggestion(
             evidence,
             breadth_phases: evidence.breadthPhases,
             depth_genres: evidence.depthGenres,
-          },
+          } as unknown as Json,
           action_required: true,
         })
       }

@@ -28,6 +28,7 @@ import {
 import { useMasteryState } from '../hooks/useMasteryState'
 import { ConceptCardSequence } from '../components/formula/ConceptCardSequence'
 import { supabase } from '../lib/supabase'
+import type { Database } from '../types/supabase'
 import { enqueue, flush } from '../lib/offlineQueue'
 import { useNetworkStatus } from '../hooks/useNetworkStatus'
 import { FormulaBuilder } from '../components/formula/FormulaBuilder'
@@ -265,7 +266,7 @@ export default function FormulaPage() {
             const { data: classRow } = await supabase
               .from('classes')
               .select('teacher_id')
-              .eq('id', profile.class_id)
+              .eq('id', profile.class_id as string)
               .maybeSingle()
             if (classRow?.teacher_id) {
               await supabase.from('teacher_notifications').insert({
@@ -329,7 +330,7 @@ export default function FormulaPage() {
 
       await supabase
         .from('mastery_tracking')
-        .upsert(masteryPayload, { onConflict: 'pupil_id,level_id' })
+        .upsert(masteryPayload as unknown as Database['public']['Tables']['mastery_tracking']['Insert'], { onConflict: 'pupil_id,level_id' })
 
       // Phase 2: write mastery_event when gate first passes
       const gateJustPassed = masteryPayload.gate_passed && !(existingMastery as MasteryTracking | null)?.gate_passed
@@ -714,7 +715,7 @@ export default function FormulaPage() {
 
       await supabase
         .from('mastery_tracking')
-        .upsert(masteryPayload, { onConflict: 'pupil_id,level_id' })
+        .upsert(masteryPayload as unknown as Database['public']['Tables']['mastery_tracking']['Insert'], { onConflict: 'pupil_id,level_id' })
 
       // WF-009: XP + streak update
       const { data: progressRow } = await supabase

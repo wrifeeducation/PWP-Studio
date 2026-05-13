@@ -41,9 +41,9 @@ interface RecentSession {
   pupil_id: string
   first_name: string | null
   subject_noun: string
-  chain_length: number
+  chain_length: number | null
   status: string
-  created_at: string
+  created_at: string | null
   completed_at: string | null
 }
 
@@ -58,8 +58,8 @@ interface SessionDetail {
 }
 
 interface WeeklyTheme {
-  theme_noun: string
-  genre_hint: string
+  theme_noun: string | null
+  genre_hint: string | null
 }
 
 type SubTab = 'overview' | 'theme' | 'sessions' | 'positions'
@@ -227,7 +227,7 @@ function ClassOverviewPanel({ classId }: { classId: string }) {
         .order('created_at', { ascending: false })
 
       const posMap = Object.fromEntries((positions ?? []).map((p) => [p.pupil_id, p.highest_lesson]))
-      const sessionsByPupil: Record<string, { created_at: string; subject_noun: string }[]> = {}
+      const sessionsByPupil: Record<string, { created_at: string | null; subject_noun: string }[]> = {}
       for (const s of sessions ?? []) {
         if (!sessionsByPupil[s.pupil_id]) sessionsByPupil[s.pupil_id] = []
         sessionsByPupil[s.pupil_id]!.push(s)
@@ -483,7 +483,7 @@ function SessionReviewPanel({ classId }: { classId: string }) {
       .select('id, step_number, formula_label, sentence, ai_passed, attempts, ai_feedback')
       .eq('session_id', sessionId)
       .order('step_number', { ascending: true })
-    setStepDetails((prev) => ({ ...prev, [sessionId]: (data ?? []) as SessionDetail[] }))
+    setStepDetails((prev) => ({ ...prev, [sessionId]: (data ?? []) as unknown as SessionDetail[] }))
     setLoadingSteps((prev) => ({ ...prev, [sessionId]: false }))
   }, [expandedId, stepDetails])
 

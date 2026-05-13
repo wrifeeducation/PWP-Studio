@@ -263,7 +263,7 @@ export function AnalyticsTab() {
 
       // XP buckets from class progress
       if (classRes.data) {
-        const rows = classRes.data as ClassProgressRow[]
+        const rows = classRes.data as unknown as ClassProgressRow[]
         setAllRows(rows)
         setTotalPupils(rows.length)
         setUnlockedCount(rows.filter((r) => r.writing_studio_unlocked).length)
@@ -278,7 +278,7 @@ export function AnalyticsTab() {
 
       // Transfer gap data
       if (transferRes.data && classRes.data) {
-        const classRows = classRes.data as ClassProgressRow[]
+        const classRows = classRes.data as unknown as ClassProgressRow[]
         const transferRows = transferRes.data as PupilTransferRate[]
         const td = classRows.map((r) => ({
           name: r.first_name,

@@ -33,7 +33,7 @@ export function SchoolSettingsTab({ schoolId }: { schoolId: string }) {
       .single()
       .then(({ data }) => {
         if (data) {
-          setSchool(data as School)
+          setSchool(data as unknown as School)
           setEditName(data.name)
           setEditPhase(data.phase as SchoolPhase)
         }
@@ -57,7 +57,7 @@ export function SchoolSettingsTab({ schoolId }: { schoolId: string }) {
       .eq('id', schoolId)
       .select('*')
       .single()
-    if (data) setSchool(data as School)
+    if (data) setSchool(data as unknown as School)
     setEditing(false)
     setSaving(false)
     setSaved(true)

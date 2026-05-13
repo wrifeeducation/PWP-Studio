@@ -367,7 +367,7 @@ function ClassProgressTab() {
       supabase.from('v_class_formula_progress').select('*'),
       supabase.from('v_pupil_transfer_rate').select('*'),
     ]).then(([progressResult, transferResult]) => {
-      if (progressResult.data) setRows(progressResult.data as ClassProgressRow[])
+      if (progressResult.data) setRows(progressResult.data as unknown as ClassProgressRow[])
       if (transferResult.data) setTransferRates(transferResult.data as PupilTransferRate[])
       setLoading(false)
     })
@@ -2157,7 +2157,7 @@ function NotificationsTab({ teacherId, onActionTaken }: NotificationsTabProps) {
           rows.map((r) => ({
             ...r,
             pupil_name: r.pupil_id ? nameMap[r.pupil_id] : undefined,
-          }))
+          })) as unknown as NotificationRow[]
         )
         setLoading(false)
       })
@@ -2630,7 +2630,7 @@ function ChallengesTab() {
       setPupils(pupilRows)
 
       // Enrich challenges with pupil names
-      const rawChallenges = (challengesRes.data ?? []) as ChallengeAssignment[]
+      const rawChallenges = (challengesRes.data ?? []) as unknown as ChallengeAssignment[]
       const enriched = rawChallenges.map((c) => ({
         ...c,
         pupil_name: c.pupil_id
@@ -2665,7 +2665,7 @@ function ChallengesTab() {
 
     const { data, error: err } = await supabase
       .from('pwp_challenge_assignments')
-      .insert(payload)
+      .insert(payload as { challenge_type: string; source: string; active: boolean; class_id?: string; pupil_id?: string })
       .select()
       .single()
 
@@ -2677,7 +2677,7 @@ function ChallengesTab() {
       }
     } else {
       const newChallenge: ChallengeAssignment = {
-        ...(data as ChallengeAssignment),
+        ...(data as unknown as ChallengeAssignment),
         pupil_name: assignScope === 'pupil'
           ? pupils.find((p) => p.id === selectedPupilId)?.first_name
           : undefined,

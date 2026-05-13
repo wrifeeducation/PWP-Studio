@@ -684,7 +684,7 @@ export default function ParentPage() {
             id: p.id,
             first_name: p.first_name,
             year_group: p.year_group,
-            progress: (progressRes.data as PupilProgress) ?? null,
+            progress: (progressRes.data as unknown as PupilProgress) ?? null,
             recentBadges,
             writingPieces,
             levelStatuses,
@@ -1097,7 +1097,7 @@ function PupilChallengesPanel({ pupilProfileId }: { pupilProfileId: string }) {
         .order('assigned_at', { ascending: false })
 
       if (!cancelled) {
-        setChallenges((rows ?? []) as ParentChallengeRow[])
+        setChallenges((rows ?? []) as unknown as ParentChallengeRow[])
         setLoading(false)
       }
     }
@@ -1118,7 +1118,7 @@ function PupilChallengesPanel({ pupilProfileId }: { pupilProfileId: string }) {
 
     const { data, error: err } = await supabase
       .from('pwp_challenge_assignments')
-      .insert(payload)
+      .insert(payload as { challenge_type: string; source: string; active: boolean; pupil_id: string; class_id?: string })
       .select()
       .single()
 
@@ -1129,7 +1129,7 @@ function PupilChallengesPanel({ pupilProfileId }: { pupilProfileId: string }) {
         flash(err.message, true)
       }
     } else {
-      setChallenges((prev) => [data as ParentChallengeRow, ...prev])
+      setChallenges((prev) => [data as unknown as ParentChallengeRow, ...prev])
       flash(`✓ ${PARENT_CHALLENGE_LABELS[newType]} challenge assigned`)
     }
     setSaving(false)

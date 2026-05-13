@@ -799,8 +799,8 @@ export default function LevelPage() {
           }
         }
 
-        setLevel(lvl as PwpLevel)
-        setSteps((stepsData ?? []) as PwpStep[])
+        setLevel(lvl as unknown as PwpLevel)
+        setSteps((stepsData ?? []) as unknown as PwpStep[])
         setScreen('start')
       } catch (err) {
         console.error('[LevelPage] load error:', err)

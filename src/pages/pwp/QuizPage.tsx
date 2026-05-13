@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
+import type { Json } from '@/types/supabase'
 import { assessStep } from '@/lib/pwp/pwpApi'
 import { useTTS } from '@/hooks/useTTS'
 import { usePWPAudioPlayer } from '@/hooks/usePWPAudio'
@@ -751,7 +752,7 @@ export default function QuizPage() {
         await supabase.from('pwp_quiz_results').insert({
           quiz_id:        quiz.id,
           pupil_id:       pupilId,
-          prompts:        allResults,
+          prompts:        allResults as unknown as Json,
           overall_passed: passed,
           completed_at:   new Date().toISOString(),
         })

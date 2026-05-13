@@ -45,7 +45,7 @@ export default function SharePage() {
       if (error) throw error
       if (!data || (Array.isArray(data) && data.length === 0)) return null
       const row = Array.isArray(data) ? data[0] : data
-      return row as SharedEntry
+      return row as unknown as SharedEntry
     },
     enabled: !!token,
     staleTime: 1000 * 60 * 10,

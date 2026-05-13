@@ -174,29 +174,35 @@ export type Database = {
       classes: {
         Row: {
           academic_year: string
+          active_genre: string | null
           created_at: string | null
           id: string
           name: string
           school_id: string
           teacher_id: string | null
+          w_level: number | null
           year_group: number
         }
         Insert: {
           academic_year: string
+          active_genre?: string | null
           created_at?: string | null
           id?: string
           name: string
           school_id: string
           teacher_id?: string | null
+          w_level?: number | null
           year_group: number
         }
         Update: {
           academic_year?: string
+          active_genre?: string | null
           created_at?: string | null
           id?: string
           name?: string
           school_id?: string
           teacher_id?: string | null
+          w_level?: number | null
           year_group?: number
         }
         Relationships: [
@@ -982,9 +988,12 @@ export type Database = {
           pupil_id: string
           scaffold_stage_formula: number
           sessions_on_current_level: number
+          current_pwp_level_id: number | null
+          highest_level_reached: number | null
           star_shield_active: boolean
           stars_last_replenished: string | null
           stars_remaining: number
+          streak_days: number | null
           streak_shield_active: boolean | null
           total_xp: number | null
           updated_at: string | null
@@ -999,9 +1008,11 @@ export type Database = {
           created_at?: string | null
           current_formula_level?: number
           current_paragraph_phase?: string | null
+          current_pwp_level_id?: number | null
           current_streak?: number | null
           difficulty_profile?: Json
           double_xp_until?: string | null
+          highest_level_reached?: number | null
           id?: string
           last_session_date?: string | null
           levels_mastered_count?: number
@@ -1017,6 +1028,7 @@ export type Database = {
           star_shield_active?: boolean
           stars_last_replenished?: string | null
           stars_remaining?: number
+          streak_days?: number | null
           streak_shield_active?: boolean | null
           total_xp?: number | null
           updated_at?: string | null
@@ -1030,9 +1042,11 @@ export type Database = {
           created_at?: string | null
           current_formula_level?: number
           current_paragraph_phase?: string | null
+          current_pwp_level_id?: number | null
           current_streak?: number | null
           difficulty_profile?: Json
           double_xp_until?: string | null
+          highest_level_reached?: number | null
           id?: string
           last_session_date?: string | null
           levels_mastered_count?: number
@@ -1048,6 +1062,7 @@ export type Database = {
           star_shield_active?: boolean
           stars_last_replenished?: string | null
           stars_remaining?: number
+          streak_days?: number | null
           streak_shield_active?: boolean | null
           total_xp?: number | null
           updated_at?: string | null
@@ -1609,9 +1624,9 @@ export type Database = {
         Relationships: []
       }
       learning_events: {
-        Row: { id: string; pupil_id: string; event_type: string; created_at: string | null; from_value: string | null; to_value: string | null; genre: string | null; triggered_by: string | null; evidence: Json | null }
-        Insert: { id?: string; pupil_id: string; event_type: string; created_at?: string | null; from_value?: string | null; to_value?: string | null; genre?: string | null; triggered_by?: string | null; evidence?: Json | null }
-        Update: { id?: string; pupil_id?: string; event_type?: string; created_at?: string | null; from_value?: string | null; to_value?: string | null; genre?: string | null; triggered_by?: string | null; evidence?: Json | null }
+        Row: { id: string; pupil_id: string; app: string | null; event_type: string; event_data: Json | null; class_id: string | null; created_at: string | null; from_value: string | null; to_value: string | null; genre: string | null; triggered_by: string | null; evidence: Json | null }
+        Insert: { id?: string; pupil_id: string; app?: string | null; event_type: string; event_data?: Json | null; class_id?: string | null; created_at?: string | null; from_value?: string | null; to_value?: string | null; genre?: string | null; triggered_by?: string | null; evidence?: Json | null }
+        Update: { id?: string; pupil_id?: string; app?: string | null; event_type?: string; event_data?: Json | null; class_id?: string | null; created_at?: string | null; from_value?: string | null; to_value?: string | null; genre?: string | null; triggered_by?: string | null; evidence?: Json | null }
         Relationships: []
       }
       pupils: {
@@ -1627,9 +1642,9 @@ export type Database = {
         Relationships: []
       }
       pwp_challenge_assignments: {
-        Row: { id: string; class_id: string; pupil_id: string | null; challenge_type: string; source: string; active: boolean; created_at: string | null; assigned_by: string | null }
-        Insert: { id?: string; class_id: string; pupil_id?: string | null; challenge_type: string; source: string; active?: boolean; created_at?: string | null; assigned_by?: string | null }
-        Update: { id?: string; class_id?: string; pupil_id?: string | null; challenge_type?: string; source?: string; active?: boolean; created_at?: string | null; assigned_by?: string | null }
+        Row: { id: string; class_id: string; pupil_id: string | null; challenge_type: string; source: string; active: boolean; assigned_at: string; due_date: string | null; created_at: string | null; assigned_by: string | null }
+        Insert: { id?: string; class_id?: string | null; pupil_id?: string | null; challenge_type: string; source: string; active?: boolean; assigned_at?: string; due_date?: string | null; created_at?: string | null; assigned_by?: string | null }
+        Update: { id?: string; class_id?: string; pupil_id?: string | null; challenge_type?: string; source?: string; active?: boolean; assigned_at?: string; due_date?: string | null; created_at?: string | null; assigned_by?: string | null }
         Relationships: []
       }
       pwp_chain_sentences: {
@@ -1645,15 +1660,15 @@ export type Database = {
         Relationships: []
       }
       pwp_class_themes: {
-        Row: { id: string; class_id: string; formula_level: number; theme_label: string; week_start: string; active: boolean; set_by: string | null; created_at: string | null }
-        Insert: { id?: string; class_id: string; formula_level: number; theme_label: string; week_start: string; active?: boolean; set_by?: string | null; created_at?: string | null }
-        Update: { id?: string; class_id?: string; formula_level?: number; theme_label?: string; week_start?: string; active?: boolean; set_by?: string | null; created_at?: string | null }
+        Row: { id: string; class_id: string; formula_level: number; theme_noun: string | null; genre_hint: string | null; theme_label: string | null; theme: string | null; suggestions: Json | null; week_start: string; active: boolean; set_by: string | null; created_at: string | null }
+        Insert: { id?: string; class_id: string; formula_level?: number; theme_noun?: string | null; genre_hint?: string | null; theme_label?: string | null; theme?: string | null; suggestions?: Json | null; week_start: string; active?: boolean; set_by?: string | null; created_at?: string | null }
+        Update: { id?: string; class_id?: string; formula_level?: number; theme_noun?: string | null; genre_hint?: string | null; theme_label?: string | null; theme?: string | null; suggestions?: Json | null; week_start?: string; active?: boolean; set_by?: string | null; created_at?: string | null }
         Relationships: []
       }
       pwp_compound_sessions: {
-        Row: { id: string; pupil_id: string; class_id: string | null; session_date: string; xp_earned: number; level: number; subject_noun: string; created_at: string | null }
-        Insert: { id?: string; pupil_id: string; class_id?: string | null; session_date: string; xp_earned: number; level: number; subject_noun: string; created_at?: string | null }
-        Update: { id?: string; pupil_id?: string; class_id?: string | null; session_date?: string; xp_earned?: number; level?: number; subject_noun?: string; created_at?: string | null }
+        Row: { id: string; pupil_id: string; class_id: string | null; session_date: string; xp_earned: number; level: number; subject_noun: string; anchor_sentence: string | null; conjunction: string | null; second_clause: string | null; conjunction_type: string | null; full_compound_sentence: string | null; accepted: boolean; attempts: number; created_at: string | null }
+        Insert: { id?: string; pupil_id: string; class_id?: string | null; session_date: string; xp_earned?: number; level?: number; subject_noun?: string; anchor_sentence?: string | null; conjunction?: string | null; second_clause?: string | null; conjunction_type?: string | null; full_compound_sentence?: string | null; accepted?: boolean; attempts?: number; created_at?: string | null }
+        Update: { id?: string; pupil_id?: string; class_id?: string | null; session_date?: string; xp_earned?: number; level?: number; subject_noun?: string; anchor_sentence?: string | null; conjunction?: string | null; second_clause?: string | null; conjunction_type?: string | null; full_compound_sentence?: string | null; accepted?: boolean; attempts?: number; created_at?: string | null }
         Relationships: []
       }
       pwp_free_practice_sentences: {
@@ -1663,15 +1678,15 @@ export type Database = {
         Relationships: []
       }
       pwp_levels: {
-        Row: { id: number; level_number: number; title: string; new_element: string; trigger_note: string | null; is_paragraph_phase: boolean; xp_reward: number; created_at: string | null }
-        Insert: { id?: number; level_number: number; title: string; new_element: string; trigger_note?: string | null; is_paragraph_phase?: boolean; xp_reward?: number; created_at?: string | null }
-        Update: { id?: number; level_number?: number; title?: string; new_element?: string; trigger_note?: string | null; is_paragraph_phase?: boolean; xp_reward?: number; created_at?: string | null }
+        Row: { id: number; level_number: number; title: string; new_element: string; trigger_note: string | null; is_paragraph_phase: boolean; word_bank_phase: string | null; sort_order: number; xp_reward: number; created_at: string | null }
+        Insert: { id?: number; level_number: number; title: string; new_element: string; trigger_note?: string | null; is_paragraph_phase?: boolean; word_bank_phase?: string | null; sort_order?: number; xp_reward?: number; created_at?: string | null }
+        Update: { id?: number; level_number?: number; title?: string; new_element?: string; trigger_note?: string | null; is_paragraph_phase?: boolean; word_bank_phase?: string | null; sort_order?: number; xp_reward?: number; created_at?: string | null }
         Relationships: []
       }
       pwp_paragraphs: {
-        Row: { id: string; session_id: string; lead_sentence: string | null; support_sentences: Json | null; close_sentence: string | null; close_ai_passed: boolean | null; close_ai_feedback: string | null; created_at: string | null }
-        Insert: { id?: string; session_id: string; lead_sentence?: string | null; support_sentences?: Json | null; close_sentence?: string | null; close_ai_passed?: boolean | null; close_ai_feedback?: string | null; created_at?: string | null }
-        Update: { id?: string; session_id?: string; lead_sentence?: string | null; support_sentences?: Json | null; close_sentence?: string | null; close_ai_passed?: boolean | null; close_ai_feedback?: string | null; created_at?: string | null }
+        Row: { id: string; session_id: string; lead_sentence: string | null; support_sentences: Json | null; close_sentence: string | null; close_ai_passed: boolean | null; close_ai_feedback: string | null; scaffold_mode: boolean | null; completed_at: string | null; created_at: string | null }
+        Insert: { id?: string; session_id: string; lead_sentence?: string | null; support_sentences?: Json | null; close_sentence?: string | null; close_ai_passed?: boolean | null; close_ai_feedback?: string | null; scaffold_mode?: boolean | null; completed_at?: string | null; created_at?: string | null }
+        Update: { id?: string; session_id?: string; lead_sentence?: string | null; support_sentences?: Json | null; close_sentence?: string | null; close_ai_passed?: boolean | null; close_ai_feedback?: string | null; scaffold_mode?: boolean | null; completed_at?: string | null; created_at?: string | null }
         Relationships: []
       }
       pwp_pupil_badges: {
@@ -1699,15 +1714,15 @@ export type Database = {
         Relationships: []
       }
       pwp_quiz_prompts: {
-        Row: { id: number; quiz_id: number; prompt_number: number; subject: string; verb: string; instruction: string; target_sentence: string | null; created_at: string | null }
-        Insert: { id?: number; quiz_id: number; prompt_number: number; subject: string; verb: string; instruction: string; target_sentence?: string | null; created_at?: string | null }
-        Update: { id?: number; quiz_id?: number; prompt_number?: number; subject?: string; verb?: string; instruction?: string; target_sentence?: string | null; created_at?: string | null }
+        Row: { id: number; quiz_id: number; prompt_number: number; subject: string; verb: string; instruction: string; target_sentence: string | null; sort_order: number; created_at: string | null }
+        Insert: { id?: number; quiz_id: number; prompt_number: number; subject: string; verb: string; instruction: string; target_sentence?: string | null; sort_order?: number; created_at?: string | null }
+        Update: { id?: number; quiz_id?: number; prompt_number?: number; subject?: string; verb?: string; instruction?: string; target_sentence?: string | null; sort_order?: number; created_at?: string | null }
         Relationships: []
       }
       pwp_quiz_results: {
-        Row: { id: string; pupil_id: string; quiz_id: number; overall_passed: boolean; prompt_results: Json; attempt_number: number; session_id: string | null; created_at: string }
-        Insert: { id?: string; pupil_id: string; quiz_id: number; overall_passed: boolean; prompt_results: Json; attempt_number?: number; session_id?: string | null; created_at?: string }
-        Update: { id?: string; pupil_id?: string; quiz_id?: number; overall_passed?: boolean; prompt_results?: Json; attempt_number?: number; session_id?: string | null; created_at?: string }
+        Row: { id: string; pupil_id: string; quiz_id: number; overall_passed: boolean; prompts: Json | null; ai_summary: string | null; attempt_number: number; session_id: string | null; completed_at: string | null; created_at: string }
+        Insert: { id?: string; pupil_id: string; quiz_id?: number; overall_passed: boolean; prompts?: Json | null; ai_summary?: string | null; attempt_number?: number; session_id?: string | null; completed_at?: string | null; created_at?: string }
+        Update: { id?: string; pupil_id?: string; quiz_id?: number; overall_passed?: boolean; prompts?: Json | null; ai_summary?: string | null; attempt_number?: number; session_id?: string | null; completed_at?: string | null; created_at?: string }
         Relationships: []
       }
       pwp_quizzes: {
@@ -1717,21 +1732,21 @@ export type Database = {
         Relationships: []
       }
       pwp_session_steps: {
-        Row: { id: string; session_id: string; step_number: number; formula_label: string; sentence: string; passed: boolean; attempts: number; created_at: string | null }
-        Insert: { id?: string; session_id: string; step_number: number; formula_label: string; sentence: string; passed: boolean; attempts: number; created_at?: string | null }
-        Update: { id?: string; session_id?: string; step_number?: number; formula_label?: string; sentence?: string; passed?: boolean; attempts?: number; created_at?: string | null }
+        Row: { id: string; session_id: string; step_number: number; formula_label: string; sentence: string; passed: boolean; ai_passed: boolean | null; ai_feedback: string | null; element_id: number | null; attempts: number; submitted_at: string | null; created_at: string | null }
+        Insert: { id?: string; session_id: string; step_number: number; formula_label: string; sentence: string; passed?: boolean; ai_passed?: boolean | null; ai_feedback?: string | null; element_id?: number | null; attempts?: number; submitted_at?: string | null; created_at?: string | null }
+        Update: { id?: string; session_id?: string; step_number?: number; formula_label?: string; sentence?: string; passed?: boolean; ai_passed?: boolean | null; ai_feedback?: string | null; element_id?: number | null; attempts?: number; submitted_at?: string | null; created_at?: string | null }
         Relationships: []
       }
       pwp_sessions: {
-        Row: { id: string; pupil_id: string; status: string; theme_noun: string | null; genre_hint: string | null; subject_noun: string; highest_lesson: number; created_at: string | null; completed_at: string | null }
-        Insert: { id?: string; pupil_id: string; status?: string; theme_noun?: string | null; genre_hint?: string | null; subject_noun?: string; highest_lesson?: number; created_at?: string | null; completed_at?: string | null }
-        Update: { id?: string; pupil_id?: string; status?: string; theme_noun?: string | null; genre_hint?: string | null; subject_noun?: string; highest_lesson?: number; created_at?: string | null; completed_at?: string | null }
+        Row: { id: string; pupil_id: string; class_id: string | null; status: string; theme_noun: string | null; genre_hint: string | null; subject_noun: string; chain_length: number | null; highest_lesson: number; created_at: string | null; completed_at: string | null }
+        Insert: { id?: string; pupil_id: string; class_id?: string | null; status?: string; theme_noun?: string | null; genre_hint?: string | null; subject_noun?: string; chain_length?: number | null; highest_lesson?: number; created_at?: string | null; completed_at?: string | null }
+        Update: { id?: string; pupil_id?: string; class_id?: string | null; status?: string; theme_noun?: string | null; genre_hint?: string | null; subject_noun?: string; chain_length?: number | null; highest_lesson?: number; created_at?: string | null; completed_at?: string | null }
         Relationships: []
       }
       pwp_steps: {
-        Row: { id: number; level_id: number; step_number: number; formula: string; step_type: string; instruction: string; example_sentence: string | null; word_bank_config: Json | null; created_at: string | null }
-        Insert: { id?: number; level_id: number; step_number: number; formula: string; step_type: string; instruction: string; example_sentence?: string | null; word_bank_config?: Json | null; created_at?: string | null }
-        Update: { id?: number; level_id?: number; step_number?: number; formula?: string; step_type?: string; instruction?: string; example_sentence?: string | null; word_bank_config?: Json | null; created_at?: string | null }
+        Row: { id: number; level_id: number; step_number: number; formula: string; step_type: string; instruction: string | null; example: string | null; example_sentence: string | null; subject_prompt: string | null; target_sentence: string | null; is_paragraph_step: boolean; sort_order: number; word_bank_config: Json | null; created_at: string | null }
+        Insert: { id?: number; level_id: number; step_number: number; formula: string; step_type: string; instruction?: string | null; example?: string | null; example_sentence?: string | null; subject_prompt?: string | null; target_sentence?: string | null; is_paragraph_step?: boolean; sort_order?: number; word_bank_config?: Json | null; created_at?: string | null }
+        Update: { id?: number; level_id?: number; step_number?: number; formula?: string; step_type?: string; instruction?: string | null; example?: string | null; example_sentence?: string | null; subject_prompt?: string | null; target_sentence?: string | null; is_paragraph_step?: boolean; sort_order?: number; word_bank_config?: Json | null; created_at?: string | null }
         Relationships: []
       }
       streaks: {
@@ -1847,6 +1862,7 @@ export type Database = {
       }
     }
     Functions: {
+      get_portfolio_by_share_token: { Args: { p_token: string }; Returns: Json }
       get_user_role: { Args: never; Returns: string }
       get_user_school_id: { Args: never; Returns: string }
       increment_xp: {

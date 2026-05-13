@@ -8,6 +8,7 @@
  */
 
 import { supabase } from './supabase'
+import type { Json } from '../types/supabase'
 import type {
   Genre,
   WritingDimension,
@@ -152,7 +153,7 @@ export const assessWriting = async (
       punctuation: result.punctuation.confidence,
       spelling: result.spelling.confidence,
       purpose_audience_effect: result.purpose_audience_effect.confidence,
-    },
+    } as unknown as Json,
     evidence_citations: {
       composition: [result.composition.evidence_citation],
       vocabulary: [result.vocabulary.evidence_citation],
@@ -160,9 +161,9 @@ export const assessWriting = async (
       punctuation: [result.punctuation.evidence_citation],
       spelling: [result.spelling.evidence_citation],
       purpose_audience_effect: [result.purpose_audience_effect.evidence_citation],
-    },
-    flags: { low_confidence_dims: result.low_confidence_flags },
-    raw_ai_response: result.raw_ai_response,
+    } as unknown as Json,
+    flags: { low_confidence_dims: result.low_confidence_flags } as unknown as Json,
+    raw_ai_response: result.raw_ai_response as unknown as Json,
     model_used: 'gpt-4o',
     assessed_at: new Date().toISOString(),
   })
