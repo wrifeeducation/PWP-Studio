@@ -344,11 +344,12 @@ export const getChainFormula = (level: number): ChainFormulaDefinition | undefin
 
 /**
  * Returns all defined chain formulas up to and including `currentLevel`.
- * Minimum chain length is CL5 — pupils below CL5 always see CL1–CL5
- * so every session has a meaningful arc of progression.
+ * Level N = exactly N sentences: a Level 1 pupil writes 1 sentence, Level 2 writes 2, etc.
+ * Each step in the chain is an evolution of the previous — the pupil sees their last
+ * sentence and writes a new one that incorporates it plus the new formula element.
  */
 export const getChainForLevel = (currentLevel: number): ChainFormulaDefinition[] => {
-  const effectiveLevel = Math.max(currentLevel, 5)
+  const effectiveLevel = Math.max(currentLevel, 1)
   return CHAIN_FORMULA_DEFINITIONS.filter((f) => f.level <= effectiveLevel).sort(
     (a, b) => a.level - b.level,
   )

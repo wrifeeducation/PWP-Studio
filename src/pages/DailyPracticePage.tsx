@@ -16,11 +16,12 @@
  * Max 200 lines — heavy lifting is in ChainBuilder + SessionComplete.
  */
 
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { SubjectPicker } from '../components/chain/SubjectPicker'
 import { ChainBuilder } from '../components/chain/ChainBuilder'
+import { getChainForLevel } from '../lib/chain/formulaDefinitions'
 import { CompoundBuilder } from '../components/chain/CompoundBuilder'
 import { SessionComplete } from '../components/chain/SessionComplete'
 import { supabase } from '../lib/supabase'
@@ -132,6 +133,9 @@ const DailyPracticePage: React.FC = () => {
 
   const currentLevel = levelData?.current_level ?? 1
   const currentStreak = (streakData?.current_streak ?? 0) + 1 // +1 for today
+
+  // How many sentences this pupil writes per session
+  const sentenceCount = useMemo(() => getChainForLevel(currentLevel).length, [currentLevel])
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
 
@@ -342,15 +346,20 @@ const DailyPracticePage: React.FC = () => {
               flexShrink: 0,
             }}
           >
-            ← {phase === 'picking' ? 'Dashboard' : phase === 'compounding' ? 'Back to chain' : 'Change subject'}
+            ← {phase === 'picking' ? 'Map' : phase === 'compounding' ? 'Back to chain' : 'Change subject'}
           </button>
         )}
         <div style={{ flex: 1, textAlign: 'center' }}>
-          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.65)', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-            PWP Studio
-          </div>
-          <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>
+          <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff', lineHeight: 1.2 }}
+            data-tts="Daily Writing Practice">
             Daily Practice ✏️
+          </div>
+          <div
+            style={{ fontSize: '12px', color: 'rgba(255,255,255,0.80)', fontWeight: 600, marginTop: 2 }}
+            data-tts={`Level ${currentLevel} — ${sentenceCount} sentence${sentenceCount !== 1 ? 's' : ''} today`}
+            data-testid="level-indicator"
+          >
+            Level {currentLevel} · {sentenceCount} sentence{sentenceCount !== 1 ? 's' : ''}
           </div>
         </div>
         {currentStreak > 0 && (

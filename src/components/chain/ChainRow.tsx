@@ -61,6 +61,12 @@ interface ChainRowProps {
   rowState: ChainRowState
   formula: ChainFormulaDefinition
   subjectNoun: string
+  /**
+   * The accepted (punctuated) sentence from the previous step.
+   * Shown as a scaffold so the pupil can evolve it into this step's formula.
+   * Undefined for the first row.
+   */
+  previousSentence?: string
   onSubmit: (sentence: string) => void
   /** Called when pupil confirms capitalisation + punctuation */
   onPunctuationConfirmed: (punctuatedSentence: string) => void
@@ -72,6 +78,7 @@ export const ChainRow: React.FC<ChainRowProps> = ({
   rowState,
   formula,
   subjectNoun,
+  previousSentence,
   onSubmit,
   onPunctuationConfirmed,
   autoFocus = false,
@@ -370,6 +377,55 @@ export const ChainRow: React.FC<ChainRowProps> = ({
       {/* ── Active input ── */}
       {isActive && (
         <>
+          {/* ── Previous sentence scaffold (steps 2+) ── */}
+          {previousSentence && (
+            <div
+              style={{
+                marginBottom: 12,
+                padding: '10px 14px',
+                borderRadius: 14,
+                backgroundColor: '#EDE7F6',
+                border: '1.5px solid #6C5CE755',
+              }}
+              data-tts={`Build on your previous sentence: ${previousSentence}`}
+              data-testid="previous-sentence-scaffold"
+            >
+              <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 800,
+                color: '#6C5CE7', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Build on this ↓
+              </p>
+              <p style={{ margin: '0 0 10px', fontSize: 16, fontWeight: 600, color: '#2D3436' }}>
+                {previousSentence}
+              </p>
+              {/* Previous sentence words as tappable chips */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}
+                data-tts="Tap a word to add it to your new sentence">
+                {previousSentence
+                  .replace(/[.!?,]/g, '')
+                  .split(' ')
+                  .filter(Boolean)
+                  .map((word, i) => (
+                    <motion.button
+                      key={i}
+                      type="button"
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => handleWordTap(word)}
+                      data-testid={`prev-word-chip-${i}`}
+                      data-tts={`Add word: ${word}`}
+                      style={{
+                        padding: '5px 12px', borderRadius: 16,
+                        backgroundColor: '#6C5CE7', color: '#fff',
+                        fontSize: 14, fontWeight: 700, border: 'none',
+                        cursor: 'pointer', minHeight: 34,
+                      }}
+                    >
+                      {word}
+                    </motion.button>
+                  ))}
+              </div>
+            </div>
+          )}
+
           {/* Word bank */}
           {hasWordBank && (
             <div style={{ marginBottom: 10 }}>

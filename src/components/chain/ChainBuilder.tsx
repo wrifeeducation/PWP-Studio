@@ -184,12 +184,19 @@ export const ChainBuilder: React.FC<ChainBuilderProps> = ({
           )
         }
 
+        // Previous step's finalised sentence — evolution scaffold for pupil
+        const prevRow = i > 0 ? rows[i - 1] : null
+        const previousSentence = prevRow
+          ? (prevRow.punctuatedSentence ?? prevRow.sentence) || undefined
+          : undefined
+
         return (
           <ChainRow
             key={row.level}
             rowState={row}
             formula={formula}
             subjectNoun={subjectNoun}
+            previousSentence={previousSentence}
             onSubmit={(sentence) => handleSubmit(i, sentence)}
             onPunctuationConfirmed={(punctuated) => handlePunctuationConfirmed(i, punctuated)}
             autoFocus={row.status === 'active'}
