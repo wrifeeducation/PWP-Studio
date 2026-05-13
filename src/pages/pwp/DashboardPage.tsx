@@ -359,7 +359,7 @@ interface PathNodeRowProps {
   node: PathNode
   isLast: boolean
   isCurrent: boolean
-  nodeRef?: React.RefObject<HTMLDivElement>
+  nodeRef?: React.RefObject<HTMLDivElement | null>
   onClick: () => void
 }
 

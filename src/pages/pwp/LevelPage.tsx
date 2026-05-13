@@ -729,7 +729,7 @@ function LevelCompleteScreen({ level, sessionXp, newTitle, onContinue }: DoneScr
 export default function LevelPage() {
   const { levelId }    = useParams<{ levelId: string }>()
   const navigate       = useNavigate()
-  const { profile }    = useAuthStore()
+  useAuthStore()
 
   // ── Audio ─────────────────────────────────────────────────────────────────
   const { speak, stop: stopTts } = useTTS()
@@ -832,7 +832,7 @@ export default function LevelPage() {
         try {
           const result = await assessParagraphClose({
             leadSentence:     parts.lead,
-            supportSentences: parts.supports.filter(s => s.trim() !== ''),
+            supportSentences: parts.supports.filter((s: string) => s.trim() !== ''),
             closeSentence:    parts.close,
             scaffoldMode:     true,
           })
@@ -841,7 +841,7 @@ export default function LevelPage() {
         } catch {
           // Fallback: structural check (all three parts non-empty)
           passed  = parts.lead.trim() !== ''
-            && parts.supports.some(s => s.trim() !== '')
+            && parts.supports.some((s: string) => s.trim() !== '')
             && parts.close.trim() !== ''
           message = passed
             ? 'Good paragraph structure — Lead, Support, and Close all present!'

@@ -686,7 +686,7 @@ export default function QuizPage() {
           sentence:     trimmed,
           formulaLabel: prompt.instruction,
           elementCode:  String(prompt.id),
-          subjectNoun:  prompt.subject !== '—' ? prompt.subject : undefined,
+          subjectNoun:  prompt.subject !== '—' ? prompt.subject : '',
           attemptNumber: 1,
         })
         passed  = result.passed

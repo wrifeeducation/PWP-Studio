@@ -340,7 +340,7 @@ function PupilProgressPanel({ pupil, isPro }: { pupil: LinkedPupil; isPro: boole
               role="tab"
               aria-selected={activeTab === id}
               onClick={() => setActiveTab(id)}
-              className="pb-2 mr-5 text-sm font-semibold transition-colors"
+              className="pb-2 mr-5 text-sm font-semibold"
               style={{
                 color: activeTab === id ? 'var(--color-brand-primary)' : 'var(--color-text-muted)',
                 borderBottom:
@@ -356,14 +356,14 @@ function PupilProgressPanel({ pupil, isPro }: { pupil: LinkedPupil; isPro: boole
 
       {/* Tab panels */}
       <div className="p-5">
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="sync">
           {activeTab === 'progress' && (
             <motion.div
               key="progress"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
             >
               {/* Recent badges */}
               {pupil.recentBadges.length > 0 && (
@@ -416,8 +416,8 @@ function PupilProgressPanel({ pupil, isPro }: { pupil: LinkedPupil; isPro: boole
               key="writing"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
               className="space-y-3"
             >
               {pupil.writingPieces.length === 0 ? (
@@ -437,8 +437,8 @@ function PupilProgressPanel({ pupil, isPro }: { pupil: LinkedPupil; isPro: boole
               key="challenges"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
             >
               <PupilChallengesPanel pupilProfileId={pupil.id} />
             </motion.div>
@@ -1146,12 +1146,16 @@ function PupilChallengesPanel({ pupilProfileId }: { pupilProfileId: string }) {
   }
 
   if (loading) {
-    return <p className="text-sm text-center py-4" style={{ color: 'var(--color-text-muted)' }}>Loading challenges…</p>
+    return (
+      <div className="min-h-[120px] flex items-center justify-center">
+        <p className="text-sm text-center" style={{ color: 'var(--color-text-muted)' }}>Loading challenges…</p>
+      </div>
+    )
   }
 
   if (!pupilsId) {
     return (
-      <div className="text-center py-4">
+      <div className="min-h-[120px] flex items-center justify-center text-center py-4">
         <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
           Challenges are available once your child has logged in to WriFe PWP at least once.
         </p>

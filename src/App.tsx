@@ -1,470 +1,153 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, lazy, Suspense } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/stores/authStore'
+import { ProtectedRoute } from '@/components/ui/ProtectedRoute'
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 
-// Auth initialisation
-import { supabase } from './lib/supabase'
-import { useAuthStore } from './stores/authStore'
-import type { Profile } from './types/index'
+// ── Eager-loaded pages (small, always needed) ────────────────────────────────
+import LoginPage        from '@/pages/LoginPage'
+import HomeSignupPage   from '@/pages/HomeSignupPage'
+import TeacherSignupPage from '@/pages/TeacherSignupPage'
+import AuthConfirmPage  from '@/pages/AuthConfirmPage'
+import UpdatePasswordPage from '@/pages/UpdatePasswordPage'
 
-// Route guards
-import { ProtectedRoute } from './components/ui/ProtectedRoute'
-import { LoadingSpinner } from './components/ui/LoadingSpinner'
-import { ErrorBoundary } from './components/ui/ErrorBoundary'
-import { ToastContainer } from './components/ui/ToastContainer'
+// ── Lazy-loaded PWP pages ─────────────────────────────────────────────────────
+const DashboardPage   = lazy(() => import('@/pages/pwp/DashboardPage'))
+const LevelPage       = lazy(() => import('@/pages/pwp/LevelPage'))
+const QuizPage        = lazy(() => import('@/pages/pwp/QuizPage'))
+const TeacherPage     = lazy(() => import('@/pages/pwp/TeacherPage'))
+const OnboardingPage  = lazy(() => import('@/pages/pwp/OnboardingPage'))
 
-// High contrast: apply on load from stored preference
-import { applyHighContrastPreference } from './lib/contrastMode'
-import { useSettingsStore } from './stores/settingsStore'
-
-// Static pages (small, load eagerly)
-import HomePage from './pages/HomePage'
-import LoginPage from './pages/LoginPage'
-import DashboardPage from './pages/DashboardPage'
-import PupilWelcomePage from './pages/PupilWelcomePage'
-import FormulaPage from './pages/FormulaPage'
-import ParagraphPage from './pages/ParagraphPage'
-import DailyPracticePage from './pages/DailyPracticePage'
-import FreePracticePage from './pages/FreePracticePage'
-import ConnectGridPage from './pages/ConnectGridPage'
-
-// Home signup — standalone parent sign-up page (Route C entry point)
-const HomeSignupPage = lazy(() => import('./pages/HomeSignupPage'))
-
-// Teacher signup — standalone independent teacher sign-up page (Route D entry point)
-const TeacherSignupPage = lazy(() => import('./pages/TeacherSignupPage'))
-
-// WF-040: Heavy pages — lazy loaded to reduce initial bundle
-const WritingStudioPage = lazy(() => import('./pages/WritingStudioPage'))
-const SharePage = lazy(() => import('./pages/SharePage'))
-const TeacherPage = lazy(() => import('./pages/TeacherPage'))
-const TeacherReviewPage = lazy(() => import('./pages/TeacherReviewPage'))
-const AdminPage = lazy(() => import('./pages/AdminPage'))
-const ParentPage = lazy(() => import('./pages/ParentPage'))
-const PricingPage = lazy(() => import('./pages/PricingPage'))
-const PortfolioPage = lazy(() => import('./pages/PortfolioPage'))
-const SettingsPage = lazy(() => import('./pages/SettingsPage'))
-// WF-056: Teacher onboarding (invite-only — not auto-redirected)
-const OnboardingPage = lazy(() => import('./pages/OnboardingPage'))
-// Auth email link handler + password update
-const AuthConfirmPage = lazy(() => import('./pages/AuthConfirmPage'))
-const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage'))
-const UpdatePasswordPage = lazy(() => import('./pages/UpdatePasswordPage'))
-
-// PWP new session — lazy loaded (heavy AI + paragraph builder)
-const PWPSessionPage = lazy(() => import('./pages/pwp/PWPSessionPage'))
-
-// Role constants
-import { Role } from './types/index'
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
-    },
-  },
-})
-
-/**
- * AuthInitialiser — sets up Supabase auth listener and populates Zustand store.
- * Renders nothing; used at root so auth is ready before routes render.
- *
- * BUG-001 fix: stale-while-revalidate pattern.
- * Profile is written to localStorage on every successful fetch.
- * On cold-start (page reload / direct URL), the cached profile is loaded
- * immediately so ProtectedRoute never sees a null profile mid-session-check.
- * The fresh DB fetch then updates the cache silently in the background.
- */
-
-const PROFILE_CACHE_KEY = 'wrife_profile_v1'
-
-function readCachedProfile(): Profile | null {
-  try {
-    const raw = localStorage.getItem(PROFILE_CACHE_KEY)
-    return raw ? (JSON.parse(raw) as Profile) : null
-  } catch {
-    return null
-  }
-}
-
-function saveCachedProfile(profile: Profile): void {
-  try {
-    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile))
-  } catch { /* quota exceeded — silently ignore */ }
-}
-
-function clearCachedProfile(): void {
-  try { localStorage.removeItem(PROFILE_CACHE_KEY) } catch { /* ignore */ }
-}
-
-/** Backfill name from JWT user_metadata when the profiles row is absent or lacks first_name.
- *  School pupils (Route A) arrive with first_name in user_metadata since the B1 fix
- *  in wrife-website — but their profiles row may be null or have a null first_name. */
-function applyMetadataFallback(
-  profile: Profile | null,
-  userId: string,
-  meta: Record<string, unknown>,
-): Profile | null {
-  if (profile) {
-    if (!profile.first_name && meta.first_name) {
-      return { ...profile, first_name: meta.first_name as string }
-    }
-    return profile
-  }
-  // No profiles row at all — school pupils authenticated via Route A
-  if (meta.first_name || meta.display_name) {
-    return {
-      id: userId,
-      role: Role.PUPIL,
-      first_name: (meta.first_name as string | undefined) ?? null,
-      display_name: null,
-      created_at: '',
-    } as unknown as Profile
-  }
-  return null
-}
-
-/** Fetch a user profile; give up after 8 s (extended from 5 s for slow connections). */
-async function fetchProfileWithTimeout(userId: string): Promise<Profile | null> {
-  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000))
-  const fetch = Promise.resolve(
-    supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-  )
-    .then(({ data, error }) => {
-      if (error) {
-        console.error('[AuthInitialiser] fetchProfileWithTimeout error:', error)
-      }
-      return data && !error ? (data as Profile) : null
-    })
-    .catch((err) => {
-      console.error('[AuthInitialiser] fetchProfileWithTimeout exception:', err)
-      return null
-    })
-  return Promise.race([fetch, timeout])
-}
-
+// ── Auth initialiser ─────────────────────────────────────────────────────────
+// Keeps Zustand auth store in sync with Supabase session.
+// Must be a component (not a hook) so it can live at root without rendering.
 function AuthInitialiser() {
   const { setSession, setProfile, setLoading, setInitialised, clearAuth } = useAuthStore()
 
   useEffect(() => {
-    /**
-     * BUG-006 fix (v2): keep the onAuthStateChange callback SYNCHRONOUS.
-     *
-     * Root cause (revised): The Supabase JS client uses the browser Web Locks API
-     * (lock key: "sb-{project-ref}-auth-token") for all token reads/writes.
-     * signInWithPassword() holds this lock while persisting the new tokens.
-     * If the onAuthStateChange callback is async, Supabase fires it without
-     * awaiting — meaning INITIAL_SESSION and SIGNED_IN handlers run concurrently,
-     * both racing to acquire the same lock → "Lock was released because another
-     * request stole it" → fetchProfileWithTimeout throws (caught → null) → login
-     * fails with "Could not load account profile".
-     *
-     * Fix: Make the callback synchronous per Supabase docs. Kick all async work
-     * off outside the callback (via Promise chains). For SIGNED_IN events add a
-     * 300ms delay to let signInWithPassword fully release the lock before the
-     * profile query needs to read the session token.
-     *
-     * Admin login has its own self-sufficient profile fetch (AdminLoginPage.tsx)
-     * and does not depend on this handler for navigation.
-     */
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      // ── Synchronous: update session in store immediately ──────────────────
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
 
       if (session?.user) {
         const userId = session.user.id
 
         if (event === 'INITIAL_SESSION') {
-          // ── Stale-while-revalidate (page reload / direct URL) ─────────────
-          // 1. Hydrate from cache immediately so ProtectedRoute never flashes
-          const cached = readCachedProfile()
+          // Optimistically restore from cache, then revalidate in background
+          const cached = localStorage.getItem('pwp_profile_v1')
           if (cached) {
-            setProfile(cached)
-            setLoading(false)
-            setInitialised(true)
+            try { setProfile(JSON.parse(cached)); setLoading(false); setInitialised(true) } catch {}
           }
 
-          // 2. Fetch fresh profile async — no await inside callback
-          fetchProfileWithTimeout(userId).then(fresh => {
-            const meta = session.user?.user_metadata ?? {}
-            const resolved = applyMetadataFallback(fresh, userId, meta)
-            if (resolved) {
-              setProfile(resolved)
-              saveCachedProfile(resolved)
-            }
-            // 3. First-ever visit: mark ready after fetch completes
-            if (!cached) {
-              setLoading(false)
-              setInitialised(true)
-            }
-          })
-        } else {
-          // SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED, etc.
-
-          // Route A detection is handled in lib/supabase.ts (before createClient),
-          // which is the only synchronous moment the hash is still present.
-
-          // Delay 300ms so signInWithPassword's auth-token lock fully releases
-          // before the profile query tries to read the session token.
-          setLoading(true)
-          setTimeout(() => {
-            fetchProfileWithTimeout(userId).then(profile => {
-              const meta = session.user?.user_metadata ?? {}
-              const resolved = applyMetadataFallback(profile, userId, meta)
-              if (resolved) {
-                setProfile(resolved)
-                saveCachedProfile(resolved)
+          supabase.from('profiles').select('*').eq('id', userId).single()
+            .then(({ data }) => {
+              if (data) {
+                setProfile(data)
+                localStorage.setItem('pwp_profile_v1', JSON.stringify(data))
               }
-              setLoading(false)
-              setInitialised(true)
+              if (!cached) { setLoading(false); setInitialised(true) }
             })
+        } else {
+          // SIGNED_IN / TOKEN_REFRESHED
+          setLoading(true)
+          // 300ms delay lets signInWithPassword release the auth lock first
+          setTimeout(() => {
+            supabase.from('profiles').select('*').eq('id', userId).single()
+              .then(({ data }) => {
+                if (data) {
+                  setProfile(data)
+                  localStorage.setItem('pwp_profile_v1', JSON.stringify(data))
+                }
+                setLoading(false)
+                setInitialised(true)
+              })
           }, 300)
         }
       } else {
-        // SIGNED_OUT or no session
-        clearCachedProfile()
+        localStorage.removeItem('pwp_profile_v1')
         clearAuth()
       }
     })
 
-    return () => {
-      subscription.unsubscribe()
-    }
+    return () => subscription.unsubscribe()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return null
 }
 
-/** SettingsInitialiser — applies persisted preferences on startup. */
-function SettingsInitialiser() {
-  const { highContrast, fontSize } = useSettingsStore()
-
-  useEffect(() => {
-    applyHighContrastPreference(highContrast)
-    if (fontSize === 'large') {
-      document.documentElement.classList.add('font-large')
-    } else {
-      document.documentElement.classList.remove('font-large')
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  return null
-}
-
-function App() {
+// ── App ───────────────────────────────────────────────────────────────────────
+export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        {/* Auth initialiser runs once at root — no render output */}
-        <AuthInitialiser />
-        {/* WF-038: Apply settings preferences on startup */}
-        <SettingsInitialiser />
+    <BrowserRouter>
+      <AuthInitialiser />
 
-        {/* WF-053: Toast notification container */}
-        <ToastContainer />
+      <Suspense fallback={<LoadingSpinner label="Loading…" />}>
+        <Routes>
+          {/* ── Public auth routes ─────────────────────────────────────────── */}
+          <Route path="/login"           element={<LoginPage />} />
+          <Route path="/home-signup"     element={<HomeSignupPage />} />
+          <Route path="/teacher-signup"  element={<TeacherSignupPage />} />
+          <Route path="/auth/confirm"    element={<AuthConfirmPage />} />
+          <Route path="/update-password" element={<UpdatePasswordPage />} />
 
-        <Suspense fallback={<LoadingSpinner label="Loading page…" />}>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/home-signup" element={<HomeSignupPage />} />
-            <Route path="/teacher-signup" element={<TeacherSignupPage />} />
-            <Route path="/admin/login" element={<AdminLoginPage />} />
-            <Route path="/auth/confirm" element={<AuthConfirmPage />} />
-            <Route path="/update-password" element={<UpdatePasswordPage />} />
+          {/* ── Pupil routes ───────────────────────────────────────────────── */}
+          {/* Dashboard = learning path (world map) */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['pupil']}>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
 
-            {/* Landing page — redirects logged-in users to their dashboard */}
-            <Route path="/" element={<HomePage />} />
+          {/* Level practice: /level/7 loads level 7, auto-routes to current step */}
+          <Route
+            path="/level/:levelId"
+            element={
+              <ProtectedRoute allowedRoles={['pupil']}>
+                <LevelPage />
+              </ProtectedRoute>
+            }
+          />
 
-            {/* Pupil welcome screen — first thing pupils see after login */}
-            <Route
-              path="/welcome"
-              element={
-                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                  <PupilWelcomePage />
-                </ProtectedRoute>
-              }
-            />
+          {/* Mastery quiz */}
+          <Route
+            path="/quiz/:quizId"
+            element={
+              <ProtectedRoute allowedRoles={['pupil']}>
+                <QuizPage />
+              </ProtectedRoute>
+            }
+          />
 
-            {/* WF-003: Pupil dashboard — pupils only */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                  <ErrorBoundary>
-                    <DashboardPage />
-                  </ErrorBoundary>
-                </ProtectedRoute>
-              }
-            />
+          {/* First-login onboarding walkthrough */}
+          <Route
+            path="/onboarding"
+            element={
+              <ProtectedRoute allowedRoles={['pupil']}>
+                <OnboardingPage />
+              </ProtectedRoute>
+            }
+          />
 
-            {/* WF-006: Formula Practice — pupils only */}
-            <Route
-              path="/practice"
-              element={
-                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                  <FormulaPage />
-                </ProtectedRoute>
-              }
-            />
+          {/* ── Teacher route ──────────────────────────────────────────────── */}
+          <Route
+            path="/teacher"
+            element={
+              <ProtectedRoute allowedRoles={['teacher', 'school_admin']}>
+                <TeacherPage />
+              </ProtectedRoute>
+            }
+          />
 
-            {/* PWP Daily Chain Practice — pupils only */}
-            <Route
-              path="/daily-practice"
-              element={
-                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                  <DailyPracticePage />
-                </ProtectedRoute>
-              }
-            />
+          {/* ── Root redirect ──────────────────────────────────────────────── */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-            {/* Connect Grid Planner — between chain and paragraph */}
-            <Route
-              path="/connect-grid"
-              element={
-                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                  <ConnectGridPage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* PWP Free Practice — unlimited sessions with help mode */}
-            <Route
-              path="/free-practice"
-              element={
-                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                  <FreePracticePage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* WF-011: Paragraph Builder — pupils only, from L8 */}
-            <Route
-              path="/paragraph"
-              element={
-                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                  <ParagraphPage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* WF-016: Writing Studio — pupils only, requires studio_unlocked */}
-            <Route
-              path="/studio"
-              element={
-                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                  <WritingStudioPage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* PWP new formula chain session — pupils only */}
-            {/* Note: no inner Suspense — outer Suspense handles the lazy load.
-                Inner Suspense caused React 19 + React Router v7 to fall through
-                to the catch-all route while PWPSessionPage was loading. */}
-            <Route
-              path="/pwp/session"
-              element={
-                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                  <PWPSessionPage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Teacher dashboard — teachers only */}
-            <Route
-              path="/teacher"
-              element={
-                <ProtectedRoute allowedRoles={[Role.TEACHER]}>
-                  <ErrorBoundary>
-                    <TeacherPage />
-                  </ErrorBoundary>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* WF-019: Teacher review of individual writing piece */}
-            <Route
-              path="/teacher/review/:pieceId"
-              element={
-                <ProtectedRoute allowedRoles={[Role.TEACHER]}>
-                  <TeacherReviewPage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Platform admin panel — admin role only */}
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute allowedRoles={[Role.ADMIN]}>
-                  <AdminPage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* WF-024: Parent read-only view — parents only */}
-            <Route
-              path="/parent"
-              element={
-                <ProtectedRoute allowedRoles={[Role.PARENT]}>
-                  <ParentPage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* WF-058: Pricing page — accessible to authenticated parents + public */}
-            <Route path="/pricing" element={<PricingPage />} />
-
-            {/* S5-7: Public share page — no login required */}
-            <Route path="/share/:token" element={<SharePage />} />
-
-            {/* WF-029: Pupil portfolio — pupils only */}
-            <Route
-              path="/portfolio"
-              element={
-                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                  <PortfolioPage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* WF-037: Pupil settings page */}
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute allowedRoles={[Role.PUPIL]}>
-                  <SettingsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* WF-056: Teacher onboarding wizard */}
-            <Route
-              path="/onboarding"
-              element={
-                <ProtectedRoute allowedRoles={[Role.TEACHER, Role.SCHOOL_ADMIN]}>
-                  <ErrorBoundary>
-                    <OnboardingPage />
-                  </ErrorBoundary>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Catch-all: redirect to role-based home */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
-    </QueryClientProvider>
+          {/* ── Catch-all ──────────────────────────────────────────────────── */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
   )
 }
-
-export default App

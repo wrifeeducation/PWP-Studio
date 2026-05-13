@@ -70,7 +70,6 @@ function DemoWordBank() {
   }
 
   function check() {
-    const joined = slotIds.join(',')
     const correct = DEMO_ANSWER.every(id => slotIds.includes(id))
     setFeedback(correct ? 'correct' : 'try')
     if (!correct) {
