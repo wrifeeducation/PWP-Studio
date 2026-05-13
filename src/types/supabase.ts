@@ -1589,6 +1589,7 @@ export type Database = {
           year_group_min?: number
         }
         Relationships: []
+      }
       class_members: {
         Row: { id: string; class_id: string; pupil_id: string; joined_at: string | null; created_at: string | null }
         Insert: { id?: string; class_id: string; pupil_id: string; joined_at?: string | null; created_at?: string | null }
