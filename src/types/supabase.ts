@@ -1739,8 +1739,6 @@ export type Database = {
         Update: { id?: string; pupil_id?: string; current_streak?: number; longest_streak?: number; last_activity_date?: string | null; created_at?: string | null }
         Relationships: []
       }
-
-      }
     }
     Views: {
       v_class_formula_progress: {
