@@ -15,7 +15,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { chipColourForWord, getWordClassColour, guessWordClass, WORD_CLASS_COLOURS } from '@/constants/wordClassColours'
+import { chipColourForWord, getWordClassColour, guessWordClass } from '@/constants/wordClassColours'
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
