@@ -219,7 +219,7 @@ function Slide1HowItWorks() {
   const steps = [
     { icon: '🎯', title: 'Learn a formula',    body: 'Every level teaches one new sentence pattern — from simple nouns to embedded clauses.' },
     { icon: '🧩', title: 'Build sentences',    body: 'Colour-coded tiles show you the word classes. Arrange them into the right order.' },
-    { icon: '✅', title: 'Get instant feedback', body: 'The app checks your sentence straight away. Correct it until it's perfect.' },
+    { icon: '✅', title: 'Get instant feedback', body: "The app checks your sentence straight away. Correct it until it's perfect." },
     { icon: '🚀', title: 'Move up a level',    body: 'Hit 80% accuracy and you unlock the next formula. Work through all 35 to become a Formula Master.' },
   ]
   return (
