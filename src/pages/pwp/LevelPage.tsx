@@ -315,11 +315,11 @@ function InLevelScreen({
   return (
     <main
       id="pwp-level-content"
-      className="min-h-screen bg-[#FDF8EE] flex flex-col items-center justify-center p-4"
+      className="min-h-screen bg-[#FDF8EE] flex flex-col items-start justify-start pt-6 px-4 pb-8 md:items-center md:pt-10"
       aria-label={`Level ${level.level_number} — Step ${stepIndex + 1} of ${total}`}
     >
       <div
-        className="w-full max-w-[680px] rounded-[20px] overflow-hidden"
+        className="w-full max-w-[720px] md:max-w-[860px] xl:max-w-[1040px] rounded-[20px] overflow-hidden"
         style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}
       >
         {/* Header bar */}
@@ -432,18 +432,20 @@ function InLevelScreen({
             </div>
           </div>
 
-          {/* Example sentence */}
-          <div className="bg-[#f8f5ff] rounded-[10px] px-4 py-3 mb-4 flex items-center gap-2">
-            <span
-              className="text-[11px] font-bold flex-shrink-0"
-              style={{ color: ACCENT }}
-            >
-              Example:
-            </span>
-            <span className="text-[14px] text-[#2D3436] italic" data-tts={step.example}>
-              {step.example}
-            </span>
-          </div>
+          {/* Example sentence — hidden when empty (L7-9 have no example) */}
+          {step.example && (
+            <div className="bg-[#f8f5ff] rounded-[10px] px-4 py-3 mb-4 flex items-center gap-2">
+              <span
+                className="text-[11px] font-bold flex-shrink-0"
+                style={{ color: ACCENT }}
+              >
+                Example:
+              </span>
+              <span className="text-[14px] text-[#2D3436] italic" data-tts={step.example}>
+                {step.example}
+              </span>
+            </div>
+          )}
 
           {/* Subject prompt */}
           <div className="mb-3">
