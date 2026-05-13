@@ -26,12 +26,16 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Force new SW to activate immediately and take control of all tabs
+        // without waiting for the user to close old tabs.
+        clientsClaim: true,
+        skipWaiting: true,
         globPatterns: ['**/*.{js,css,html,ico,svg}'],
         globIgnores: ['mascot/**', '**/*.png'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MiB safety net
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/nxhkpqngnxshgotvuujb\.supabase\.co\/rest\/.*/i,
+            urlPattern: /^https:\/\/gzmgjkbtsvezfclmreru\.supabase\.co\/rest\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'supabase-rest-cache',
