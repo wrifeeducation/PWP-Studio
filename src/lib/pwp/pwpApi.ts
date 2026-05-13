@@ -22,11 +22,40 @@ export interface GenerateChainResponse {
   highestLesson: number
 }
 
+// ── Formula-aware assessment result (PWP_Assessment_Feedback_Prompt.md §1) ──
+
+export type ErrorType =
+  | 'missing_element'
+  | 'wrong_order'
+  | 'wrong_tense'
+  | 'wrong_subject_type'
+  | 'wrong_determiner'
+  | 'extra_element'
+  | 'incomplete_sentence'
+  | 'wrong_word_class'
+
+export interface AssessmentResult {
+  is_correct:           boolean
+  error_type:           ErrorType | null
+  error_word:           string | null
+  error_position:       number | null
+  formula_position:     number | null
+  expected_word_class:  string | null
+  found_word_class:     string | null
+  correction_hint:      string | null
+  tense_found:          string | null
+  tense_required:       string | null
+  /** Grammar insight shown on correct answer (from pwp_steps.grammar_insight) */
+  grammar_insight?:     string | null
+}
+
 export interface AssessStepResponse {
   passed: boolean
   feedback: string
   suggestedRevision: string | null
   confidence: number
+  /** Present when the Edge Function returns formula-aware results */
+  assessment?: AssessmentResult
 }
 
 export interface AssessParagraphCloseResponse {

@@ -13,6 +13,7 @@ import type { PwpLevel, PwpStep, PwpWordBankConfig } from '@/types/pwp'
 import { WordBankPhaseA } from '@/components/pwp/wordbank/WordBankPhaseA'
 import { WordBankPhaseB } from '@/components/pwp/wordbank/WordBankPhaseB'
 import { GuidancePanel } from '@/components/pwp/guidance/GuidancePanel'
+import { PunctuationStep } from '@/components/pwp/step/PunctuationStep'
 import { useTTS } from '@/hooks/useTTS'
 import { usePWPAudioPlayer } from '@/hooks/usePWPAudio'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -49,6 +50,10 @@ interface FeedbackData {
   state: Exclude<FeedbackState, 'idle' | 'assessing'>
   message: string
   xpEarned: number
+  /** Specific correction hint from AI assessment (shown for needs_revision) */
+  correctionHint?: string | null
+  /** Grammar insight shown on correct (from pwp_steps.grammar_insight) */
+  grammarInsight?: string | null
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -301,25 +306,51 @@ function InLevelScreen({
   const isWordBankPhase   = stepPhase === 'A' || stepPhase === 'B'
   const isParagraphStep   = step.is_paragraph_step === true
 
+  // ── Punctuation / capitalisation state ────────────────────────────
+  // rawAssembly: the unpunctuated text from word bank or textarea
+  // value (parent): only set after PunctuationStep completes (= submitted value)
+  const [rawAssembly, setRawAssembly] = useState('')
+  // typeMode: in Phase A, allow switching to free text instead of word bank
+  const [typeMode, setTypeMode] = useState(false)
+
+  // Reset raw + final when step changes
+  useEffect(() => {
+    setRawAssembly('')
+    setTypeMode(false)
+    onChange('')
+  }, [stepIndex]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleRawChange = (raw: string) => {
+    setRawAssembly(raw)
+    onChange('')  // clear final value until punctuation step done
+  }
+
+  const handlePunctComplete = (final: string) => {
+    onChange(final)
+  }
+
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const ACCENT = isParagraph ? '#00b894' : '#6C5CE7'
 
   useEffect(() => {
-    if (!feedback) textareaRef.current?.focus()
-  }, [stepIndex, feedback])
+    if (!feedback && !isWordBankPhase && !isParagraphStep) textareaRef.current?.focus()
+  }, [stepIndex, feedback, isWordBankPhase, isParagraphStep])
 
   const progressPct = Math.round((stepIndex / total) * 100)
   const badge = stepTypeBadge(step.step_type)
 
+  // Show PunctuationStep when raw text is assembled and no feedback yet
+  const showPunctStep = !feedback && !isParagraphStep && rawAssembly.trim().length > 0
+
   return (
     <main
       id="pwp-level-content"
-      className="min-h-screen bg-[#FDF8EE] flex flex-col items-start justify-start pt-6 px-4 pb-8 md:items-center md:pt-10"
+      className="min-h-screen bg-[#FDF8EE] flex flex-col items-center justify-start pt-6 px-4 sm:pt-8 sm:px-6 lg:pt-10 lg:px-8 pb-24 sm:pb-8"
       aria-label={`Level ${level.level_number} — Step ${stepIndex + 1} of ${total}`}
     >
       <div
-        className="w-full max-w-[720px] md:max-w-[860px] xl:max-w-[1040px] rounded-[20px] overflow-hidden"
+        className="w-full max-w-[640px] sm:max-w-[720px] lg:max-w-[900px] rounded-[20px] overflow-hidden"
         style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}
       >
         {/* Header bar */}
@@ -481,14 +512,14 @@ function InLevelScreen({
             />
           )}
 
-          {/* ── Word Bank Phase A — Build Mode (L1–6) ── */}
-          {stepPhase === 'A' && wbConfig && !feedback && (
+          {/* ── Word Bank Phase A — Build Mode (L1–6), unless type mode toggled ── */}
+          {stepPhase === 'A' && wbConfig && !feedback && !typeMode && (
             <WordBankPhaseA
               key={`wba-${stepIndex}`}
               bankWords={wbConfig.bank_words ?? []}
               distractors={wbConfig.distractors ?? null}
               subjectPrompt={step.subject_prompt}
-              onChange={onChange}
+              onChange={handleRawChange}
               disabled={isAssessing}
             />
           )}
@@ -500,30 +531,61 @@ function InLevelScreen({
               bankWords={wbConfig.bank_words ?? []}
               gapSlots={wbConfig.gap_slots ?? []}
               targetSentence={step.target_sentence}
-              onChange={onChange}
+              onChange={handleRawChange}
               disabled={isAssessing}
             />
           )}
 
-          {/* ── Text input — shown for free-write phases (C/D) and during feedback for all modes ── */}
-          {((!isWordBankPhase && !isParagraphStep) || !!feedback) && (
+          {/* ── "I'll type instead" toggle — Phase A only ── */}
+          {stepPhase === 'A' && !feedback && (
+            <div className="flex justify-end mt-2 mb-1">
+              <button
+                className="text-xs text-[#9b87f0] hover:text-[#6C5CE7] transition-colors underline underline-offset-2"
+                onClick={() => {
+                  setTypeMode(t => !t)
+                  setRawAssembly('')
+                  onChange('')
+                }}
+                data-tts={typeMode ? 'Use word bank' : "I'll type instead"}
+              >
+                {typeMode ? '← Use word bank' : "I'll type instead →"}
+              </button>
+            </div>
+          )}
+
+          {/* ── Text input — free-write (C/D), type-mode override, or feedback display ── */}
+          {((!isWordBankPhase && !isParagraphStep) || typeMode || !!feedback) && (
             <textarea
               ref={textareaRef}
-              className="w-full border-2 rounded-xl px-4 py-3 text-[16px] text-[#2D3436] outline-none font-[inherit] resize-none transition-colors bg-white"
+              className="w-full border-2 rounded-xl px-4 py-3 text-base sm:text-lg text-[#2D3436] outline-none font-[inherit] resize-none transition-colors bg-white min-h-[80px] sm:min-h-[88px]"
               style={{
                 borderColor: feedback
                   ? (feedback.state.startsWith('correct') ? '#00b894' : '#F5A623')
                   : '#e0d8ff',
               }}
-              placeholder="Type your sentence here…"
-              value={value}
-              onChange={e => onChange(e.target.value)}
+              placeholder="Write your sentence here…"
+              value={typeMode ? rawAssembly : (isWordBankPhase && feedback ? value : (feedback ? value : rawAssembly))}
+              onChange={e => handleRawChange(e.target.value)}
               onFocus={e => { if (!feedback) e.target.style.borderColor = ACCENT }}
               onBlur={e => { if (!feedback) e.target.style.borderColor = '#e0d8ff' }}
               rows={3}
               disabled={!!feedback || isAssessing}
-              readOnly={isWordBankPhase && !!feedback}
-              data-tts={isWordBankPhase && feedback ? 'Your assembled sentence' : 'Type your sentence'}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              data-tts={isWordBankPhase && feedback ? 'Your assembled sentence' : 'Write your sentence here'}
+            />
+          )}
+
+          {/* ── Punctuation + capitalisation step ── */}
+          {showPunctStep && (
+            <PunctuationStep
+              key={`punct-${stepIndex}-${rawAssembly}`}
+              sentence={rawAssembly}
+              availableMarks={['.', '?', '!']}
+              onComplete={handlePunctComplete}
+              onSpeak={onSpeak}
+              disabled={isAssessing}
             />
           )}
 
@@ -558,6 +620,18 @@ function InLevelScreen({
                   <div className="text-[13px] text-[#2D3436] leading-[1.5]">
                     {feedback.message}
                   </div>
+                  {/* Specific correction hint from formula-aware assessment */}
+                  {feedback.correctionHint && (
+                    <div className="mt-2 text-[12px] font-semibold text-[#d4700a] bg-[#fff3e0] rounded-lg px-3 py-2">
+                      💡 {feedback.correctionHint}
+                    </div>
+                  )}
+                  {/* Grammar insight shown on correct answer */}
+                  {feedback.grammarInsight && feedback.state.startsWith('correct') && (
+                    <div className="mt-2 text-[12px] text-[#4a5568] bg-[#f0f4ff] rounded-lg px-3 py-2 border-l-2 border-[#6C5CE7]">
+                      📖 {feedback.grammarInsight}
+                    </div>
+                  )}
                   {feedback.xpEarned > 0 && (
                     <span className="inline-block mt-2 bg-[#F5C500] text-[#854d0e] text-[12px] font-bold px-3 py-[3px] rounded-xl">
                       +{feedback.xpEarned} XP
@@ -568,63 +642,67 @@ function InLevelScreen({
             )}
           </AnimatePresence>
 
-          {/* Action buttons */}
-          <div className="flex gap-3 mt-4 relative">
-            {/* XP floater — positioned above the button row */}
-            <XPFloater key={xpFloaterKey} amount={xpFloaterAmount} />
-            <button
-              className="flex-1 bg-white border-2 border-[#e0d8ff] rounded-xl py-3 text-[13px] font-semibold text-[#6C5CE7] flex items-center justify-center gap-2 hover:bg-[#f0ecff] transition-colors"
-              onClick={onBack}
-              data-tts="Back to path"
-            >
-              ← Path
-            </button>
+          {/* Action buttons — sticky on mobile so soft keyboard never covers them */}
+          <div className="sticky bottom-0 bg-[#FDF8EE] pt-3 pb-2 sm:static sm:bg-transparent sm:pt-0 sm:pb-0 border-t sm:border-0 border-stone-100 mt-4">
+            <div className="flex gap-3 relative">
+              {/* XP floater — positioned above the button row */}
+              <XPFloater key={xpFloaterKey} amount={xpFloaterAmount} />
+              <button
+                className="flex-1 bg-white border-2 border-[#e0d8ff] rounded-xl py-3 text-[13px] font-semibold text-[#6C5CE7] flex items-center justify-center gap-2 hover:bg-[#f0ecff] transition-colors min-h-[44px]"
+                onClick={onBack}
+                data-tts="Back to path"
+              >
+                ← Path
+              </button>
 
-            {feedback ? (
-              <motion.button
-                className="flex-[2] rounded-xl py-3 text-white font-bold text-[15px]"
-                style={{
-                  background: feedback.state.startsWith('correct')
-                    ? 'linear-gradient(135deg, #00b894, #00cec9)'
-                    : 'linear-gradient(135deg, #F5A623, #F5C500)',
-                  boxShadow: feedback.state.startsWith('correct')
-                    ? '0 3px 12px rgba(0,184,148,0.4)'
-                    : '0 3px 12px rgba(245,166,35,0.4)',
-                }}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={onContinue}
-                data-tts={feedback.state.startsWith('correct') ? 'Continue to next step' : 'Try again'}
-              >
-                {feedback.state.startsWith('correct')
-                  ? (stepIndex < steps.length - 1 ? 'Continue →' : 'Finish Level! 🎉')
-                  : 'Try Again →'}
-              </motion.button>
-            ) : (
-              <motion.button
-                className="flex-[2] rounded-xl py-3 text-white font-bold text-[15px] disabled:opacity-50"
-                style={{
-                  background: 'linear-gradient(135deg, #F5A623, #F5C500)',
-                  boxShadow: '0 3px 12px rgba(245,166,35,0.4)',
-                }}
-                whileHover={!isAssessing && value.trim() ? { scale: 1.01 } : {}}
-                whileTap={!isAssessing && value.trim() ? { scale: 0.98 } : {}}
-                onClick={onSubmit}
-                disabled={isAssessing || !value.trim()}
-                data-tts="Submit your sentence"
-              >
-                {isAssessing ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <motion.span
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
-                      className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"
-                    />
-                    Checking…
-                  </span>
-                ) : 'Submit ✓'}
-              </motion.button>
-            )}
+              {feedback ? (
+                <motion.button
+                  className="flex-[2] rounded-xl py-3 text-white font-bold text-[15px] min-h-[44px]"
+                  style={{
+                    background: feedback.state.startsWith('correct')
+                      ? 'linear-gradient(135deg, #00b894, #00cec9)'
+                      : 'linear-gradient(135deg, #F5A623, #F5C500)',
+                    boxShadow: feedback.state.startsWith('correct')
+                      ? '0 3px 12px rgba(0,184,148,0.4)'
+                      : '0 3px 12px rgba(245,166,35,0.4)',
+                  }}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={onContinue}
+                  data-tts={feedback.state.startsWith('correct') ? 'Continue to next step' : 'Try again'}
+                >
+                  {feedback.state.startsWith('correct')
+                    ? (stepIndex < steps.length - 1 ? 'Continue →' : 'Finish Level! 🎉')
+                    : 'Try Again →'}
+                </motion.button>
+              ) : (
+                <motion.button
+                  className="flex-[2] rounded-xl py-3 text-white font-bold text-[15px] disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+                  style={{
+                    background: 'linear-gradient(135deg, #F5A623, #F5C500)',
+                    boxShadow: '0 3px 12px rgba(245,166,35,0.4)',
+                  }}
+                  whileHover={!isAssessing && value.trim() ? { scale: 1.01 } : {}}
+                  whileTap={!isAssessing && value.trim() ? { scale: 0.98 } : {}}
+                  onClick={onSubmit}
+                  disabled={isAssessing || !value.trim()}
+                  data-tts="Submit your sentence"
+                >
+                  {isAssessing ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <motion.span
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                        className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                      />
+                      Checking…
+                    </span>
+                  ) : !value.trim() && (rawAssembly.trim() || typeMode)
+                    ? 'Choose punctuation first'
+                    : 'Submit ✓'}
+                </motion.button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -755,6 +833,7 @@ export default function LevelPage() {
   const [streakDays,  setStreakDays]   = useState(0)
   const [value,             setValue]             = useState('')
   const [attemptCount,      setAttemptCount]      = useState(0)
+  const [consecutiveErrors, setConsecutiveErrors] = useState(0)
   const [hintsUsedThisStep, setHintsUsedThisStep] = useState(0)
   // Paragraph parts — kept in a ref so handleSubmit can read them synchronously
   const paragraphPartsRef = useRef<ParagraphParts | null>(null)
@@ -851,6 +930,8 @@ export default function LevelPage() {
         }
       } else {
         // ── Regular sentence assessment ────────────────────────────────────
+        let correctionHint: string | null = null
+        let grammarInsight: string | null = null
         try {
           const result = await assessStep({
             sentence:      trimmed,
@@ -861,38 +942,83 @@ export default function LevelPage() {
           })
           passed  = result.passed
           message = result.feedback
+          // Extract formula-aware details if present
+          if (result.assessment) {
+            correctionHint = result.assessment.correction_hint ?? null
+            grammarInsight = result.assessment.grammar_insight ?? null
+          }
         } catch {
           passed  = clientCheck(trimmed, step.target_sentence)
           message = passed
             ? 'Your sentence matches the formula perfectly!'
-            : `Try to follow the formula: ${step.formula}. Example: ${step.example}`
+            : `Check the formula: ${step.formula}`
         }
+        // Also try to get grammar_insight from the step row directly
+        if (passed && !grammarInsight) {
+          grammarInsight = (step as any).grammar_insight ?? null // eslint-disable-line @typescript-eslint/no-explicit-any
+        }
+
+        const isFirst = attemptCount === 0
+        if (passed) {
+          const baseXp    = isFirst ? XP_FIRST : XP_RETRY
+          const hintCost  = Math.min(hintsUsedThisStep * 2, baseXp)
+          const xp        = baseXp - hintCost
+          const extra     = step.is_paragraph_step ? XP_PARA : 0
+          const earned    = xp + extra
+          setSessionXp(prev => prev + earned)
+          setConsecutiveErrors(0)
+          setFeedback({
+            state:         isFirst ? 'correct_first' : 'correct_retry',
+            message,
+            xpEarned:      earned,
+            grammarInsight,
+          })
+          if (sfxEnabled) playSfx('feedback--correct')
+          setXpFloaterAmt(earned)
+          setXpFloaterKey(k => k + 1)
+        } else {
+          const newErrors = consecutiveErrors + 1
+          setConsecutiveErrors(newErrors)
+          setLives(l => l - 1)
+          setFeedback({
+            state:          'needs_revision',
+            message,
+            xpEarned:       0,
+            correctionHint,
+          })
+          if (sfxEnabled) playSfx('feedback--try-again')
+          // Adaptive pacing: auto-open guidance after 3 consecutive errors
+          if (newErrors >= 3) {
+            speak('guidance.adaptive_open')
+            setHintsUsedThisStep(1)  // trigger Level 1 guidance to auto-open
+          }
+        }
+        return  // early return — we handled everything in the else block
       }
 
+      // Paragraph path falls through here
       const isFirst = attemptCount === 0
       if (passed) {
         const baseXp    = isFirst ? XP_FIRST : XP_RETRY
-        const hintCost  = Math.min(hintsUsedThisStep * 2, baseXp) // −2 XP per hint, min 0
+        const hintCost  = Math.min(hintsUsedThisStep * 2, baseXp)
         const xp        = baseXp - hintCost
         const extra     = step.is_paragraph_step ? XP_PARA : 0
         const earned    = xp + extra
         setSessionXp(prev => prev + earned)
+        setConsecutiveErrors(0)
         setFeedback({
           state:    isFirst ? 'correct_first' : 'correct_retry',
           message,
           xpEarned: earned,
         })
         if (sfxEnabled) playSfx('feedback--correct')
-        // Trigger XP floater
         setXpFloaterAmt(earned)
         setXpFloaterKey(k => k + 1)
       } else {
+        const newErrors = consecutiveErrors + 1
+        setConsecutiveErrors(newErrors)
         setLives(l => l - 1)
-        setFeedback({
-          state:    'needs_revision',
-          message,
-          xpEarned: 0,
-        })
+        setFeedback({ state: 'needs_revision', message, xpEarned: 0 })
         if (sfxEnabled) playSfx('feedback--try-again')
       }
     } finally {
@@ -923,6 +1049,7 @@ export default function LevelPage() {
       setValue('')
       setFeedback(null)
       setAttemptCount(0)
+      setConsecutiveErrors(0)
       setHintsUsedThisStep(0)
       paragraphPartsRef.current = null
     } else {
