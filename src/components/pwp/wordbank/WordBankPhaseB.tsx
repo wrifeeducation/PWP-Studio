@@ -88,7 +88,7 @@ function assemble(tokens: string[], gapPositions: Map<number, GapSlot>, gapValue
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
 export interface WordBankPhaseBProps {
-  bankWords:      string[]
+  bankWords:      string[]   // adjective (or other new-element) chips to tap into gaps
   gapSlots:       GapSlot[]
   targetSentence: string
   onChange:       (assembled: string) => void
@@ -97,7 +97,7 @@ export interface WordBankPhaseBProps {
 
 // ─── COMPONENT ───────────────────────────────────────────────────────────────
 
-export function WordBankPhaseB({ bankWords: _bankWords, gapSlots, targetSentence, onChange, disabled }: WordBankPhaseBProps) {
+export function WordBankPhaseB({ bankWords, gapSlots, targetSentence, onChange, disabled }: WordBankPhaseBProps) {
   const tokens      = useMemo(() => tokenise(targetSentence), [targetSentence])
   const gapPositions = useMemo(
     () => new Map(gapSlots.map(g => [g.position, g])),
@@ -109,6 +109,22 @@ export function WordBankPhaseB({ bankWords: _bankWords, gapSlots, targetSentence
     gapSlots.forEach(g => { init[g.position] = '' })
     return init
   })
+
+  // Track which gap is currently focused so chip taps know where to go.
+  // Defaults to the first unfilled gap.
+  const firstGapPos = gapSlots[0]?.position ?? null
+  const [activeGap, setActiveGap] = useState<number | null>(firstGapPos)
+
+  // When a chip is tapped, fill the active gap (or the first empty gap)
+  const handleChipTap = (word: string) => {
+    if (disabled) return
+    const target =
+      activeGap !== null && (gapValues[activeGap] ?? '').trim() === '' ? activeGap
+      : gapSlots.find(g => (gapValues[g.position] ?? '').trim() === '')?.position
+      ?? null
+    if (target === null) return
+    setGapValues(prev => ({ ...prev, [target]: word }))
+  }
 
   // Emit assembled sentence on every gap change
   useEffect(() => {
@@ -124,6 +140,39 @@ export function WordBankPhaseB({ bankWords: _bankWords, gapSlots, targetSentence
 
   return (
     <div className="select-none mb-3">
+      {/* ── Adjective / new-element chip bank ───────────────────────── */}
+      {bankWords.length > 0 && (
+        <div className="bg-[#f8f5ff] border-2 border-[#e8e0ff] rounded-xl px-3 py-3 sm:px-4 sm:py-3 mb-3">
+          <div className="text-[10px] font-bold text-[#9b87f0] uppercase tracking-wider mb-2">
+            Choose a word to fill the gap
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {bankWords.map((word, i) => {
+              const alreadyUsed = Object.values(gapValues).some(v => v.trim() === word)
+              const { bg, fg } = gapColour('adjective')
+              return (
+                <button
+                  key={i}
+                  className="px-3 py-2 sm:px-4 rounded-xl text-sm sm:text-base font-semibold min-h-[44px] border shadow-sm transition-all"
+                  style={{
+                    background:  alreadyUsed ? '#f3f0ff' : bg,
+                    color:       alreadyUsed ? '#b0a0e0' : fg,
+                    borderColor: alreadyUsed ? '#d8d0ff' : `${bg}88`,
+                    opacity:     alreadyUsed ? 0.6 : 1,
+                  }}
+                  onClick={() => handleChipTap(word)}
+                  disabled={disabled || alreadyUsed}
+                  aria-label={`Tap to use: ${word}`}
+                  data-tts={word}
+                >
+                  {word}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Hint label */}
       <div className="text-[10px] font-bold text-[#9b87f0] uppercase tracking-wide mb-2">
         Complete the sentence — fill in the gaps
@@ -150,16 +199,19 @@ export function WordBankPhaseB({ bankWords: _bankWords, gapSlots, targetSentence
                   className="border-2 rounded-lg px-2 py-[5px] text-[14px] font-semibold text-center outline-none transition-all"
                   style={{
                     width: inputWidth,
-                    borderColor: (gapValues[pos] ?? '').trim() ? border : `${border}`,
+                    borderColor: activeGap === pos ? border : (gapValues[pos] ?? '').trim() ? border : `${border}`,
                     background:  (gapValues[pos] ?? '').trim() ? bg : '#fff',
                     color:       fg,
-                    boxShadow:   (gapValues[pos] ?? '').trim()
+                    boxShadow:   activeGap === pos
+                      ? `0 0 0 3px ${border}60`
+                      : (gapValues[pos] ?? '').trim()
                       ? `0 0 0 3px ${border}40`
                       : 'none',
                   }}
                   placeholder={gap.label}
                   value={gapValues[pos] ?? ''}
                   onChange={e => updateGap(pos, e.target.value)}
+                  onFocus={() => setActiveGap(pos)}
                   disabled={disabled}
                   data-tts={`Type a ${gap.word_class} here`}
                   aria-label={`${gap.word_class} gap`}

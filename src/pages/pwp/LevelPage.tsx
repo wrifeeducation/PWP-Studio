@@ -12,8 +12,11 @@ import type { ParagraphParts } from '@/components/pwp/paragraph/ParagraphBuilder
 import type { PwpLevel, PwpStep, PwpWordBankConfig } from '@/types/pwp'
 import { WordBankPhaseA } from '@/components/pwp/wordbank/WordBankPhaseA'
 import { WordBankPhaseB } from '@/components/pwp/wordbank/WordBankPhaseB'
+import { WordBankTenseVariety } from '@/components/pwp/wordbank/WordBankTenseVariety'
 import { GuidancePanel } from '@/components/pwp/guidance/GuidancePanel'
 import { PunctuationStep } from '@/components/pwp/step/PunctuationStep'
+import { TypeModeTileInput } from '@/components/pwp/step/TypeModeTileInput'
+import { SubjectPrompt } from '@/components/pwp/step/SubjectPrompt'
 import { useTTS } from '@/hooks/useTTS'
 import { usePWPAudioPlayer } from '@/hooks/usePWPAudio'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -305,10 +308,14 @@ function InLevelScreen({
   // typeMode: in Phase A, allow switching to free text instead of word bank
   const [typeMode, setTypeMode] = useState(false)
 
-  // Reset raw + final when step changes
+  // Subject confirmed by pupil at L7+ (Phase B subject prompt)
+  const [subjectConfirmed, setSubjectConfirmed] = useState(false)
+
+  // Reset raw + final + subject prompt when step changes
   useEffect(() => {
     setRawAssembly('')
     setTypeMode(false)
+    setSubjectConfirmed(false)
     onChange('')
   }, [stepIndex]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -513,8 +520,8 @@ function InLevelScreen({
             />
           )}
 
-          {/* ── Word Bank Phase A — Build Mode (L1–6), unless type mode toggled ── */}
-          {stepPhase === 'A' && wbConfig && !feedback && !typeMode && (
+          {/* ── Word Bank Phase A — Build Mode (L1–6), unless type mode or tense_variety ── */}
+          {stepPhase === 'A' && wbConfig && !feedback && !typeMode && step.step_type !== 'tense_variety' && (
             <WordBankPhaseA
               key={`wba-${stepIndex}`}
               bankWords={wbConfig.bank_words ?? []}
@@ -525,13 +532,32 @@ function InLevelScreen({
             />
           )}
 
+          {/* ── Subject prompt — Phase B (L7+): pupil types their subject before composing ── */}
+          {stepPhase === 'B' && !feedback && (
+            <SubjectPrompt
+              key={`subject-${stepIndex}`}
+              onConfirm={(val) => setSubjectConfirmed(val.trim().length > 0)}
+              disabled={isAssessing}
+            />
+          )}
+
           {/* ── Word Bank Phase B — Gap Mode (L7–19) ── */}
-          {stepPhase === 'B' && wbConfig && !feedback && (
+          {stepPhase === 'B' && wbConfig && !feedback && subjectConfirmed && (
             <WordBankPhaseB
               key={`wbb-${stepIndex}`}
               bankWords={wbConfig.bank_words ?? []}
               gapSlots={wbConfig.gap_slots ?? []}
               targetSentence={step.target_sentence}
+              onChange={handleRawChange}
+              disabled={isAssessing}
+            />
+          )}
+
+          {/* ── Tense variety — three-tray mode for step_type === 'tense_variety' ── */}
+          {step.step_type === 'tense_variety' && wbConfig && !feedback && (
+            <WordBankTenseVariety
+              key={`tv-${stepIndex}`}
+              bankWords={wbConfig.bank_words ?? []}
               onChange={handleRawChange}
               disabled={isAssessing}
             />
@@ -554,8 +580,17 @@ function InLevelScreen({
             </div>
           )}
 
-          {/* ── Text input — free-write (C/D), type-mode override, or feedback display ── */}
-          {((!isWordBankPhase && !isParagraphStep) || typeMode || !!feedback) && (
+          {/* ── Type-mode tile builder — shown when pupil toggles "I'll type instead" ── */}
+          {typeMode && !feedback && (
+            <TypeModeTileInput
+              key={`type-${stepIndex}`}
+              onChange={handleRawChange}
+              disabled={isAssessing}
+            />
+          )}
+
+          {/* ── Text input — free-write (C/D phases) or feedback display ── */}
+          {((!isWordBankPhase && !isParagraphStep && !typeMode) || !!feedback) && (
             <textarea
               ref={textareaRef}
               className="w-full border-2 rounded-xl px-4 py-3 text-base sm:text-lg text-[#2D3436] outline-none font-[inherit] resize-none transition-colors bg-white min-h-[80px] sm:min-h-[88px]"
@@ -565,7 +600,7 @@ function InLevelScreen({
                   : '#e0d8ff',
               }}
               placeholder="Write your sentence here…"
-              value={typeMode ? rawAssembly : (isWordBankPhase && feedback ? value : (feedback ? value : rawAssembly))}
+              value={isWordBankPhase && feedback ? value : (feedback ? value : rawAssembly)}
               onChange={e => handleRawChange(e.target.value)}
               onFocus={e => { if (!feedback) e.target.style.borderColor = ACCENT }}
               onBlur={e => { if (!feedback) e.target.style.borderColor = '#e0d8ff' }}

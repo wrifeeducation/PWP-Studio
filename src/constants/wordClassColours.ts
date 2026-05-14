@@ -27,6 +27,8 @@ export const WORD_CLASS_COLOURS: Record<string, WordClassColour> = {
   pronoun:     { bg: '#D4468A', fg: '#ffffff', label: 'Pro',  name: 'Pronoun' },
   preposition: { bg: '#6B7280', fg: '#ffffff', label: 'Prep', name: 'Preposition' },
   conjunction: { bg: '#9B8A2E', fg: '#ffffff', label: 'Conj', name: 'Conjunction' },
+  place:       { bg: '#0EA5C9', fg: '#ffffff', label: 'Pl',   name: 'Place' },
+  proper:      { bg: '#C026D3', fg: '#ffffff', label: 'Pr',   name: 'Name' },
 } as const
 
 /** Look up by label (N, V, D, Adj, …) or full name (noun, verb, …) */
@@ -51,6 +53,43 @@ const CONJUNCTIONS = new Set(['and','but','or','so','yet','nor','because','altho
 const ADVERBS      = new Set(['quickly','slowly','hard','yesterday','today','tomorrow','outside','inside','here','there','very','quite','really','rather','angrily','bravely','excitedly','finally','first','next','however','meanwhile','subsequently'])
 const ADJECTIVES   = new Set(['tall','short','red','blue','old','new','big','small','fast','slow','strong','weak','clever','brave','happy','sad','dark','bright','long','beautiful','exhausted','battered','determined','fierce','gentle','cold','warm','busy','quiet','loud','thin','young'])
 const HELPING_VERBS = new Set(['is','are','was','were','has','have','had','will','would','could','should','can','may','might','shall','did','does','do'])
+
+/**
+ * Well-known place names that should get the 'place' word class (cyan chip).
+ * Stored lowercase; comparison is always lowercased before lookup.
+ */
+const PLACE_NAMES = new Set([
+  // UK cities & regions
+  'london','manchester','birmingham','edinburgh','cardiff','belfast','liverpool',
+  'leeds','bristol','sheffield','glasgow','newcastle','nottingham','oxford',
+  'cambridge','brighton','leicester','coventry','bath','york','exeter',
+  'norwich','portsmouth','southampton','reading','wolverhampton','sunderland',
+  // Countries & capitals commonly used in KS1-3 writing
+  'paris','berlin','rome','madrid','amsterdam','brussels','vienna','warsaw',
+  'lisbon','athens','stockholm','oslo','copenhagen','dublin','reykjavik',
+  'tokyo','beijing','shanghai','delhi','mumbai','sydney','melbourne',
+  'new york','washington','toronto','ottawa','cairo','nairobi','lagos',
+  // Natural/geographic features
+  'thames','severn','mersey','avon','clyde','tyne','trent',
+  'snowdon','ben nevis','everest','sahara','amazon','nile',
+  'pacific','atlantic','mediterranean','arctic','antarctic',
+  // Fictional/story places common in primary texts
+  'narnia','hogwarts','neverland','wonderland',
+])
+
+/**
+ * Common proper names (people) that should get the 'proper' word class (fuchsia chip).
+ * These are the subject nouns most likely to appear in PWP word banks.
+ * Note: "Sam" is explicitly excluded from word banks per spec, so it is not listed here.
+ */
+const PROPER_NAMES = new Set([
+  'liam','emma','noah','olivia','amara','felix','zara','kai','priya','jess',
+  'mia','leo','maya','theo','isla','jasper','freya','max','ruby','oscar',
+  'lily','jake','sofia','eli','grace','ben','ava','lucas','chloe','harry',
+  'ella','james','poppy','ethan','niamh','ravi','aisha','tom','sophie',
+  'jack','layla','alex','evie','tyler','ivy','charlie','daisy','finn',
+  'amber','george','rosie','henry','imogen','archie','ellie','joseph','lydia',
+])
 
 /**
  * Irregular past-tense verbs that don't end in -ed and would otherwise be
@@ -85,6 +124,11 @@ export function guessWordClass(word: string): string {
   if (PAST_IRREGULAR_VERBS.has(w)) return 'verb'
   // Morphological patterns: -ing, -ed, -s verb forms
   if (w.endsWith('ing') || w.endsWith('ed') || (w.endsWith('s') && w.length > 4)) return 'verb'
+  // Named entities — checked after verb patterns to avoid misclassifying
+  if (PLACE_NAMES.has(w))          return 'place'
+  if (PROPER_NAMES.has(w))         return 'proper'
+  // Capitalised words not otherwise classified are likely proper nouns
+  if (word[0] === word[0].toUpperCase() && word[0] !== word[0].toLowerCase()) return 'proper'
   return 'noun'
 }
 
