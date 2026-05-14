@@ -14,6 +14,13 @@
  * phase → 'punctuate', not synchronously in handleCapitalise(), so the
  * punctuation buttons are guaranteed to be visible before the prompt plays.
  *
+ * Fix (session 35 — 2026-05-14):
+ *   • Capitalisation now only resets when the FIRST WORD changes, not on every
+ *     word addition. Fixes capitalise-reset-on-word-add bug.
+ *   • Punctuation selector is gated on minWordCount so it only appears once all
+ *     formula elements are present. Fixes premature-punctuation and
+ *     premature-"ready to submit" bugs.
+ *
  * Per PWP_Interaction_Design_Prompt.md §3.
  */
 
@@ -33,6 +40,12 @@ export interface PunctuationStepProps {
   /** Voice callback — plays audio keys */
   onSpeak?: (key: string) => void
   disabled?: boolean
+  /**
+   * Minimum word count required before punctuation may be selected.
+   * Derived from the number of elements in the step's formula (e.g. "N + V" = 2).
+   * When undefined, no gate is applied (legacy / free-write phases).
+   */
+  minWordCount?: number
 }
 
 type Phase = 'capitalise' | 'punctuate' | 'done'
@@ -45,17 +58,45 @@ export function PunctuationStep({
   onComplete,
   onSpeak,
   disabled = false,
+  minWordCount,
 }: PunctuationStepProps) {
   const [phase, setPhase] = useState<Phase>('capitalise')
   const [capitalised, setCapitalised] = useState(false)
   const [selectedMark, setSelectedMark] = useState<string | null>(null)
 
-  // Reset capitalise/punctuate state whenever the sentence changes
+  // ── Derived values (needed in hooks — must come before any early returns) ──
+  const words            = sentence.trim().split(/\s+/).filter(Boolean)
+  const currentWordCount = words.length
+  // Formula gate: punctuation only available once all formula elements are present.
+  // minWordCount = number of '+'-separated elements in the step's formula string.
+  const formulaComplete  = minWordCount === undefined || currentWordCount >= minWordCount
+
+  // ── FIX: only reset when the FIRST WORD changes, not on every word addition ──
+  // Previously `[sentence]` dependency caused full reset every time a tile was
+  // added, clearing capitalisation mid-build. Now we track the first word and
+  // only reset when it genuinely changes (new sentence start, tray cleared).
+  const prevFirstWordRef = useRef<string>('')
+
   useEffect(() => {
-    setPhase('capitalise')
-    setCapitalised(false)
-    setSelectedMark(null)
+    const firstWord = words[0] ?? ''
+    if (firstWord !== prevFirstWordRef.current) {
+      setPhase('capitalise')
+      setCapitalised(false)
+      setSelectedMark(null)
+      prevFirstWordRef.current = firstWord
+    }
+    // If firstWord is unchanged, the pupil just added more words — preserve state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sentence])
+
+  // ── Auto-advance to punctuate once formula is complete after capitalisation ──
+  // If the pupil capitalised early and then adds more words to meet minWordCount.
+  useEffect(() => {
+    if (capitalised && phase === 'capitalise' && formulaComplete) {
+      setPhase('punctuate')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentWordCount, capitalised])
 
   // Alice prompt: "Tap the first letter to make it a capital."
   // Fires once when the sentence first becomes non-empty.
@@ -86,9 +127,7 @@ export function PunctuationStep({
     }
   }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const words = sentence.trim().split(/\s+/).filter(Boolean)
-
-  // Empty state — show a placeholder above the word bank chips
+  // ── Empty state — show a placeholder above the word bank chips ──
   if (words.length === 0) {
     return (
       <div className="rounded-2xl border-2 border-dashed border-[#e0d8ff] bg-white px-4 py-4 sm:px-5">
@@ -102,19 +141,21 @@ export function PunctuationStep({
     )
   }
 
-  const firstWord  = words[0]
-  const restWords  = words.slice(1)
-
-  // capitalised version of first word
-  const firstCap = firstWord.charAt(0).toUpperCase() + firstWord.slice(1)
+  const firstWord    = words[0]
+  const restWords    = words.slice(1)
+  const firstCap     = firstWord.charAt(0).toUpperCase() + firstWord.slice(1)
   const displayWords = capitalised ? [firstCap, ...restWords] : words
 
   const handleCapitalise = () => {
     if (disabled || capitalised) return
     setCapitalised(true)
-    setPhase('punctuate')
-    // NOTE: voice prompt is fired by the useEffect above, not here —
-    // that ensures the punctuation buttons are rendered before Alice speaks.
+    if (formulaComplete) {
+      setPhase('punctuate')
+      // NOTE: voice prompt is fired by the useEffect above, not here —
+      // that ensures the punctuation buttons are rendered before Alice speaks.
+    }
+    // If formula isn't complete yet, stay in 'capitalise' phase.
+    // The auto-advance useEffect above will fire when the count reaches minWordCount.
   }
 
   const handleMarkSelect = (mark: string) => {
@@ -130,8 +171,10 @@ export function PunctuationStep({
       {/* Assembled sentence — click first letter to capitalise */}
       <div>
         <div className="text-xs font-semibold text-[#9b87f0] uppercase tracking-wider mb-2">
-          {phase === 'capitalise'
+          {phase === 'capitalise' && !capitalised
             ? 'Tap the first letter to make it a capital'
+            : phase === 'capitalise' && capitalised
+            ? 'Keep adding words to complete your sentence'
             : phase === 'punctuate'
             ? 'Now choose how your sentence ends'
             : 'Your sentence'}

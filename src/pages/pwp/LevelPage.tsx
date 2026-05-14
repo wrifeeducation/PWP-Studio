@@ -487,8 +487,17 @@ function InLevelScreen({
             />
           )}
 
-          {/* ── Punctuation + capitalisation step — always shown for Phase A (placeholder when empty), above the word bank ── */}
-          {!feedback && !isParagraphStep && (stepPhase === 'A' ? !typeMode : rawAssembly.trim().length > 0) && (
+          {/* ── Punctuation + capitalisation step ────────────────────────────────
+               Show as placeholder when Phase A word-bank mode (even when empty),
+               OR show whenever rawAssembly has content (word-bank after words added,
+               typed mode, or C/D free-write phases).
+               FIX-03: typeMode no longer hides PunctuationStep — typed sentences
+               must also pass through capitalisation + punctuation before submit.
+               FIX-05: minWordCount derived from formula element count gates the
+               punctuation selector so it only appears once the formula is complete.
+          ── */}
+          {!feedback && !isParagraphStep &&
+           (rawAssembly.trim().length > 0 || (stepPhase === 'A' && !typeMode)) && (
             <PunctuationStep
               key={`punct-${stepIndex}`}
               sentence={rawAssembly}
@@ -496,6 +505,7 @@ function InLevelScreen({
               onComplete={handlePunctComplete}
               onSpeak={onSpeak}
               disabled={isAssessing}
+              minWordCount={step.formula ? step.formula.split(/\s*\+\s*/).length : undefined}
             />
           )}
 
@@ -1059,11 +1069,37 @@ export default function LevelPage() {
         let correctionHint: string | null = null
         let grammarInsight: string | null = null
         try {
+          // Derive structural params from step + formula for accurate assessment.
+          // The Edge Function defaults to 'proper_noun' / 'past' / 'new_element'
+          // which is wrong for present-tense, continuous, pronoun, and
+          // consolidation steps. Always pass explicit values.
+          const formulaLower = step.formula?.toLowerCase() ?? ''
+
+          const subjectType: 'proper_noun' | 'det_noun' | 'pronoun' =
+            (step as any).subject_type ??
+            (formulaLower.includes('pronoun') ? 'pronoun' :
+             formulaLower.includes('det')     ? 'det_noun' :
+             'proper_noun')
+
+          const tenseParam: 'past' | 'present' | 'continuous' | 'any' =
+            (step as any).tense ??
+            (step.step_type === 'tense_variety'            ? 'any' :
+             formulaLower.includes('present tense')        ? 'present' :
+             formulaLower.includes('continuous') ||
+             formulaLower.includes('-ing')                 ? 'continuous' :
+             'past')
+
+          const stepTypeParam =
+            (step.step_type as 'new_element' | 'consolidation' | 'tense_variety' | 'transition')
+            ?? 'new_element'
+
           const result = await assessStep({
             sentence:      trimmed,
             formulaLabel:  step.formula,
             elementCode:   String(step.id),
-            subjectNoun:   step.subject_prompt,
+            subject_type:  subjectType,
+            tense:         tenseParam,
+            step_type:     stepTypeParam,
             attemptNumber: attemptCount + 1,
           })
           passed  = result.passed

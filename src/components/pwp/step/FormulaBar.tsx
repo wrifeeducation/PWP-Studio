@@ -18,30 +18,64 @@ import { getWordClassColour } from '@/constants/wordClassColours'
 // the canonical word-class keys used by wordClassColours.ts.
 
 const LABEL_TO_CLASS: Record<string, string> = {
-  // Determiners
+  // ── Determiners ───────────────────────────────────────────────────────────
   det: 'determiner', d: 'determiner',
-  // Nouns
-  n: 'noun', noun: 'noun', 'n(subject)': 'noun', 'n(object)': 'noun',
+  'det (definite)': 'determiner', 'det (indefinite)': 'determiner',
+
+  // ── Nouns ─────────────────────────────────────────────────────────────────
+  n: 'noun', noun: 'noun',
+  'n(subject)': 'noun', 'n(object)': 'noun',
   'noun(subject)': 'noun', 'noun(object)': 'noun',
-  // Verbs
-  v: 'verb', verb: 'verb', 'v(past)': 'verb', 'v(present)': 'verb',
-  'v(continuous)': 'verb', 'helping v': 'verb', 'helping verb': 'verb',
+  'noun (subject)': 'noun', 'noun (object)': 'noun',
+
+  // ── Verbs — short forms ───────────────────────────────────────────────────
+  v: 'verb', verb: 'verb',
+  'v(past)': 'verb', 'v(present)': 'verb', 'v(continuous)': 'verb',
   'v(-ing)': 'verb', 'verb(-ing)': 'verb',
-  // Adjectives
-  adj: 'adjective', adjective: 'adjective', 'adj(subject)': 'adjective',
-  'adj(object)': 'adjective',
-  // Adverbs
-  adv: 'adverb', adverb: 'adverb', 'adv(manner)': 'adverb',
-  'adv(time)': 'adverb', 'adv(place)': 'adverb', 'adv-manner': 'adverb',
-  'adv-time': 'adverb', 'adv-place': 'adverb',
-  // Pronouns
-  pro: 'pronoun', pronoun: 'pronoun', 'pronoun(subject)': 'pronoun',
-  // Prepositions
-  prep: 'preposition', preposition: 'preposition', 'prep phrase': 'preposition',
-  // Conjunctions
+  'helping v': 'verb', 'helping verb': 'verb',
+
+  // ── Verbs — DB natural-language forms (as stored in pwp_steps.formula) ───
+  // These must be present or the token falls back to 'noun' and renders coral red.
+  'verb (past tense)': 'verb',
+  'verb (present tense)': 'verb',
+  'verb (continuous)': 'verb',
+  'verb (past)': 'verb',
+  'verb (present)': 'verb',
+  'helping verb + verb(-ing)': 'verb',
+  'helping verb + verb (-ing)': 'verb',
+  'helping verb (is)': 'verb',
+  'helping verb (are)': 'verb',
+  'helping verb (was)': 'verb',
+  'helping verb (were)': 'verb',
+
+  // ── Adjectives ────────────────────────────────────────────────────────────
+  adj: 'adjective', adjective: 'adjective',
+  'adj(subject)': 'adjective', 'adj(object)': 'adjective',
+  'adj (subject)': 'adjective', 'adj (object)': 'adjective',
+
+  // ── Adverbs ───────────────────────────────────────────────────────────────
+  adv: 'adverb', adverb: 'adverb',
+  'adv(manner)': 'adverb', 'adv(time)': 'adverb', 'adv(place)': 'adverb',
+  'adv-manner': 'adverb', 'adv-time': 'adverb', 'adv-place': 'adverb',
+  'adverb (manner)': 'adverb', 'adverb (time)': 'adverb', 'adverb (place)': 'adverb',
+  'adverb of manner': 'adverb', 'adverb of time': 'adverb', 'adverb of place': 'adverb',
+
+  // ── Pronouns ──────────────────────────────────────────────────────────────
+  pro: 'pronoun', pronoun: 'pronoun',
+  'pronoun(subject)': 'pronoun', 'pronoun (subject)': 'pronoun',
+
+  // ── Prepositions ──────────────────────────────────────────────────────────
+  prep: 'preposition', preposition: 'preposition',
+  'prep phrase': 'preposition', 'preposition phrase': 'preposition',
+  'prep + det + noun': 'preposition',
+
+  // ── Conjunctions ──────────────────────────────────────────────────────────
   conj: 'conjunction', conjunction: 'conjunction',
-  // Proper / place
+
+  // ── Proper nouns / names / places ─────────────────────────────────────────
   'proper noun': 'proper', 'proper n': 'proper',
+  name: 'proper', names: 'proper',
+  'place noun': 'place', place: 'place',
 }
 
 function tokenToWordClass(token: string): string {

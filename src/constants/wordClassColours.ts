@@ -28,7 +28,9 @@ export const WORD_CLASS_COLOURS: Record<string, WordClassColour> = {
   preposition: { bg: '#6B7280', fg: '#ffffff', label: 'Prep', name: 'Preposition' },
   conjunction: { bg: '#9B8A2E', fg: '#ffffff', label: 'Conj', name: 'Conjunction' },
   place:       { bg: '#0EA5C9', fg: '#ffffff', label: 'Pl',   name: 'Place' },
-  proper:      { bg: '#C026D3', fg: '#ffffff', label: 'Pr',   name: 'Name' },
+  // proper nouns (Names) share noun coral red at KS1-2: Names fill the Noun slot,
+  // so both the formula chip and the word bank tile should be the same colour.
+  proper:      { bg: '#E05252', fg: '#ffffff', label: 'N',    name: 'Name' },
 } as const
 
 /** Look up by label (N, V, D, Adj, …) or full name (noun, verb, …) */
