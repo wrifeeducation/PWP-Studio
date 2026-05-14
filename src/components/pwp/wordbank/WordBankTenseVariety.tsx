@@ -165,16 +165,19 @@ export function WordBankTenseVariety({ bankWords, onChange, disabled }: WordBank
                 className="px-3 py-2 min-h-[48px] flex flex-wrap items-center gap-1.5 bg-white border-b"
                 style={{ borderColor: tray.text + '20' }}
               >
-                {subj && (
-                  <motion.span
-                    className="px-2 py-1 rounded-lg text-xs font-semibold"
-                    style={{ ...chipColourForWord(subj) }}
-                    initial={{ scale: 0.7, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                  >
-                    {subj}
-                  </motion.span>
-                )}
+                {subj && (() => {
+                  const { bg, fg } = chipColourForWord(subj)
+                  return (
+                    <motion.span
+                      className="px-2 py-1 rounded-lg text-xs font-semibold"
+                      style={{ background: bg, color: fg }}
+                      initial={{ scale: 0.7, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                    >
+                      {subj}
+                    </motion.span>
+                  )
+                })()}
                 <AnimatePresence>
                   {verb && (
                     <motion.span
