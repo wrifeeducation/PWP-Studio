@@ -326,28 +326,46 @@ interface ChapterCardProps {
 }
 
 function ChapterCard({ chapter, levelsDone, totalLevels }: ChapterCardProps) {
+  const isParagraphChapter = chapter.id === 4
+  const bannerBg     = isParagraphChapter ? '#00b894' : '#6C5CE7'
+  const bannerBorder = isParagraphChapter ? '#007d67' : '#3d35a0'
+  const allDone      = levelsDone === totalLevels && totalLevels > 0
+
   return (
     <div
-      className="bg-white rounded-2xl px-5 py-4 mb-4 border-2 border-[#e8e0ff] flex items-center gap-4"
-      style={{ boxShadow: '0 2px 12px rgba(108,92,231,0.08)' }}
+      style={{
+        background: bannerBg,
+        borderRadius: 16,
+        borderBottom: `4px solid ${bannerBorder}`,
+        padding: 'clamp(14px, 2.5vw, 20px) clamp(16px, 4vw, 28px)',
+        marginBottom: 16,
+      }}
     >
-      <div className="text-[32px] flex-shrink-0">{chapter.icon}</div>
-      <div className="flex-1 min-w-0">
-        <div className="text-[10px] font-bold text-[#6C5CE7] uppercase tracking-[1px]">
-          Chapter {chapter.id}
-        </div>
-        <div className="text-[16px] font-extrabold text-[#2D3436] my-[2px]">{chapter.name}</div>
-        <div className="flex gap-[5px] flex-wrap mt-1">
-          {chapter.pills.map(p => (
-            <span key={p} className="bg-[#f0ecff] text-[#6C5CE7] text-[10px] font-semibold px-2 py-[1px] rounded-xl">
-              {p}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <span style={{ fontSize: 22 }}>{chapter.icon}</span>
+            <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
+              Chapter {chapter.id}
             </span>
-          ))}
+          </div>
+          <div style={{ color: 'white', fontSize: 'var(--pwp-text-lg)', fontWeight: 800, marginBottom: 8, lineHeight: 1.2 }}>
+            {chapter.name}
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {chapter.pills.map(p => (
+              <span key={p} style={{ background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 12 }}>
+                {p}
+              </span>
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="text-right flex-shrink-0">
-        <div className="text-[20px] font-extrabold text-[#6C5CE7]">{levelsDone}/{totalLevels}</div>
-        <div className="text-[10px] text-[#aaa]">levels complete</div>
+        <div style={{ flexShrink: 0, textAlign: 'right' }}>
+          <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 8, padding: '5px 10px', color: 'white', fontWeight: 700, fontSize: 'var(--pwp-text-sm)' }}>
+            {allDone ? '✓ Complete!' : `${levelsDone}/${totalLevels}`}
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, marginTop: 3 }}>levels</div>
+        </div>
       </div>
     </div>
   )
@@ -364,29 +382,39 @@ interface PathNodeRowProps {
 }
 
 function PathNodeRow({ node, isLast, isCurrent, nodeRef, onClick }: PathNodeRowProps) {
-  const isLevel    = node.kind === 'level'
+  const isLevel     = node.kind === 'level'
   const isParagraph = isLevel && (node as LevelNode).isParagraph
-  const isQuiz     = node.kind === 'quiz'
+  const isQuiz      = node.kind === 'quiz'
 
-  const PRIMARY   = isParagraph ? '#00b894' : isQuiz ? '#F5C500' : '#6C5CE7'
-  const DONE_BG   = isParagraph ? '#55d6b3' : isQuiz ? '#fde68a' : '#a29bf5'
-  const LOCKED_BG = isParagraph ? '#b2f0e0' : isQuiz ? '#fef3c7' : '#e0daf8'
+  const PRIMARY = isParagraph ? '#00b894' : isQuiz ? '#F5C500' : '#6C5CE7'
+  const DARK    = isParagraph ? '#007d67' : isQuiz ? '#c4980a' : '#3d35a0'
 
+  // Current formula/quiz nodes use orange CTA colour; paragraph nodes use teal
   const nodeBg =
-    node.state === 'done'    ? DONE_BG  :
-    node.state === 'current' ? PRIMARY  :
-    node.state === 'next'    ? PRIMARY  :
-    LOCKED_BG
+    node.state === 'done'    ? (isParagraph ? '#55d6b3' : isQuiz ? '#fde68a' : '#a29bf5') :
+    node.state === 'current' ? (isParagraph ? '#00b894' : isQuiz ? '#F5C500' : '#F5A623') :
+    node.state === 'next'    ? PRIMARY :
+    '#ddd'
+
+  const nodeShadowColor =
+    node.state === 'current' ? (isParagraph ? '#007d67' : isQuiz ? '#c4980a' : '#c47a0a') :
+    node.state === 'locked'  ? '#bbb' :
+    DARK
+
+  const nodeShadowH = node.state === 'current' ? 5 : 4
+
+  // Bigger circle for the current node — pupils feel "where I am" is special
+  const nodeSize =
+    node.state === 'done'    ? 52 :
+    node.state === 'current' ? 64 :
+    node.state === 'next'    ? 56 :
+    48
 
   const nodeIcon =
     node.state === 'done'   ? '✓' :
     node.state === 'locked' ? '🔒' :
     isQuiz                  ? '⭐' :
     isParagraph             ? '📝' : '✏️'
-
-  const tagBg   = isParagraph ? '#e0faf4' : isQuiz ? '#fef9e0' : '#f0ecff'
-  const tagText = isParagraph ? '#00b894' : isQuiz ? '#d4a017' : '#6C5CE7'
-  const tagLabel = isQuiz ? '★ Checkpoint' : isParagraph ? '📝 Paragraph' : 'Formula Chain'
 
   const badge = {
     done:    { bg: '#e0faf4', fg: '#00b894', label: '✓ Done' },
@@ -403,76 +431,99 @@ function PathNodeRow({ node, isLast, isCurrent, nodeRef, onClick }: PathNodeRowP
         ref={isCurrent ? (nodeRef as React.RefObject<HTMLDivElement>) : undefined}
         className="flex items-center gap-3 mb-2"
       >
-        {/* Circle node — rendered as a button when clickable for keyboard access */}
-        <motion.button
-          className="w-[60px] h-[60px] rounded-full flex flex-col items-center justify-center flex-shrink-0 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#6C5CE7]"
-          style={{
-            background: nodeBg,
-            cursor:     isClickable ? 'pointer' : 'default',
-            opacity:    node.state === 'locked' ? 0.6 : 1,
-            border:     'none',
-            boxShadow:  isCurrent
-              ? `0 0 0 4px ${PRIMARY}40, 0 4px 14px ${PRIMARY}50`
-              : undefined,
-          }}
-          animate={isCurrent ? { scale: [1, 1.08, 1] } : {}}
-          transition={isCurrent ? { duration: 2, repeat: Infinity, ease: 'easeInOut' } : {}}
-          onClick={isClickable ? onClick : undefined}
-          whileHover={isClickable ? { scale: 1.06 } : {}}
-          whileTap={isClickable  ? { scale: 0.97 } : {}}
-          disabled={!isClickable}
-          aria-label={
-            isClickable
-              ? `Start ${isLevel ? `Level ${(node as LevelNode).levelNumber}` : node.title} — ${node.title}`
-              : `${node.title} — locked`
-          }
-          aria-current={isCurrent ? 'step' : undefined}
-          data-tts={node.title}
-        >
-          {isLevel && (
-            <span className="text-white text-[10px] font-bold leading-none">
-              {(node as LevelNode).levelNumber}
-            </span>
+        {/* Node column: "Start!" callout pill (current only) + circle */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 70, flexShrink: 0 }}>
+          {isCurrent && (
+            <motion.div
+              style={{
+                background: '#F5A623',
+                boxShadow: '0 2px 0 0 #c47a0a',
+                borderRadius: 20,
+                padding: '2px 9px',
+                marginBottom: 4,
+                color: 'white',
+                fontSize: 10,
+                fontWeight: 800,
+                whiteSpace: 'nowrap',
+              }}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+            >
+              Start!
+            </motion.div>
           )}
-          <span
-            className="text-[18px] leading-none"
-            style={{ opacity: node.state === 'locked' ? 0.5 : 1 }}
-            aria-hidden="true"
+          <motion.button
+            className="rounded-full flex flex-col items-center justify-center focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#6C5CE7]"
+            style={{
+              width: nodeSize,
+              height: nodeSize,
+              background: nodeBg,
+              cursor: isClickable ? 'pointer' : 'default',
+              opacity: node.state === 'locked' ? 0.45 : 1,
+              border: 'none',
+              boxShadow: `0 ${nodeShadowH}px 0 0 ${nodeShadowColor}`,
+              outline: isCurrent ? '4px solid #fff3e0' : 'none',
+              outlineOffset: 2,
+            }}
+            animate={isCurrent ? { scale: [1, 1.06, 1] } : {}}
+            transition={isCurrent ? { duration: 2.2, repeat: Infinity, ease: 'easeInOut' } : {}}
+            onClick={isClickable ? onClick : undefined}
+            whileHover={isClickable ? { scale: 1.07 } : {}}
+            whileTap={isClickable ? { scale: 0.94, boxShadow: '0 0 0 0 transparent' } : {}}
+            disabled={!isClickable}
+            aria-label={
+              isClickable
+                ? `Start ${isLevel ? `Level ${(node as LevelNode).levelNumber}` : node.title} — ${node.title}`
+                : `${node.title} — locked`
+            }
+            aria-current={isCurrent ? 'step' : undefined}
+            data-tts={node.title}
           >
-            {nodeIcon}
-          </span>
-        </motion.button>
+            {isLevel && node.state !== 'locked' && (
+              <span style={{ color: 'white', fontSize: 10, fontWeight: 800, lineHeight: 1, marginBottom: 2 }}>
+                {(node as LevelNode).levelNumber}
+              </span>
+            )}
+            <span
+              style={{ fontSize: node.state === 'current' ? 22 : 17, lineHeight: 1, opacity: node.state === 'locked' ? 0.5 : 1 }}
+              aria-hidden="true"
+            >
+              {nodeIcon}
+            </span>
+          </motion.button>
+        </div>
 
         {/* Info text */}
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-bold text-[#2D3436] truncate" data-tts={node.title}>
+          <div style={{ fontSize: 'var(--pwp-text-sm)', fontWeight: 700, color: '#2D3436' }} className="truncate" data-tts={node.title}>
             {isLevel ? `Level ${(node as LevelNode).levelNumber} — ${node.title}` : node.title}
           </div>
-          <div className="text-[11px] text-[#aaa] mt-[1px] truncate">
+          <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }} className="truncate">
             {node.newElement ?? ''}
           </div>
-          <span
-            className="inline-block mt-[3px] px-2 py-[1px] rounded-[10px] text-[10px] font-semibold"
-            style={{ background: tagBg, color: tagText }}
-          >
-            {tagLabel}
-          </span>
         </div>
 
         {/* State badge */}
         <div
-          className="flex-shrink-0 px-[10px] py-1 rounded-[20px] text-[11px] font-bold whitespace-nowrap"
-          style={{ background: badge.bg, color: badge.fg }}
+          className="flex-shrink-0 whitespace-nowrap"
+          style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.fg }}
         >
           {badge.label}
         </div>
       </div>
 
-      {/* Vertical connector */}
+      {/* Vertical connector — centre-aligned with the 70px node column */}
       {!isLast && (
         <div
-          className="w-[3px] h-[24px] rounded-sm ml-[28px] mb-2"
-          style={{ background: `linear-gradient(${PRIMARY}, ${PRIMARY}88)` }}
+          style={{
+            width: 4,
+            height: 24,
+            borderRadius: 2,
+            marginLeft: 33,
+            marginBottom: 8,
+            background: node.state === 'locked' ? '#ddd' : PRIMARY,
+          }}
         />
       )}
     </>
@@ -680,14 +731,25 @@ export default function DashboardPage() {
         )}
 
         {/* MAIN PANEL */}
-        <main id="pwp-main-content" className="flex-1 bg-[#FDF8EE]" style={{ padding: 'clamp(16px, 3vw, 32px)' }}>
+        <main id="pwp-main-content" className="flex-1" style={{ backgroundColor: '#f5f3ff', padding: 'clamp(16px, 3vw, 32px)' }}>
 
-          {/* Header */}
-          <div className="mb-5">
-            <h1 className="text-[24px] font-extrabold text-[#2D3436]">
+          {/* Hero banner */}
+          <div
+            style={{
+              background: '#6C5CE7',
+              borderRadius: 16,
+              borderBottom: '4px solid #3d35a0',
+              padding: 'clamp(14px, 2.5vw, 22px) clamp(16px, 4vw, 28px)',
+              marginBottom: 20,
+            }}
+          >
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>
+              Your Progress
+            </div>
+            <h1 style={{ color: 'white', fontSize: 'var(--pwp-text-xl)', fontWeight: 800, margin: 0, lineHeight: 1.2 }}>
               Your Learning Path ✨
             </h1>
-            <p className="text-[13px] text-[#666] mt-[2px]">
+            <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 'var(--pwp-text-sm)', margin: '4px 0 0' }}>
               Keep going — every step makes you a better writer!
             </p>
           </div>
@@ -702,13 +764,14 @@ export default function DashboardPage() {
           {/* Quick Resume button */}
           {quickResumeNode && (
             <motion.button
-              className="w-full mb-6 py-4 rounded-2xl text-white font-extrabold text-[16px] flex items-center justify-center gap-2"
+              className="w-full mb-6 py-4 rounded-2xl text-white font-extrabold flex items-center justify-center gap-2"
               style={{
-                background: 'linear-gradient(135deg, #F5A623 0%, #F5C500 100%)',
-                boxShadow: '0 4px 20px rgba(245,166,35,0.45)',
+                fontSize: 'var(--pwp-text-base)',
+                background: '#F5A623',
+                boxShadow: '0 4px 0 0 #c47a0a',
               }}
               whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
+              whileTap={{ y: 4, boxShadow: '0 0 0 0 transparent' }}
               onClick={() => handleNodeClick(quickResumeNode)}
               data-tts="Quick Resume"
             >

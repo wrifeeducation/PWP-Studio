@@ -237,15 +237,11 @@ function LevelStartScreen({ level, steps, totalXp, streakDays, onStart, onBack }
             <motion.button
               className="w-full mt-5 py-4 rounded-2xl text-white font-extrabold text-[17px]"
               style={{
-                background: isParagraph
-                  ? 'linear-gradient(135deg, #00b894, #00cec9)'
-                  : 'linear-gradient(135deg, #F5A623, #F5C500)',
-                boxShadow: isParagraph
-                  ? '0 4px 16px rgba(0,184,148,0.45)'
-                  : '0 4px 16px rgba(245,166,35,0.45)',
+                background: isParagraph ? '#00b894' : '#F5A623',
+                boxShadow: isParagraph ? '0 4px 0 0 #007d67' : '0 4px 0 0 #c47a0a',
               }}
               whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
+              whileTap={{ y: 4, boxShadow: '0 0 0 0 transparent' }}
               onClick={onStart}
               data-tts={`Start Level ${level.level_number}`}
             >
@@ -433,7 +429,7 @@ function InLevelScreen({
                 >
                   Formula
                 </div>
-                <div className="text-[15px] font-bold text-[#2D3436] leading-[1.4]" data-tts={step.formula}>
+                <div style={{ fontSize: 'var(--pwp-text-md)', fontWeight: 800, color: '#2D3436', lineHeight: 1.35 }} data-tts={step.formula}>
                   {step.formula}
                 </div>
                 <span
@@ -465,7 +461,7 @@ function InLevelScreen({
               >
                 Example:
               </span>
-              <span className="text-[14px] text-[#2D3436] italic" data-tts={step.example}>
+              <span style={{ fontSize: 'var(--pwp-text-base)', color: '#2D3436', fontStyle: 'italic' }} data-tts={step.example}>
                 {step.example}
               </span>
             </div>
@@ -585,101 +581,28 @@ function InLevelScreen({
             />
           )}
 
-          {/* Feedback overlay — role="status" announces result to screen readers */}
-          <AnimatePresence>
-            {feedback && (
-              <motion.div
-                className="mt-3 rounded-2xl px-5 py-4 flex items-start gap-3"
-                style={{
-                  background: feedback.state.startsWith('correct') ? '#e0faf4' : '#fff8e6',
-                  border: `2px solid ${feedback.state.startsWith('correct') ? '#00b894' : '#F5A623'}`,
-                }}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                role="status"
-                aria-live="polite"
-                aria-atomic="true"
-              >
-                <span className="text-[26px] flex-shrink-0" aria-hidden="true">
-                  {feedback.state.startsWith('correct') ? '✅' : '💡'}
-                </span>
-                <div className="flex-1">
-                  <div
-                    className="text-[15px] font-extrabold mb-1"
-                    style={{ color: feedback.state.startsWith('correct') ? '#00b894' : '#d4700a' }}
-                  >
-                    {feedback.state === 'correct_first' && 'Excellent! First time! 🌟'}
-                    {feedback.state === 'correct_retry' && 'Well done — you got there! 🎉'}
-                    {feedback.state === 'needs_revision' && 'Almost there — try again!'}
-                  </div>
-                  <div className="text-[13px] text-[#2D3436] leading-[1.5]">
-                    {feedback.message}
-                  </div>
-                  {/* Specific correction hint from formula-aware assessment */}
-                  {feedback.correctionHint && (
-                    <div className="mt-2 text-[12px] font-semibold text-[#d4700a] bg-[#fff3e0] rounded-lg px-3 py-2">
-                      💡 {feedback.correctionHint}
-                    </div>
-                  )}
-                  {/* Grammar insight shown on correct answer */}
-                  {feedback.grammarInsight && feedback.state.startsWith('correct') && (
-                    <div className="mt-2 text-[12px] text-[#4a5568] bg-[#f0f4ff] rounded-lg px-3 py-2 border-l-2 border-[#6C5CE7]">
-                      📖 {feedback.grammarInsight}
-                    </div>
-                  )}
-                  {feedback.xpEarned > 0 && (
-                    <span className="inline-block mt-2 bg-[#F5C500] text-[#854d0e] text-[12px] font-bold px-3 py-[3px] rounded-xl">
-                      +{feedback.xpEarned} XP
-                    </span>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Action buttons — sticky on mobile so soft keyboard never covers them */}
-          <div className="sticky bottom-0 pt-3 pb-2 sm:static sm:pt-0 sm:pb-0 border-t sm:border-0 border-stone-100 mt-4" style={{ backgroundColor: 'var(--color-background)' }}>
-            <div className="flex gap-3 relative">
-              {/* XP floater — positioned above the button row */}
-              <XPFloater key={xpFloaterKey} amount={xpFloaterAmount} />
-              <button
-                className="flex-1 bg-white border-2 border-[#e0d8ff] rounded-xl py-3 text-[13px] font-semibold text-[#6C5CE7] flex items-center justify-center gap-2 hover:bg-[#f0ecff] transition-colors min-h-[44px]"
-                onClick={onBack}
-                data-tts="Back to path"
-              >
-                ← Path
-              </button>
-
-              {feedback ? (
-                <motion.button
-                  className="flex-[2] rounded-xl py-3 text-white font-bold text-[15px] min-h-[44px]"
-                  style={{
-                    background: feedback.state.startsWith('correct')
-                      ? 'linear-gradient(135deg, #00b894, #00cec9)'
-                      : 'linear-gradient(135deg, #F5A623, #F5C500)',
-                    boxShadow: feedback.state.startsWith('correct')
-                      ? '0 3px 12px rgba(0,184,148,0.4)'
-                      : '0 3px 12px rgba(245,166,35,0.4)',
-                  }}
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={onContinue}
-                  data-tts={feedback.state.startsWith('correct') ? 'Continue to next step' : 'Try again'}
+          {/* Action buttons — hidden when feedback panel slides up */}
+          {!feedback && (
+            <div className="sticky bottom-0 pt-3 pb-2 sm:static sm:pt-0 sm:pb-0 border-t sm:border-0 border-stone-100 mt-4" style={{ backgroundColor: 'var(--color-background)' }}>
+              <div className="flex gap-3 relative">
+                {/* XP floater — positioned above the button row */}
+                <XPFloater key={xpFloaterKey} amount={xpFloaterAmount} />
+                <button
+                  className="flex-1 bg-white border-2 border-[#e0d8ff] rounded-xl py-3 text-[13px] font-semibold text-[#6C5CE7] flex items-center justify-center gap-2 hover:bg-[#f0ecff] transition-colors min-h-[44px]"
+                  onClick={onBack}
+                  data-tts="Back to path"
                 >
-                  {feedback.state.startsWith('correct')
-                    ? (stepIndex < steps.length - 1 ? 'Continue →' : 'Finish Level! 🎉')
-                    : 'Try Again →'}
-                </motion.button>
-              ) : (
+                  ← Path
+                </button>
                 <motion.button
-                  className="flex-[2] rounded-xl py-3 text-white font-bold text-[15px] disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+                  className="flex-[2] rounded-xl py-3 text-white font-extrabold disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
                   style={{
-                    background: 'linear-gradient(135deg, #F5A623, #F5C500)',
-                    boxShadow: '0 3px 12px rgba(245,166,35,0.4)',
+                    fontSize: 'var(--pwp-text-base)',
+                    background: '#F5A623',
+                    boxShadow: '0 4px 0 0 #c47a0a',
                   }}
                   whileHover={!isAssessing && value.trim() ? { scale: 1.01 } : {}}
-                  whileTap={!isAssessing && value.trim() ? { scale: 0.98 } : {}}
+                  whileTap={!isAssessing && value.trim() ? { y: 4, boxShadow: '0 0 0 0 transparent' } : {}}
                   onClick={onSubmit}
                   disabled={isAssessing || !value.trim()}
                   data-tts="Submit your sentence"
@@ -697,12 +620,97 @@ function InLevelScreen({
                     ? 'Choose punctuation first'
                     : 'Submit ✓'}
                 </motion.button>
+              </div>
+            </div>
+          )}
+        </div>
+        </div>
+        </div>
+
+      {/* ── Full-width feedback panel — slides up from bottom (Duolingo-style) ── */}
+      <AnimatePresence>
+        {feedback && (
+          <motion.div
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            style={{
+              position: 'fixed',
+              bottom: 0, left: 0, right: 0,
+              background: feedback.state.startsWith('correct') ? '#00b894' : '#F5A623',
+              padding: 'clamp(14px, 2.5vw, 20px) clamp(16px, 4vw, 32px)',
+              paddingBottom: 'calc(clamp(14px, 2.5vw, 20px) + env(safe-area-inset-bottom, 0px))',
+              zIndex: 100,
+              boxShadow: '0 -4px 24px rgba(0,0,0,0.15)',
+            }}
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          >
+            {/* Row 1: icon + heading + XP chip */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+              <span style={{ fontSize: 22, flexShrink: 0 }} aria-hidden="true">
+                {feedback.state.startsWith('correct') ? '✅' : '💡'}
+              </span>
+              <span style={{ color: 'white', fontWeight: 800, fontSize: 'var(--pwp-text-base)', flex: 1 }}>
+                {feedback.state === 'correct_first' && 'Excellent! First time! 🌟'}
+                {feedback.state === 'correct_retry' && 'Well done — you got there! 🎉'}
+                {feedback.state === 'needs_revision' && 'Almost there — try again!'}
+              </span>
+              {feedback.xpEarned > 0 && (
+                <span style={{ background: 'rgba(255,255,255,0.25)', borderRadius: 20, padding: '4px 10px', color: 'white', fontWeight: 700, fontSize: 'var(--pwp-text-xs)', flexShrink: 0 }}>
+                  +{feedback.xpEarned} XP
+                </span>
               )}
             </div>
-          </div>
-        </div>
-        </div>
-        </div>
+
+            {/* Row 2: feedback message */}
+            <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: 'var(--pwp-text-sm)', lineHeight: 1.5, marginBottom: 10 }}>
+              {feedback.message}
+            </div>
+
+            {/* Correction hint */}
+            {feedback.correctionHint && (
+              <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: 8, padding: '7px 12px', fontSize: 'var(--pwp-text-xs)', color: 'rgba(255,255,255,0.92)', marginBottom: 10 }}>
+                💡 {feedback.correctionHint}
+              </div>
+            )}
+
+            {/* Grammar insight */}
+            {feedback.grammarInsight && feedback.state.startsWith('correct') && (
+              <div style={{ background: 'rgba(255,255,255,0.18)', borderRadius: 8, padding: '7px 12px', fontSize: 'var(--pwp-text-xs)', color: 'rgba(255,255,255,0.92)', marginBottom: 10, borderLeft: '3px solid rgba(255,255,255,0.6)' }}>
+                📖 {feedback.grammarInsight}
+              </div>
+            )}
+
+            {/* Continue / Try Again CTA — white button with coloured text */}
+            <motion.button
+              style={{
+                width: '100%',
+                background: 'white',
+                color: feedback.state.startsWith('correct') ? '#007d67' : '#c47a0a',
+                borderRadius: 14,
+                border: 'none',
+                padding: '14px 24px',
+                fontSize: 'var(--pwp-text-base)',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 3px 0 0 rgba(0,0,0,0.12)',
+                minHeight: 56,
+              }}
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ y: 3, boxShadow: '0 0 0 0 transparent' }}
+              onClick={onContinue}
+              data-tts={feedback.state.startsWith('correct') ? 'Continue to next step' : 'Try again'}
+            >
+              {feedback.state.startsWith('correct')
+                ? (stepIndex < steps.length - 1 ? 'Continue →' : 'Finish Level! 🎉')
+                : 'Try Again →'}
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   )
 }
@@ -786,11 +794,11 @@ function LevelCompleteScreen({ level, sessionXp, newTitle, onContinue }: DoneScr
         <motion.button
           className="w-full py-4 rounded-2xl text-white font-extrabold text-[17px]"
           style={{
-            background: `linear-gradient(135deg, ${ACCENT}, ${level.is_paragraph_phase ? '#00cec9' : '#a29bf5'})`,
-            boxShadow: `0 4px 20px ${ACCENT}55`,
+            background: ACCENT,
+            boxShadow: level.is_paragraph_phase ? '0 4px 0 0 #007d67' : '0 4px 0 0 #3d35a0',
           }}
           whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+          whileTap={{ y: 4, boxShadow: '0 0 0 0 transparent' }}
           onClick={onContinue}
           data-tts="Back to your learning path"
         >
