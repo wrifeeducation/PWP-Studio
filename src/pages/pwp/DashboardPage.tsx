@@ -536,9 +536,9 @@ function PathNodeRow({ node, isLast, isCurrent, nodeRef, onClick }: PathNodeRowP
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const navigate       = useNavigate()
-  const { profile }    = useAuthStore()
-  const currentNodeRef = useRef<HTMLDivElement>(null)
+  const navigate                         = useNavigate()
+  const { profile, user, isInitialised } = useAuthStore()
+  const currentNodeRef                   = useRef<HTMLDivElement>(null)
   const showBackToHub  = sessionStorage.getItem('entryViaHub') === '1'
   const { speak }      = useTTS()
 
@@ -549,9 +549,13 @@ export default function DashboardPage() {
   const pathNodes = buildPathNodes(progress)
 
   // ── Fetch progress ────────────────────────────────────────────────────────
+  // Wait for auth to be fully initialised before fetching — prevents a blank
+  // screen on first login where auth state hasn't propagated yet (BUG-01).
   useEffect(() => {
+    if (!isInitialised) return  // auth still loading — wait for next render
+
     const load = async () => {
-      const pupilId = getPupilId()
+      const pupilId = user?.id ?? getPupilId()
       if (!pupilId) { navigate('/login'); return }
 
       try {
@@ -640,7 +644,7 @@ export default function DashboardPage() {
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [user?.id, isInitialised])
 
   // Auto-scroll to current node once loaded
   useEffect(() => {
