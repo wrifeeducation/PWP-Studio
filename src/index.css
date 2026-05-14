@@ -50,6 +50,27 @@
   /* Disabled / inactive state */
   --color-disabled: #9CA3AF;  /* Tailwind gray-400 */
 
+  /* ── Fluid Typography Scale ─────────────────────────────────────────────────
+     clamp(min, preferred, max) — scales smoothly from 320px to 1280px viewport.
+     Never use fixed px for pupil-facing text. Use these tokens instead.        */
+  --pwp-text-2xs:  clamp(11px, 0.85vw + 8.3px,  13px);  /* captions, legends   */
+  --pwp-text-xs:   clamp(13px, 0.52vw + 11.3px, 15px);  /* labels, subtitles   */
+  --pwp-text-sm:   clamp(14px, 0.42vw + 12.7px, 16px);  /* secondary body      */
+  --pwp-text-base: clamp(16px, 0.42vw + 14.7px, 18px);  /* primary pupil body  */
+  --pwp-text-md:   clamp(18px, 0.63vw + 16px,   20px);  /* step questions      */
+  --pwp-text-lg:   clamp(20px, 0.83vw + 17.3px, 24px);  /* section headings    */
+  --pwp-text-xl:   clamp(24px, 1.25vw + 20px,   28px);  /* page titles         */
+  --pwp-text-2xl:  clamp(28px, 2.08vw + 21.3px, 34px);  /* celebration numbers */
+
+  /* ── Touch Target Scale (WCAG 2.5.5) ───────────────────────────────────────*/
+  --pwp-touch-min:  44px;   /* minimum for all interactive elements            */
+  --pwp-touch-cozy: 52px;   /* preferred for secondary actions                 */
+  --pwp-touch-xl:   60px;   /* primary CTAs (Submit, Start, Continue)          */
+
+  /* ── Layout Tokens ──────────────────────────────────────────────────────────*/
+  --pwp-content-width:  672px;  /* focused reading/writing area max-width       */
+  --pwp-sidebar-width:  220px;  /* world map / dashboard sidebar width          */
+
   /* Legacy generic tokens — defined here so they resolve in light mode.
      The dark-mode block below overrides these for dark themes.
      NOTE: prefer the --color-* tokens above for all new code. */
@@ -119,11 +140,10 @@ h2 {
 }
 
 h1 {
-  font-size: 56px;
+  font-size: clamp(28px, 4vw + 12px, 56px);
   letter-spacing: -1.68px;
   margin: 32px 0;
   @media (max-width: 1024px) {
-    font-size: 36px;
     margin: 20px 0;
   }
 }
@@ -190,10 +210,11 @@ p {
   color: var(--color-text-light);
   border: none;
   border-radius: 12px;
-  padding: 10px 24px;
+  padding: 13px 24px;
+  min-height: var(--pwp-touch-min);
   font-family: inherit;
   font-weight: 700;
-  font-size: 16px;
+  font-size: var(--pwp-text-base);
   cursor: pointer;
   transition: opacity 0.15s, transform 0.1s;
 }

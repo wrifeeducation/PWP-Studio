@@ -439,9 +439,9 @@ const PWPSessionPage: React.FC = () => {
               background: 'rgba(255,255,255,0.18)',
               border: '1.5px solid rgba(255,255,255,0.35)',
               borderRadius: '8px', color: '#fff',
-              fontSize: '14px', fontWeight: 600,
+              fontSize: 'var(--pwp-text-sm)', fontWeight: 600,
               padding: '6px 12px', cursor: 'pointer',
-              minHeight: '36px',
+              minHeight: 'var(--pwp-touch-min)',
             }}
           >
             ←{store.phase === 'entry' ? ' Dashboard' : ' Exit'}

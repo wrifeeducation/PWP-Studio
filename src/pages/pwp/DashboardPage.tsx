@@ -225,7 +225,7 @@ function Sidebar({ progress, pupilName, onSignOut }: SidebarProps) {
   })
 
   return (
-    <div className="w-[220px] flex-shrink-0 bg-[#6C5CE7] flex flex-col gap-3 p-5 overflow-y-auto">
+    <div style={{ width: 'var(--pwp-sidebar-width)', minHeight: '100dvh', backgroundColor: '#6C5CE7', display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px', overflowY: 'auto', flexShrink: 0 }}>
       {/* Back button */}
       <button
         onClick={() => navigate('/')}
@@ -609,7 +609,7 @@ export default function DashboardPage() {
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FDF8EE] flex items-center justify-center">
+      <div style={{ minHeight: '100dvh', backgroundColor: 'var(--color-background)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <motion.div
           className="w-12 h-12 rounded-full border-4 border-[#6C5CE7] border-t-transparent"
           animate={{ rotate: 360 }}
@@ -621,23 +621,66 @@ export default function DashboardPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center p-4">
-      {/* Skip navigation — hidden until focused via keyboard */}
+    <div style={{ minHeight: '100dvh', backgroundColor: 'var(--color-background)', display: 'flex', flexDirection: 'column' }}>
+      {/* Skip navigation */}
       <a href="#pwp-main-content" className="skip-nav">
         Skip to learning path
       </a>
 
-      <div
-        className="flex w-full max-w-[960px] rounded-[20px] overflow-hidden"
-        style={{ height: '90vh', maxHeight: '800px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
-      >
-        {/* SIDEBAR */}
+      {/* ── Mobile top strip (hidden md+) ─────────────────────────────────── */}
+      {progress && (
+        <div
+          className="flex md:hidden items-center gap-3 px-4"
+          style={{ backgroundColor: '#6C5CE7', minHeight: 'var(--pwp-touch-xl)', flexShrink: 0 }}
+        >
+          <button
+            onClick={() => navigate('/')}
+            style={{
+              background: 'rgba(255,255,255,0.18)',
+              border: '1.5px solid rgba(255,255,255,0.35)',
+              borderRadius: '8px', color: '#fff',
+              fontSize: 'var(--pwp-text-xs)', fontWeight: 700,
+              padding: '6px 10px', cursor: 'pointer',
+              minHeight: 'var(--pwp-touch-min)', whiteSpace: 'nowrap',
+            }}
+            data-tts="Back to WriFe Hub"
+          >
+            ← Hub
+          </button>
+          <div className="flex-1 min-w-0">
+            <div style={{ fontSize: 'var(--pwp-text-sm)', fontWeight: 700, color: '#fff' }} className="truncate">
+              {pupilName}
+            </div>
+            <div style={{ fontSize: 'var(--pwp-text-2xs)', color: 'rgba(255,255,255,0.75)' }}>
+              ⭐ {progress.totalXp.toLocaleString()} XP · 🔥 {progress.streakDays}d streak
+            </div>
+          </div>
+          <button
+            onClick={handleSignOut}
+            style={{
+              background: 'transparent', border: 'none',
+              color: 'rgba(255,255,255,0.6)', fontSize: 'var(--pwp-text-2xs)',
+              cursor: 'pointer', minHeight: 'var(--pwp-touch-min)', padding: '0 4px',
+            }}
+            data-tts="Sign out"
+          >
+            Sign out
+          </button>
+        </div>
+      )}
+
+      {/* ── Main layout: sidebar + content ───────────────────────────────── */}
+      <div style={{ display: 'flex', flex: 1 }}>
+
+        {/* Desktop sidebar — hidden on mobile */}
         {progress && (
-          <Sidebar progress={progress} pupilName={pupilName} onSignOut={handleSignOut} />
+          <div className="hidden md:block flex-shrink-0">
+            <Sidebar progress={progress} pupilName={pupilName} onSignOut={handleSignOut} />
+          </div>
         )}
 
         {/* MAIN PANEL */}
-        <main id="pwp-main-content" className="flex-1 overflow-y-auto bg-[#FDF8EE] p-6">
+        <main id="pwp-main-content" className="flex-1 bg-[#FDF8EE]" style={{ padding: 'clamp(16px, 3vw, 32px)' }}>
 
           {/* Header */}
           <div className="mb-5">
@@ -731,7 +774,7 @@ export default function DashboardPage() {
             </div>
           )}
         </main>
-      </div>
+      </div>{/* end main layout */}
     </div>
   )
 }
