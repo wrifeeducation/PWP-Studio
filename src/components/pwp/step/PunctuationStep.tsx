@@ -207,7 +207,7 @@ export function PunctuationStep({
                     className="inline-block border-b-2 border-[#F5A623] text-base sm:text-lg"
                     style={{ color: fg }}
                   >
-                    {firstLetter.toUpperCase()}
+                    {firstLetter}
                   </span>
                   <span style={{ color: fg }}>{rest}</span>
                 </motion.button>
