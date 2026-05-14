@@ -101,17 +101,13 @@ function LevelStartScreen({ level, steps, totalXp, streakDays, onStart, onBack }
   return (
     <main
       id="pwp-level-content"
-      className="min-h-screen bg-[#FDF8EE] flex items-center justify-center p-4"
+      style={{ minHeight: '100dvh', backgroundColor: 'var(--color-background)', display: 'flex', flexDirection: 'column' }}
       aria-label={`Level ${level.level_number}: ${level.title}`}
     >
-      <div
-        className="w-full max-w-[700px] rounded-[20px] overflow-hidden"
-        style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}
-      >
-        {/* Header bar */}
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+        {/* Header bar — full width */}
         <div
-          className="px-7 py-5 flex items-center justify-between"
-          style={{ background: isParagraph ? '#00b894' : '#6C5CE7' }}
+          style={{ background: isParagraph ? '#00b894' : '#6C5CE7', padding: 'clamp(16px, 3vw, 28px) clamp(16px, 4vw, 32px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
         >
           <div className="flex items-center gap-3">
             <button
@@ -147,7 +143,7 @@ function LevelStartScreen({ level, steps, totalXp, streakDays, onStart, onBack }
         </div>
 
         {/* Body */}
-        <div className="bg-[#FDF8EE] p-7 flex gap-6">
+        <div style={{ flex: 1, backgroundColor: 'var(--color-background)', padding: 'clamp(16px, 3vw, 28px) clamp(16px, 4vw, 32px)', display: 'flex', gap: 'clamp(16px, 3vw, 24px)' }}>
           {/* Mascot column */}
           <div className="flex flex-col items-center gap-0 w-[160px] flex-shrink-0">
             <div
@@ -346,17 +342,13 @@ function InLevelScreen({
   return (
     <main
       id="pwp-level-content"
-      className="min-h-screen bg-[#FDF8EE] flex flex-col items-center justify-start pt-6 px-4 sm:pt-8 sm:px-6 lg:pt-10 lg:px-8 pb-24 sm:pb-8"
+      style={{ minHeight: '100dvh', backgroundColor: 'var(--color-background)', display: 'flex', flexDirection: 'column' }}
       aria-label={`Level ${level.level_number} — Step ${stepIndex + 1} of ${total}`}
     >
-      <div
-        className="w-full max-w-[640px] sm:max-w-[720px] lg:max-w-[900px] rounded-[20px] overflow-hidden"
-        style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}
-      >
-        {/* Header bar */}
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+        {/* Header bar — full width */}
         <div
-          className="px-6 py-[14px] flex items-center gap-4"
-          style={{ background: ACCENT }}
+          style={{ background: ACCENT, padding: 'clamp(12px, 2vw, 18px) clamp(16px, 4vw, 32px)', display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}
         >
           {/* Lives */}
           <div className="flex gap-1 flex-shrink-0">
@@ -408,8 +400,9 @@ function InLevelScreen({
           </button>
         </div>
 
-        {/* Body */}
-        <div className="bg-[#FDF8EE] px-7 py-6">
+        {/* Body — centred content column */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'clamp(16px, 3vw, 28px) clamp(16px, 4vw, 32px)', paddingBottom: 'clamp(24px, 4vw, 40px)' }}>
+        <div style={{ width: '100%', maxWidth: 'var(--pwp-content-width)', display: 'flex', flexDirection: 'column', flex: 1 }}>
           {/* Step indicator dots */}
           <div className="flex gap-1 mb-5 justify-center">
             {steps.map((_, i) => (
@@ -646,7 +639,7 @@ function InLevelScreen({
           </AnimatePresence>
 
           {/* Action buttons — sticky on mobile so soft keyboard never covers them */}
-          <div className="sticky bottom-0 bg-[#FDF8EE] pt-3 pb-2 sm:static sm:bg-transparent sm:pt-0 sm:pb-0 border-t sm:border-0 border-stone-100 mt-4">
+          <div className="sticky bottom-0 pt-3 pb-2 sm:static sm:pt-0 sm:pb-0 border-t sm:border-0 border-stone-100 mt-4" style={{ backgroundColor: 'var(--color-background)' }}>
             <div className="flex gap-3 relative">
               {/* XP floater — positioned above the button row */}
               <XPFloater key={xpFloaterKey} amount={xpFloaterAmount} />
@@ -708,7 +701,8 @@ function InLevelScreen({
             </div>
           </div>
         </div>
-      </div>
+        </div>
+        </div>
     </main>
   )
 }
@@ -727,10 +721,10 @@ function LevelCompleteScreen({ level, sessionXp, newTitle, onContinue }: DoneScr
   const title  = getLevelTitle(level.level_number)
 
   return (
-    <div className="min-h-screen bg-[#FDF8EE] flex items-center justify-center p-4">
+    <div style={{ minHeight: '100dvh', backgroundColor: 'var(--color-background)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(16px, 4vw, 32px)' }}>
       <motion.div
-        className="w-full max-w-[480px] bg-white rounded-[24px] p-10 text-center"
-        style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}
+        className="w-full max-w-[480px] text-center"
+        style={{ backgroundColor: 'var(--color-surface)', borderRadius: '24px', padding: 'clamp(24px, 5vw, 40px)', boxShadow: '0 8px 32px rgba(108,92,231,0.12)' }}
         initial={{ scale: 0.85, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 200, damping: 18 }}
