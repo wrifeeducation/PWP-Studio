@@ -3,12 +3,16 @@
  *
  * After the pupil assembles their sentence (word bank or free type),
  * this component guides them through two explicit steps:
- *   1. Tap the first letter to capitalise it
- *   2. Choose the end punctuation mark [.] [?] [!]
+ *   1. Tap the first letter to capitalise it        → Alice: "cap-step.capitalise"
+ *   2. Choose the end punctuation mark [.] [?] [!]  → Alice: "cap-step.punctuate"
  *
  * Only after both steps does onComplete() fire, enabling Submit.
  * This is a deliberate teaching mechanic — the app never auto-capitalises
  * or auto-punctuates.
+ *
+ * Voice fix (session 34): cap-step.punctuate is fired via useEffect watching
+ * phase → 'punctuate', not synchronously in handleCapitalise(), so the
+ * punctuation buttons are guaranteed to be visible before the prompt plays.
  *
  * Per PWP_Interaction_Design_Prompt.md §3.
  */
@@ -26,7 +30,7 @@ export interface PunctuationStepProps {
   availableMarks?: string[]
   /** Called with the final, capitalised+punctuated sentence */
   onComplete: (finalSentence: string) => void
-  /** Voice callback — plays Amelia prompts */
+  /** Voice callback — plays audio keys */
   onSpeak?: (key: string) => void
   disabled?: boolean
 }
@@ -53,18 +57,34 @@ export function PunctuationStep({
     setSelectedMark(null)
   }, [sentence])
 
-  // Speak Alistair's prompt the first time the sentence becomes non-empty
+  // Alice prompt: "Tap the first letter to make it a capital."
+  // Fires once when the sentence first becomes non-empty.
   const hasSentenceRef = useRef(false)
   useEffect(() => {
     const hasWords = sentence.trim().length > 0
     if (hasWords && !hasSentenceRef.current) {
       hasSentenceRef.current = true
-      onSpeak?.('cap-step--intro')
+      onSpeak?.('cap-step.capitalise')
     }
     if (!hasWords) {
       hasSentenceRef.current = false
     }
   }, [sentence]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Alice prompt: "Now choose how your sentence ends."
+  // Fires AFTER React has rendered the punctuation buttons — fixes the sync bug
+  // where the old code fired onSpeak synchronously inside handleCapitalise()
+  // before the buttons were visible.
+  const punctuatePromptFiredRef = useRef(false)
+  useEffect(() => {
+    if (phase === 'punctuate' && !punctuatePromptFiredRef.current) {
+      punctuatePromptFiredRef.current = true
+      onSpeak?.('cap-step.punctuate')
+    }
+    if (phase === 'capitalise') {
+      punctuatePromptFiredRef.current = false
+    }
+  }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const words = sentence.trim().split(/\s+/).filter(Boolean)
 
@@ -93,7 +113,8 @@ export function PunctuationStep({
     if (disabled || capitalised) return
     setCapitalised(true)
     setPhase('punctuate')
-    onSpeak?.('cap-step--done')
+    // NOTE: voice prompt is fired by the useEffect above, not here —
+    // that ensures the punctuation buttons are rendered before Alice speaks.
   }
 
   const handleMarkSelect = (mark: string) => {
