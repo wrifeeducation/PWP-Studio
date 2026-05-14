@@ -994,16 +994,26 @@ export default function LoginPage() {
                           )}
                         </div>
 
-                        <button
+                        <motion.button
                           type="submit"
                           disabled={isLoading || homeCode.length < 6}
-                          className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-60"
-                          style={{ backgroundColor: 'var(--color-brand-secondary)' }}
+                          className="w-full rounded-xl font-extrabold text-white"
+                          style={{
+                            fontSize: 'var(--pwp-text-base)',
+                            minHeight: 52,
+                            padding: '14px 24px',
+                            background: (isLoading || homeCode.length < 6) ? '#d1d5db' : '#F5A623',
+                            boxShadow: (isLoading || homeCode.length < 6) ? '0 4px 0 0 #9ca3af' : '0 4px 0 0 #c47a0a',
+                            color: (isLoading || homeCode.length < 6) ? '#6b7280' : '#fff',
+                            cursor: (isLoading || homeCode.length < 6) ? 'not-allowed' : 'pointer',
+                            transition: 'background 0.15s, box-shadow 0.15s, color 0.15s',
+                          }}
+                          whileTap={!(isLoading || homeCode.length < 6) ? { y: 4, boxShadow: '0 0 0 0 transparent' } : {}}
                           data-testid="submit-home-code"
                           data-tts="Log in with home code"
                         >
-                          {isLoading ? 'Checking…' : 'Log In →'}
-                        </button>
+                          {isLoading ? 'Checking…' : "Let's go! →"}
+                        </motion.button>
                       </form>
                     )}
 
@@ -1112,16 +1122,38 @@ export default function LoginPage() {
                         )}
                       </div>
 
-                      <button
+                      <motion.button
                         type="submit"
                         disabled={isLoading || pin.length < 4 || !classCode.trim() || !pupilUsername.trim()}
-                        className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-60"
-                        style={{ backgroundColor: 'var(--color-brand-secondary)' }}
+                        className="w-full rounded-xl font-extrabold text-white mt-2"
+                        style={{
+                          fontSize: 'var(--pwp-text-base)',
+                          minHeight: 52,
+                          padding: '14px 24px',
+                          background: (isLoading || pin.length < 4 || !classCode.trim() || !pupilUsername.trim())
+                            ? '#d1d5db'
+                            : '#F5A623',
+                          boxShadow: (isLoading || pin.length < 4 || !classCode.trim() || !pupilUsername.trim())
+                            ? '0 4px 0 0 #9ca3af'
+                            : '0 4px 0 0 #c47a0a',
+                          color: (isLoading || pin.length < 4 || !classCode.trim() || !pupilUsername.trim())
+                            ? '#6b7280'
+                            : '#fff',
+                          cursor: (isLoading || pin.length < 4 || !classCode.trim() || !pupilUsername.trim())
+                            ? 'not-allowed'
+                            : 'pointer',
+                          transition: 'background 0.15s, box-shadow 0.15s, color 0.15s',
+                        }}
+                        whileTap={
+                          !(isLoading || pin.length < 4 || !classCode.trim() || !pupilUsername.trim())
+                            ? { y: 4, boxShadow: '0 0 0 0 transparent' }
+                            : {}
+                        }
                         data-testid="submit-pin"
                         data-tts="Enter classroom"
                       >
-                        {isLoading ? 'Checking…' : 'Enter Classroom'}
-                      </button>
+                        {isLoading ? 'Checking…' : "Let's go! →"}
+                      </motion.button>
                     </form>
                     )}
                   </>
