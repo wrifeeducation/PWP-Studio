@@ -118,7 +118,11 @@ export async function assessStep(params: {
   formulaLabel: string
   elementCode: string
   previousSentence?: string
-  subjectNoun: string
+  /** @deprecated — subjectNoun is no longer used; pass subject_type instead */
+  subjectNoun?: string
+  subject_type?: 'proper_noun' | 'det_noun' | 'pronoun'
+  tense?: 'past' | 'present' | 'continuous' | 'any'
+  step_type?: 'new_element' | 'consolidation' | 'tense_variety' | 'transition'
   attemptNumber?: number
   genreHint?: string
 }): Promise<AssessStepResponse> {
