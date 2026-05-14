@@ -15,7 +15,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { chipColourForWord, getWordClassColour, guessWordClass } from '@/constants/wordClassColours'
+import { getWordClassColour, guessWordClass } from '@/constants/wordClassColours'
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -97,14 +97,6 @@ export function WordBankPhaseA({ bankWords, distractors, onChange, disabled }: W
     setTray(t => [...t, item])
   }
 
-  const removeFromTray = (id: number) => {
-    if (disabled) return
-    const item = tray.find(t => t.id === id)
-    if (!item) return
-    setPool(p => [...p, item])
-    setTray(t => t.filter(x => x.id !== id))
-  }
-
   const clearTray = () => {
     if (disabled) return
     setPool(p => [...p, ...tray])
@@ -117,67 +109,27 @@ export function WordBankPhaseA({ bankWords, distractors, onChange, disabled }: W
     [pool]
   )
 
-  const trayEmpty = tray.length === 0
-
   return (
     <div className="select-none">
-      {/* ── SENTENCE TRAY ─────────────────────────────────────────────── */}
-      <div
-        className={`
-          bg-white border-2 rounded-xl px-3 py-3 sm:px-4 mb-3
-          min-h-[64px] sm:min-h-[72px]
-          flex flex-wrap items-center gap-2
-          transition-colors
-        `}
-        style={{ borderColor: trayEmpty ? '#e0d8ff' : '#6C5CE7' }}
-        aria-label="Sentence tray — your assembled sentence"
-      >
-        {trayEmpty ? (
-          <span className="text-xs sm:text-sm text-[#bbb] italic">
-            Tap a word below to start building your sentence…
-          </span>
-        ) : (
-          <>
-            <AnimatePresence>
-              {tray.map(({ word, id }) => {
-                const { bg, fg } = chipColourForWord(word)
-                return (
-                  <motion.button
-                    key={id}
-                    className="px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl text-sm sm:text-base font-semibold min-h-[44px] border transition-opacity"
-                    style={{ background: bg, color: fg, borderColor: `${fg}30` }}
-                    initial={{ scale: 0.7, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.5, opacity: 0 }}
-                    transition={{ type: 'spring', stiffness: 320, damping: 22 }}
-                    onClick={() => removeFromTray(id)}
-                    disabled={disabled}
-                    aria-label={`Remove ${word} from sentence`}
-                    data-tts={`Remove ${word}`}
-                  >
-                    {word}
-                  </motion.button>
-                )
-              })}
-            </AnimatePresence>
-            {!disabled && tray.length > 0 && (
-              <button
-                className="ml-auto text-xs text-[#bbb] hover:text-[#888] transition-colors flex-shrink-0 min-h-[44px] px-2"
-                onClick={clearTray}
-                aria-label="Clear all words from sentence tray"
-              >
-                Clear ✕
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
       {/* ── WORD BANK ─────────────────────────────────────────────────── */}
       <div
         className="bg-[#f8f5ff] border-2 border-[#e8e0ff] rounded-xl px-3 py-3 sm:px-4 sm:py-4 space-y-3"
         aria-label="Word bank — tap a word to add it to your sentence"
       >
+        {/* Start over link — shown when pupil has placed at least one word */}
+        {!disabled && tray.length > 0 && (
+          <div className="flex justify-end mb-1">
+            <button
+              className="text-xs text-[#bbb] hover:text-[#888] transition-colors"
+              onClick={clearTray}
+              aria-label="Start over — return all words to the bank"
+              data-tts="Start over"
+            >
+              Start over ✕
+            </button>
+          </div>
+        )}
+
         {pool.length === 0 ? (
           <p className="text-xs text-[#aaa] text-center py-1">All words placed!</p>
         ) : sections.length === 0 ? null : sections.map(section => {

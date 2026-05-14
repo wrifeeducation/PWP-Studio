@@ -332,9 +332,6 @@ function InLevelScreen({
   const progressPct = Math.round((stepIndex / total) * 100)
   const badge = stepTypeBadge(step.step_type)
 
-  // Show PunctuationStep when raw text is assembled and no feedback yet
-  const showPunctStep = !feedback && !isParagraphStep && rawAssembly.trim().length > 0
-
   return (
     <main
       id="pwp-level-content"
@@ -504,6 +501,18 @@ function InLevelScreen({
             />
           )}
 
+          {/* ── Punctuation + capitalisation step — always shown for Phase A (placeholder when empty), above the word bank ── */}
+          {!feedback && !isParagraphStep && (stepPhase === 'A' ? !typeMode : rawAssembly.trim().length > 0) && (
+            <PunctuationStep
+              key={`punct-${stepIndex}`}
+              sentence={rawAssembly}
+              availableMarks={['.', '?', '!']}
+              onComplete={handlePunctComplete}
+              onSpeak={onSpeak}
+              disabled={isAssessing}
+            />
+          )}
+
           {/* ── Word Bank Phase A — Build Mode (L1–6), unless type mode toggled ── */}
           {stepPhase === 'A' && wbConfig && !feedback && !typeMode && (
             <WordBankPhaseA
@@ -566,18 +575,6 @@ function InLevelScreen({
               autoCorrect="off"
               spellCheck={false}
               data-tts={isWordBankPhase && feedback ? 'Your assembled sentence' : 'Write your sentence here'}
-            />
-          )}
-
-          {/* ── Punctuation + capitalisation step ── */}
-          {showPunctStep && (
-            <PunctuationStep
-              key={`punct-${stepIndex}-${rawAssembly}`}
-              sentence={rawAssembly}
-              availableMarks={['.', '?', '!']}
-              onComplete={handlePunctComplete}
-              onSpeak={onSpeak}
-              disabled={isAssessing}
             />
           )}
 

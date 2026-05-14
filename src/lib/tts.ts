@@ -49,9 +49,16 @@ export const speak = (
     utterance.rate = rate
     utterance.pitch = pitch
 
-    // Prefer a UK English voice; fall back to any English voice
+    // Prefer a high-quality UK English voice by name, then fall back to any en-GB / en voice.
+    // Named voices ranked: Daniel and Rishi are the best-quality en-GB voices on macOS/iOS.
+    // "Google UK English Male/Female" cover Chrome on Android/desktop.
     const voices = synth.getVoices()
+    const PREFERRED_NAMES = ['Daniel', 'Rishi', 'Google UK English Male', 'Google UK English Female', 'Arthur']
     const preferred =
+      PREFERRED_NAMES.reduce<SpeechSynthesisVoice | undefined>(
+        (found, name) => found ?? voices.find((v) => v.name === name),
+        undefined,
+      ) ??
       voices.find((v) => v.lang === 'en-GB') ??
       voices.find((v) => v.lang.startsWith('en-GB')) ??
       voices.find((v) => v.lang.startsWith('en'))

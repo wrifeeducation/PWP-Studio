@@ -13,7 +13,7 @@
  * Per PWP_Interaction_Design_Prompt.md §3.
  */
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { chipColourForWord } from '@/constants/wordClassColours'
 
@@ -46,9 +46,41 @@ export function PunctuationStep({
   const [capitalised, setCapitalised] = useState(false)
   const [selectedMark, setSelectedMark] = useState<string | null>(null)
 
+  // Reset capitalise/punctuate state whenever the sentence changes
+  useEffect(() => {
+    setPhase('capitalise')
+    setCapitalised(false)
+    setSelectedMark(null)
+  }, [sentence])
+
+  // Speak Alistair's prompt the first time the sentence becomes non-empty
+  const hasSentenceRef = useRef(false)
+  useEffect(() => {
+    const hasWords = sentence.trim().length > 0
+    if (hasWords && !hasSentenceRef.current) {
+      hasSentenceRef.current = true
+      onSpeak?.('cap-step--intro')
+    }
+    if (!hasWords) {
+      hasSentenceRef.current = false
+    }
+  }, [sentence]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const words = sentence.trim().split(/\s+/).filter(Boolean)
 
-  if (words.length === 0) return null
+  // Empty state — show a placeholder above the word bank chips
+  if (words.length === 0) {
+    return (
+      <div className="rounded-2xl border-2 border-dashed border-[#e0d8ff] bg-white px-4 py-4 sm:px-5">
+        <div className="text-xs font-semibold text-[#9b87f0] uppercase tracking-wider mb-1">
+          Your sentence
+        </div>
+        <p className="text-sm text-[#bbb] italic">
+          Tap words below to build your sentence…
+        </p>
+      </div>
+    )
+  }
 
   const firstWord  = words[0]
   const restWords  = words.slice(1)
@@ -61,7 +93,7 @@ export function PunctuationStep({
     if (disabled || capitalised) return
     setCapitalised(true)
     setPhase('punctuate')
-    onSpeak?.('punctuation.end_prompt')
+    onSpeak?.('cap-step--done')
   }
 
   const handleMarkSelect = (mark: string) => {
