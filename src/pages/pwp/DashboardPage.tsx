@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
+import { useTTS } from '@/hooks/useTTS'
 
 // ─── STATIC PATH DATA ────────────────────────────────────────────────────────
 
@@ -185,11 +186,10 @@ function buildPathNodes(progress: ProgressData | null): PathNode[] {
 
 function getLevelTitle(levelsMastered: number): string {
   if (levelsMastered === 0)  return 'Apprentice Writer'
-  if (levelsMastered < 5)   return 'Word Builder'
-  if (levelsMastered < 10)  return 'Sentence Crafter'
-  if (levelsMastered < 20)  return 'Grammar Explorer'
-  if (levelsMastered < 30)  return 'Formula Master'
-  return 'WriFe Champion'
+  if (levelsMastered < 5)   return 'Sentence Builder'
+  if (levelsMastered < 9)   return 'Phrase Crafter'
+  if (levelsMastered < 20)  return 'Paragraph Writer'
+  return 'Master Composer'  // levels 20-35
 }
 
 function xpForTier(totalXp: number): { current: number; max: number } {
@@ -207,6 +207,7 @@ interface SidebarProps {
 
 function Sidebar({ progress, pupilName, onSignOut }: SidebarProps) {
   const navigate = useNavigate()
+  const showBackToHub = sessionStorage.getItem('entryViaHub') === '1'
   const { current: xpCurrent, max: xpMax } = xpForTier(progress.totalXp)
   const xpPct = Math.min(100, Math.round((xpCurrent / xpMax) * 100))
   const ringDeg = Math.round((xpPct / 100) * 360)
@@ -226,14 +227,16 @@ function Sidebar({ progress, pupilName, onSignOut }: SidebarProps) {
 
   return (
     <div style={{ width: 'var(--pwp-sidebar-width)', minHeight: '100dvh', backgroundColor: '#6C5CE7', display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px', overflowY: 'auto', flexShrink: 0 }}>
-      {/* Back button */}
-      <button
-        onClick={() => navigate('/')}
-        className="flex items-center gap-1 text-white/60 text-xs hover:text-white/90 transition-colors"
-        data-tts="Back to WriFe Hub"
-      >
-        ← WriFe Hub
-      </button>
+      {/* Back button — only shown when accessed via WriFe Hub SSO */}
+      {showBackToHub && (
+        <button
+          onClick={() => navigate('/')}
+          className="flex items-center gap-1 text-white/60 text-xs hover:text-white/90 transition-colors"
+          data-tts="Back to WriFe Hub"
+        >
+          ← WriFe Hub
+        </button>
+      )}
 
       {/* Avatar */}
       <div className="flex flex-col items-center gap-2 mt-1">
@@ -533,9 +536,11 @@ function PathNodeRow({ node, isLast, isCurrent, nodeRef, onClick }: PathNodeRowP
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const navigate    = useNavigate()
-  const { profile } = useAuthStore()
+  const navigate       = useNavigate()
+  const { profile }    = useAuthStore()
   const currentNodeRef = useRef<HTMLDivElement>(null)
+  const showBackToHub  = sessionStorage.getItem('entryViaHub') === '1'
+  const { speak }      = useTTS()
 
   const [progress, setProgress] = useState<ProgressData | null>(null)
   const [loading,  setLoading]  = useState(true)
@@ -584,15 +589,43 @@ export default function DashboardPage() {
           return
         }
 
+        const streakDays: number = p?.streak_days ?? p?.current_streak ?? 0
+
         setProgress({
           totalXp:           p?.total_xp ?? 0,
-          streakDays:        p?.streak_days ?? p?.current_streak ?? 0,
+          streakDays,
           highestLevel:      p?.highest_level_reached ?? p?.current_formula_level ?? 1,
           currentPwpLevelId: p?.current_pwp_level_id ?? null,
           levelsMastered:    p?.levels_mastered_count ?? 0,
           badgeCount:        badgeCount ?? 0,
           completedQuizIds,
         })
+
+        // ── Gamification audio on login ────────────────────────────────────
+        // Returning user greeting (fires every login for a returning pupil)
+        speak('onboarding.returning_user')
+
+        // Streak audio: celebrate if streak is active, acknowledge if broken
+        if (streakDays > 0) {
+          speak('gamification.streak_continue')
+          // 7-day streak milestone: award +30 XP bonus (once per 7-day cycle)
+          if (streakDays % 7 === 0) {
+            // Award 7-day streak bonus XP — persist to DB
+            const pupilId = getPupilId()
+            if (pupilId) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const db = supabase as any
+              db.from('pwp_progress').select('total_xp').eq('pupil_id', pupilId).single().then(({ data }: { data: any }) => {
+                if (data) {
+                  db.from('pwp_progress').update({ total_xp: (data.total_xp ?? 0) + 30 }).eq('pupil_id', pupilId)
+                }
+              })
+            }
+            speak('gamification.xp_50_bonus')  // reuse 50-bonus key for streak celebration
+          }
+        } else {
+          speak('gamification.streak_broken')
+        }
       } catch (err) {
         console.error('[Dashboard] fetch error:', err)
         setError('Could not load progress. Check your connection and try again.')
@@ -684,20 +717,22 @@ export default function DashboardPage() {
           className="flex md:hidden items-center gap-3 px-4"
           style={{ backgroundColor: '#6C5CE7', minHeight: 'var(--pwp-touch-xl)', flexShrink: 0 }}
         >
-          <button
-            onClick={() => navigate('/')}
-            style={{
-              background: 'rgba(255,255,255,0.18)',
-              border: '1.5px solid rgba(255,255,255,0.35)',
-              borderRadius: '8px', color: '#fff',
-              fontSize: 'var(--pwp-text-xs)', fontWeight: 700,
-              padding: '6px 10px', cursor: 'pointer',
-              minHeight: 'var(--pwp-touch-min)', whiteSpace: 'nowrap',
-            }}
-            data-tts="Back to WriFe Hub"
-          >
-            ← Hub
-          </button>
+          {showBackToHub && (
+            <button
+              onClick={() => navigate('/')}
+              style={{
+                background: 'rgba(255,255,255,0.18)',
+                border: '1.5px solid rgba(255,255,255,0.35)',
+                borderRadius: '8px', color: '#fff',
+                fontSize: 'var(--pwp-text-xs)', fontWeight: 700,
+                padding: '6px 10px', cursor: 'pointer',
+                minHeight: 'var(--pwp-touch-min)', whiteSpace: 'nowrap',
+              }}
+              data-tts="Back to WriFe Hub"
+            >
+              ← Hub
+            </button>
+          )}
           <div className="flex-1 min-w-0">
             <div style={{ fontSize: 'var(--pwp-text-sm)', fontWeight: 700, color: '#fff' }} className="truncate">
               {pupilName}

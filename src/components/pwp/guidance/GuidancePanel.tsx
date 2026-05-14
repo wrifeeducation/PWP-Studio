@@ -140,12 +140,7 @@ export function GuidancePanel({ step, onHintUsed, disabled }: GuidancePanelProps
           </span>
         </button>
 
-        {/* XP cost badge */}
-        {!allRevealed && !disabled && (
-          <span className="text-[11px] text-[#bbb] font-medium">
-            −{(revealed + 1) * 2} XP on correct
-          </span>
-        )}
+        {/* No XP penalty for using hints — hints are free to encourage engagement */}
 
         {/* Toggle collapse if hints already showing */}
         {expanded && revealed > 0 && (

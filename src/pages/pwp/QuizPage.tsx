@@ -22,7 +22,7 @@ import type { BadgeInfo } from '@/hooks/usePWPBadgeCheck'
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
 const XP_PER_CORRECT = 5
-const XP_PASS_BONUS  = 30
+const XP_PASS_BONUS  = 50
 const PASS_THRESHOLD = 0.7   // 70% correct to pass
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
@@ -743,6 +743,7 @@ export default function QuizPage() {
 
       setXpEarned(xp)
       if (passed && sfxEnabled) playSfx('xp--level-up')
+      if (passed) speak('gamification.xp_50_bonus')
       setScreen('results')
 
       // Persist

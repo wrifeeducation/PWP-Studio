@@ -1,7 +1,7 @@
 // PWP Level / Step screen
 // Phases 7–11: start screen, step practice, feedback, word bank (A/B added in later phases)
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -17,6 +17,8 @@ import { GuidancePanel } from '@/components/pwp/guidance/GuidancePanel'
 import { PunctuationStep } from '@/components/pwp/step/PunctuationStep'
 import { TypeModeTileInput } from '@/components/pwp/step/TypeModeTileInput'
 import { SubjectPrompt } from '@/components/pwp/step/SubjectPrompt'
+import { FormulaBar } from '@/components/pwp/step/FormulaBar'
+import { TransitionCallout } from '@/components/pwp/step/TransitionCallout'
 import { useTTS } from '@/hooks/useTTS'
 import { usePWPAudioPlayer } from '@/hooks/usePWPAudio'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -31,6 +33,7 @@ const MAX_LIVES   = 3
 const XP_FIRST    = 10
 const XP_RETRY    = 5
 const XP_PARA     = 15
+const XP_LEVEL_BONUS = 25  // awarded on completing all steps in a level
 
 // ─── LEVEL TITLE ─────────────────────────────────────────────────────────────
 
@@ -39,9 +42,7 @@ function getLevelTitle(levelNumber: number): string {
   if (levelNumber <= 8)  return 'Sentence Builder'
   if (levelNumber <= 14) return 'Phrase Crafter'
   if (levelNumber <= 19) return 'Paragraph Writer'
-  if (levelNumber <= 25) return 'Style Composer'
-  if (levelNumber <= 30) return 'Master Crafter'
-  return 'Formula Master'
+  return 'Master Composer'  // levels 20-35
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -420,44 +421,27 @@ function InLevelScreen({
             ))}
           </div>
 
-          {/* Formula card */}
-          <div
-            className="bg-white rounded-2xl px-5 py-4 mb-4 border-l-[6px]"
-            style={{ borderColor: ACCENT, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <div
-                  className="text-[10px] font-bold uppercase tracking-[1px] mb-1"
-                  style={{ color: ACCENT }}
-                >
-                  Formula
-                </div>
-                <div style={{ fontSize: 'var(--pwp-text-md)', fontWeight: 800, color: '#2D3436', lineHeight: 1.35 }} data-tts={step.formula}>
-                  {step.formula}
-                </div>
-                <span
-                  className="inline-block mt-2 px-[10px] py-[2px] rounded-[10px] text-[10px] font-bold"
-                  style={{ background: badge.bg, color: badge.fg }}
-                >
-                  {badge.label}
-                </span>
-              </div>
-              {/* Re-read formula button */}
-              <button
-                className="flex-shrink-0 w-[32px] h-[32px] rounded-[8px] flex items-center justify-center text-[16px] transition-colors mt-[2px]"
-                style={{ background: `${ACCENT}18`, color: ACCENT }}
-                onClick={() => onSpeak(step.formula)}
-                aria-label="Hear the formula read aloud"
-                data-tts="Read formula aloud"
-              >
-                <span aria-hidden="true">🔊</span>
-              </button>
-            </div>
-          </div>
+          {/* Formula card — colour-coded word-class chips */}
+          <FormulaBar
+            formula={step.formula}
+            stepType={step.step_type}
+            newElement={level.new_element}
+            onSpeak={onSpeak}
+            accent={ACCENT}
+            stepTypeBadge={badge}
+          />
 
-          {/* Example sentence — hidden when empty (L7-9 have no example) */}
-          {step.example && (
+          {/* Transition / three-stage callout — structural shift shown with Sam as model */}
+          {(step.step_type === 'transition' || step.step_type === 'three_stage') && step.example && (
+            <TransitionCallout
+              stepType={step.step_type}
+              example={step.example}
+              accent={ACCENT}
+            />
+          )}
+
+          {/* Example sentence — shown for new_element and consolidation steps */}
+          {step.example && step.step_type !== 'transition' && step.step_type !== 'three_stage' && (
             <div className="bg-[#f8f5ff] rounded-[10px] px-4 py-3 mb-4 flex items-center gap-2">
               <span
                 className="text-[11px] font-bold flex-shrink-0"
@@ -471,20 +455,15 @@ function InLevelScreen({
             </div>
           )}
 
-          {/* Subject prompt — only shown for free-write phases (C/D).
-              Phase A/B: pupil picks their own noun from the bank below. */}
-          {!isWordBankPhase && !isParagraphStep && (
-            <div className="mb-3">
-              <div className="text-[14px] text-[#2D3436] font-semibold mb-2">
-                Write your sentence using this subject:
-              </div>
-              <div
-                className="inline-block bg-[#fff3cd] rounded-[8px] px-3 py-2 text-[13px] font-semibold text-[#856404]"
-                data-tts={`Subject: ${step.subject_prompt}`}
-              >
-                {step.subject_prompt}
-              </div>
-            </div>
+          {/* Subject prompt — Phase C/D free-write: pupil always chooses their own subject.
+              Phase A: subject comes from noun chips in the word bank.
+              Phase B: has its own SubjectPrompt block below. */}
+          {!isWordBankPhase && !isParagraphStep && !feedback && (
+            <SubjectPrompt
+              key={`subject-cd-${stepIndex}`}
+              onConfirm={(val) => setSubjectConfirmed(val.trim().length > 0)}
+              disabled={isAssessing}
+            />
           )}
 
           {/* Guidance panel — hidden while feedback is showing */}
@@ -589,8 +568,10 @@ function InLevelScreen({
             />
           )}
 
-          {/* ── Text input — free-write (C/D phases) or feedback display ── */}
-          {((!isWordBankPhase && !isParagraphStep && !typeMode) || !!feedback) && (
+          {/* ── Text input — free-write (C/D phases) or feedback display ──
+              For C/D: gated on subjectConfirmed so textarea only appears after
+              the pupil has entered their subject via SubjectPrompt. */}
+          {((!isWordBankPhase && !isParagraphStep && !typeMode && (subjectConfirmed || !!feedback)) || !!feedback) && (
             <textarea
               ref={textareaRef}
               className="w-full border-2 rounded-xl px-4 py-3 text-base sm:text-lg text-[#2D3436] outline-none font-[inherit] resize-none transition-colors bg-white min-h-[80px] sm:min-h-[88px]"
@@ -749,22 +730,84 @@ function InLevelScreen({
 
 // ─── LEVEL COMPLETE SCREEN ────────────────────────────────────────────────────
 
+// ─── Confetti helpers ─────────────────────────────────────────────────────────
+
+const CONFETTI_COLOURS = ['#6C5CE7', '#F5A623', '#00b894', '#e17055', '#fdcb6e', '#fd79a8', '#74b9ff']
+
+interface ConfettiParticle {
+  id: number
+  colour: string
+  x: number      // % from center
+  y: number      // % from center
+  rotate: number // final rotation deg
+  size: number
+  delay: number
+}
+
+function buildConfetti(count = 28): ConfettiParticle[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: i,
+    colour: CONFETTI_COLOURS[i % CONFETTI_COLOURS.length],
+    x: (Math.random() - 0.5) * 280,
+    y: (Math.random() - 0.5) * 340,
+    rotate: Math.random() * 720 - 360,
+    size: 7 + Math.random() * 7,
+    delay: Math.random() * 0.4,
+  }))
+}
+
+// ─── LEVEL COMPLETE SCREEN ────────────────────────────────────────────────────
+
 interface DoneScreenProps {
   level: PwpLevel
-  sessionXp: number
+  sessionXp: number   // total XP including the level bonus
+  xpBonus: number     // the level-completion bonus portion (shown separately)
   newTitle: string | null  // non-null when the pupil just crossed a title boundary
   onContinue: () => void
 }
 
-function LevelCompleteScreen({ level, sessionXp, newTitle, onContinue }: DoneScreenProps) {
-  const ACCENT = level.is_paragraph_phase ? '#00b894' : '#6C5CE7'
-  const title  = getLevelTitle(level.level_number)
+function LevelCompleteScreen({ level, sessionXp, xpBonus, newTitle, onContinue }: DoneScreenProps) {
+  const ACCENT   = level.is_paragraph_phase ? '#00b894' : '#6C5CE7'
+  const title    = getLevelTitle(level.level_number)
+  const stepXp   = sessionXp - xpBonus           // XP earned from step answers
+  const confetti = useMemo(() => buildConfetti(28), [])
 
   return (
-    <div style={{ minHeight: '100dvh', backgroundColor: 'var(--color-background)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(16px, 4vw, 32px)' }}>
+    <div style={{ minHeight: '100dvh', backgroundColor: 'var(--color-background)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(16px, 4vw, 32px)', position: 'relative', overflow: 'hidden' }}>
+
+      {/* ── Confetti burst ── */}
+      <div
+        style={{ position: 'absolute', top: '50%', left: '50%', pointerEvents: 'none', zIndex: 0 }}
+        aria-hidden="true"
+      >
+        {confetti.map(p => (
+          <motion.div
+            key={p.id}
+            style={{
+              position: 'absolute',
+              width: p.size,
+              height: p.size,
+              borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+              background: p.colour,
+              top: 0,
+              left: 0,
+            }}
+            initial={{ x: 0, y: 0, opacity: 1, rotate: 0, scale: 0 }}
+            animate={{
+              x: p.x,
+              y: p.y,
+              opacity: [1, 1, 0],
+              rotate: p.rotate,
+              scale: [0, 1.2, 1],
+            }}
+            transition={{ duration: 1.1, delay: p.delay, ease: 'easeOut' }}
+          />
+        ))}
+      </div>
+
       <motion.div
         className="w-full max-w-[480px] text-center"
-        style={{ backgroundColor: 'var(--color-surface)', borderRadius: '24px', padding: 'clamp(24px, 5vw, 40px)', boxShadow: '0 8px 32px rgba(108,92,231,0.12)' }}
+        style={{ backgroundColor: 'var(--color-surface)', borderRadius: '24px', padding: 'clamp(24px, 5vw, 40px)', boxShadow: '0 8px 32px rgba(108,92,231,0.12)', position: 'relative', zIndex: 1 }}
         initial={{ scale: 0.85, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 200, damping: 18 }}
@@ -809,17 +852,61 @@ function LevelCompleteScreen({ level, sessionXp, newTitle, onContinue }: DoneScr
           </motion.div>
         )}
 
-        {/* XP earned */}
+        {/* XP earned — steps subtotal + level bonus breakdown */}
         <div
-          className="inline-flex items-center gap-3 px-6 py-4 rounded-2xl mb-8"
-          style={{ background: `${ACCENT}18`, border: `2px solid ${ACCENT}40` }}
+          className="rounded-2xl mb-5 overflow-hidden"
+          style={{ border: `2px solid ${ACCENT}40` }}
         >
-          <span className="text-[32px]">⭐</span>
-          <div className="text-left">
-            <div className="text-[11px] font-bold text-[#888] uppercase tracking-wide">XP Earned</div>
-            <div className="text-[28px] font-extrabold" style={{ color: ACCENT }}>
-              +{sessionXp}
+          {/* Step XP row */}
+          <div
+            className="flex items-center gap-3 px-5 py-3"
+            style={{ background: `${ACCENT}10` }}
+          >
+            <span className="text-[22px]">⭐</span>
+            <div className="flex-1 text-left">
+              <div className="text-[11px] font-bold text-[#888] uppercase tracking-wide">Steps XP</div>
+              <div className="text-[20px] font-extrabold" style={{ color: ACCENT }} data-tts={`${stepXp} XP from steps`}>
+                +{stepXp}
+              </div>
             </div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ height: 1, background: `${ACCENT}20` }} />
+
+          {/* Level bonus row */}
+          <motion.div
+            className="flex items-center gap-3 px-5 py-3"
+            style={{ background: '#FFF7E6' }}
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.55 }}
+          >
+            <span className="text-[22px]">🎁</span>
+            <div className="flex-1 text-left">
+              <div className="text-[11px] font-bold text-[#c47a0a] uppercase tracking-wide">Level Bonus</div>
+              <div className="text-[20px] font-extrabold text-[#c47a0a]" data-tts={`${xpBonus} bonus XP for completing the level`}>
+                +{xpBonus}
+              </div>
+            </div>
+            <span
+              className="px-2 py-[2px] rounded-lg text-[10px] font-black uppercase"
+              style={{ background: '#F5A62330', color: '#c47a0a' }}
+            >
+              BONUS
+            </span>
+          </motion.div>
+
+          {/* Total row */}
+          <div style={{ height: 1, background: `${ACCENT}20` }} />
+          <div
+            className="flex items-center justify-between px-5 py-3"
+            style={{ background: `${ACCENT}18` }}
+          >
+            <span className="text-[12px] font-bold text-[#888] uppercase tracking-wide">Total XP</span>
+            <span className="text-[24px] font-extrabold" style={{ color: ACCENT }} data-tts={`Total ${sessionXp} XP earned`}>
+              +{sessionXp}
+            </span>
           </div>
         </div>
 
@@ -871,7 +958,9 @@ export default function LevelPage() {
   const [value,             setValue]             = useState('')
   const [attemptCount,      setAttemptCount]      = useState(0)
   const [consecutiveErrors, setConsecutiveErrors] = useState(0)
-  const [hintsUsedThisStep, setHintsUsedThisStep] = useState(0)
+  // Gamification milestone refs — fire once per session
+  const firstCorrectFiredRef  = useRef(false)
+  const halfwayFiredRef       = useRef(false)
   // Paragraph parts — kept in a ref so handleSubmit can read them synchronously
   const paragraphPartsRef = useRef<ParagraphParts | null>(null)
   const [feedback,          setFeedback]          = useState<FeedbackData | null>(null)
@@ -998,8 +1087,7 @@ export default function LevelPage() {
         const isFirst = attemptCount === 0
         if (passed) {
           const baseXp    = isFirst ? XP_FIRST : XP_RETRY
-          const hintCost  = Math.min(hintsUsedThisStep * 2, baseXp)
-          const xp        = baseXp - hintCost
+          const xp        = baseXp  // hints are free — no XP deduction
           const extra     = step.is_paragraph_step ? XP_PARA : 0
           const earned    = xp + extra
           setSessionXp(prev => prev + earned)
@@ -1013,6 +1101,13 @@ export default function LevelPage() {
           if (sfxEnabled) playSfx('feedback--correct')
           setXpFloaterAmt(earned)
           setXpFloaterKey(k => k + 1)
+          // Gamification audio: XP earned
+          speak(isFirst ? 'gamification.xp_10' : 'gamification.xp_5')
+          // First correct of this session
+          if (!firstCorrectFiredRef.current) {
+            firstCorrectFiredRef.current = true
+            speak('gamification.first_correct')
+          }
         } else {
           const newErrors = consecutiveErrors + 1
           setConsecutiveErrors(newErrors)
@@ -1024,10 +1119,9 @@ export default function LevelPage() {
             correctionHint,
           })
           if (sfxEnabled) playSfx('feedback--try-again')
-          // Adaptive pacing: auto-open guidance after 3 consecutive errors
+          // Adaptive pacing: nudge towards hints after 3 consecutive errors
           if (newErrors >= 3) {
             speak('guidance.adaptive_open')
-            setHintsUsedThisStep(1)  // trigger Level 1 guidance to auto-open
           }
         }
         return  // early return — we handled everything in the else block
@@ -1037,8 +1131,7 @@ export default function LevelPage() {
       const isFirst = attemptCount === 0
       if (passed) {
         const baseXp    = isFirst ? XP_FIRST : XP_RETRY
-        const hintCost  = Math.min(hintsUsedThisStep * 2, baseXp)
-        const xp        = baseXp - hintCost
+        const xp        = baseXp  // hints are free — no XP deduction
         const extra     = step.is_paragraph_step ? XP_PARA : 0
         const earned    = xp + extra
         setSessionXp(prev => prev + earned)
@@ -1051,6 +1144,12 @@ export default function LevelPage() {
         if (sfxEnabled) playSfx('feedback--correct')
         setXpFloaterAmt(earned)
         setXpFloaterKey(k => k + 1)
+        // Gamification audio: XP earned
+        speak(isFirst ? 'gamification.xp_10' : 'gamification.xp_5')
+        if (!firstCorrectFiredRef.current) {
+          firstCorrectFiredRef.current = true
+          speak('gamification.first_correct')
+        }
       } else {
         const newErrors = consecutiveErrors + 1
         setConsecutiveErrors(newErrors)
@@ -1061,7 +1160,7 @@ export default function LevelPage() {
     } finally {
       setIsAssessing(false)
     }
-  }, [level, steps, stepIndex, value, attemptCount, hintsUsedThisStep, isAssessing, sfxEnabled, playSfx, setXpFloaterAmt, setXpFloaterKey])
+  }, [level, steps, stepIndex, value, attemptCount, isAssessing, sfxEnabled, playSfx, setXpFloaterAmt, setXpFloaterKey])
 
   // ── Continue / retry handler ───────────────────────────────────────────────
   const handleContinue = useCallback(() => {
@@ -1087,15 +1186,22 @@ export default function LevelPage() {
       setFeedback(null)
       setAttemptCount(0)
       setConsecutiveErrors(0)
-      setHintsUsedThisStep(0)
       paragraphPartsRef.current = null
+      // Halfway milestone audio (fires once per level)
+      if (!halfwayFiredRef.current && nextIndex >= Math.ceil(steps.length / 2)) {
+        halfwayFiredRef.current = true
+        speak('gamification.halfway')
+      }
     } else {
-      // All steps done — persist XP update + mark level progress
+      // All steps done — award level bonus, play celebration audio, show done screen
+      setSessionXp(prev => prev + XP_LEVEL_BONUS)
+      speak('gamification.xp_25_bonus')
       persistLevelCompletion()
       if (sfxEnabled) playSfx('xp--level-up')
+      speak('celebration.level_complete')
       setScreen('done')
     }
-  }, [feedback, lives, stepIndex, steps.length, navigate, setHintsUsedThisStep, sfxEnabled, playSfx])
+  }, [feedback, lives, stepIndex, steps, navigate, sfxEnabled, playSfx, speak])
 
   const persistLevelCompletion = async () => {
     const pupilId = getPupilId()
@@ -1169,11 +1275,19 @@ export default function LevelPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [screen, feedback, isAssessing, value, handleSubmit])
 
-  // ── Auto-speak formula on each new step ──────────────────────────────────
+  // ── Step-type audio: play correct Alistair key when each step loads ─────────
+  // Keys match TTS_MANIFEST entries (Alistair instructional voice).
   useEffect(() => {
     if (screen !== 'step' || !steps[stepIndex]) return
-    // Short delay so the UI transition settles before TTS begins
-    const tid = window.setTimeout(() => speak(steps[stepIndex].formula), 450)
+    const STEP_AUDIO_KEY: Record<string, string> = {
+      new_element:    'step.new_element_intro',
+      consolidation:  'step.consolidation_intro',
+      transition:     'step.transition_arrow',
+      three_stage:    'step.three_stage',
+      tense_variety:  'step.tense_variety',
+    }
+    const key = STEP_AUDIO_KEY[steps[stepIndex].step_type] ?? 'step.new_element_intro'
+    const tid = window.setTimeout(() => speak(key), 450)
     return () => window.clearTimeout(tid)
   }, [stepIndex, screen]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1230,6 +1344,7 @@ export default function LevelPage() {
         <LevelCompleteScreen
           level={level}
           sessionXp={sessionXp}
+          xpBonus={XP_LEVEL_BONUS}
           newTitle={newTitle}
           onContinue={() => navigate('/dashboard')}
         />
@@ -1256,7 +1371,7 @@ export default function LevelPage() {
       onSubmit={handleSubmit}
       onContinue={handleContinue}
       onBack={() => navigate('/dashboard')}
-      onHintUsed={n => setHintsUsedThisStep(prev => Math.max(prev, n))}
+      onHintUsed={() => { /* hints are free — no action needed */ }}
       onPartsChange={parts => { paragraphPartsRef.current = parts }}
       onSpeak={speak}
       xpFloaterKey={xpFloaterKey}
