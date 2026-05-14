@@ -9,7 +9,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { assessStep, assessParagraphClose } from '@/lib/pwp/pwpApi'
 import { ParagraphBuilder } from '@/components/pwp/paragraph/ParagraphBuilder'
 import type { ParagraphParts } from '@/components/pwp/paragraph/ParagraphBuilder'
-import type { PwpLevel, PwpStep, PwpWordBankConfig, WordBankPhase, StepType } from '@/types/pwp'
+import type { PwpLevel, PwpStep, PwpWordBankConfig } from '@/types/pwp'
 import { WordBankPhaseA } from '@/components/pwp/wordbank/WordBankPhaseA'
 import { WordBankPhaseB } from '@/components/pwp/wordbank/WordBankPhaseB'
 import { GuidancePanel } from '@/components/pwp/guidance/GuidancePanel'
@@ -861,25 +861,13 @@ export default function LevelPage() {
           .single()
         if (lvlErr || !lvl) throw new Error('Level not found')
 
-        // Load steps — read from step_config_json (the live schema)
-        const { data: stepsRaw, error: stepsErr } = await supabase
+        // Load steps with word bank config
+        const { data: stepsData, error: stepsErr } = await supabase
           .from('pwp_steps')
-          .select('*')
+          .select('*, word_bank_config:pwp_word_bank_config(id, step_id, bank_words, gap_slots, distractors, phase_override)')
           .eq('level_id', id)
-          .order('step_number')
+          .order('sort_order')
         if (stepsErr) throw new Error('Could not load steps')
-
-        // Load word banks (nouns, adjectives, etc.) for this level
-        const { data: wordBanksRaw } = await supabase
-          .from('word_banks')
-          .select('word_class, words')
-          .eq('level_id', id)
-
-        // Build word-class → words[] lookup
-        const bankByClass: Record<string, string[]> = {}
-        ;(wordBanksRaw ?? []).forEach((wb: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-          bankByClass[wb.word_class as string] = wb.words as string[]
-        })
 
         // Load pupil progress for XP/streak display
         const pupilId = getPupilId()
@@ -897,66 +885,8 @@ export default function LevelPage() {
           }
         }
 
-        // ── Map DB level → PwpLevel (DB uses different column names) ──────────
-        const lvlRaw = lvl as any // eslint-disable-line @typescript-eslint/no-explicit-any
-        const levelMapped: PwpLevel = {
-          id:                 lvlRaw.id,
-          level_number:       lvlRaw.id,
-          title:              lvlRaw.title ?? '',
-          new_element:        lvlRaw.new_focus ?? '',
-          trigger_note:       null,
-          is_paragraph_phase: lvlRaw.paragraph_phase ?? false,
-          word_bank_phase: (
-            lvlRaw.word_bank_phase === 'build' ? 'A' :
-            lvlRaw.word_bank_phase === 'gap'   ? 'B' : 'C'
-          ) as WordBankPhase,
-          sort_order: lvlRaw.id,
-        }
-
-        // ── Map DB steps → PwpStep[] (synthesise word_bank_config) ────────────
-        const NOUN_SAMPLE = 6
-        const ADJ_SAMPLE  = 4
-        const levelNouns = (bankByClass['noun']      ?? []).slice(0, NOUN_SAMPLE)
-        const levelAdjs  = (bankByClass['adjective'] ?? []).slice(0, ADJ_SAMPLE)
-
-        const stepsMapped: PwpStep[] = (stepsRaw ?? []).map((s: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-          const cfg      = (s.step_config_json ?? {}) as any // eslint-disable-line @typescript-eslint/no-explicit-any
-          const cfgWords = (cfg.bankWords ?? []) as any[]   // eslint-disable-line @typescript-eslint/no-explicit-any
-
-          // Words the pupil must pick (non-distractors)
-          const stepWords: string[]      = cfgWords.filter(w => !w.isDistractor).map(w => w.text)
-          // Red-herring words that the pupil should avoid
-          const stepDistractors: string[] = cfgWords.filter(w => w.isDistractor).map(w => w.text)
-
-          // Full bank = step-specific words (verbs etc.) + level nouns + level adjectives
-          const allBankWords = [...stepWords, ...levelNouns, ...levelAdjs]
-
-          const wbConfig: PwpWordBankConfig = {
-            id:             0,
-            step_id:        0,
-            bank_words:     allBankWords,
-            gap_slots:      cfg.gapSlots?.length > 0 ? cfg.gapSlots : null,
-            distractors:    stepDistractors.length > 0 ? stepDistractors : null,
-            phase_override: null,
-          }
-
-          return {
-            id:               s.id,
-            level_id:         s.level_id,
-            step_number:      s.step_number,
-            formula:          s.formula ?? '',
-            step_type:        (s.step_type ?? 'consolidation') as StepType,
-            example:          s.example_sentence ?? '',
-            subject_prompt:   cfg.subject ?? '',
-            target_sentence:  '',
-            is_paragraph_step: false,
-            sort_order:       s.step_number,
-            word_bank_config: wbConfig,
-          }
-        })
-
-        setLevel(levelMapped)
-        setSteps(stepsMapped)
+        setLevel(lvl as unknown as PwpLevel)
+        setSteps((stepsData ?? []) as unknown as PwpStep[])
         setScreen('start')
       } catch (err) {
         console.error('[LevelPage] load error:', err)
