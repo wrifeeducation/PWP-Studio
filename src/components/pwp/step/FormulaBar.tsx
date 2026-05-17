@@ -33,7 +33,18 @@ const LABEL_TO_CLASS: Record<string, string> = {
   v: 'verb', verb: 'verb',
   'v(past)': 'verb', 'v(present)': 'verb', 'v(continuous)': 'verb',
   'v(-ing)': 'verb', 'verb(-ing)': 'verb',
-  'helping v': 'verb', 'helping verb': 'verb',
+
+  // ── Helping (auxiliary) verbs — get their own legend entry so pupils
+  //    can distinguish "is/are/was/were" from main action verbs.
+  'helping v': 'helping_verb', 'helping verb': 'helping_verb',
+  'helping verb (is)':  'helping_verb',
+  'helping verb (are)': 'helping_verb',
+  'helping verb (was)': 'helping_verb',
+  'helping verb (were)': 'helping_verb',
+  // Compound tokens that combine helper + -ing verb still map to helping_verb
+  // so the legend shows one "Helping Verb — is / are / was / were" row.
+  'helping verb + verb(-ing)': 'helping_verb',
+  'helping verb + verb (-ing)': 'helping_verb',
 
   // ── Verbs — DB natural-language forms (as stored in pwp_steps.formula) ───
   // These must be present or the token falls back to 'noun' and renders coral red.
@@ -42,12 +53,6 @@ const LABEL_TO_CLASS: Record<string, string> = {
   'verb (continuous)': 'verb',
   'verb (past)': 'verb',
   'verb (present)': 'verb',
-  'helping verb + verb(-ing)': 'verb',
-  'helping verb + verb (-ing)': 'verb',
-  'helping verb (is)': 'verb',
-  'helping verb (are)': 'verb',
-  'helping verb (was)': 'verb',
-  'helping verb (were)': 'verb',
 
   // ── Adjectives ────────────────────────────────────────────────────────────
   adj: 'adjective', adjective: 'adjective',
@@ -90,16 +95,17 @@ function tokenToWordClass(token: string): string {
 
 // Each entry: [proper term, plain-English explanation]
 const WC_FRIENDLY: Record<string, [string, string]> = {
-  determiner:   ['Determiner',   'the / a'],
-  noun:         ['Noun',         'a name or thing'],
-  verb:         ['Verb',         'an action word'],
-  adjective:    ['Adjective',    'a describing word'],
-  adverb:       ['Adverb',       'how / when / where'],
-  pronoun:      ['Pronoun',      'I / he / she / they'],
-  preposition:  ['Preposition',  'a position word'],
-  conjunction:  ['Conjunction',  'a joining word'],
-  proper:       ['Proper Noun',  'a name (person or place)'],
-  place:        ['Place Name',   'a place name'],
+  determiner:    ['Determiner',    'the / a'],
+  noun:          ['Noun',          'a name or thing'],
+  verb:          ['Verb',          'an action word'],
+  helping_verb:  ['Helping Verb',  'is / are / was / were'],
+  adjective:     ['Adjective',     'a describing word'],
+  adverb:        ['Adverb',        'how / when / where'],
+  pronoun:       ['Pronoun',       'I / he / she / they'],
+  preposition:   ['Preposition',   'a position word'],
+  conjunction:   ['Conjunction',   'a joining word'],
+  proper:        ['Proper Noun',   'a name (person or place)'],
+  place:         ['Place Name',    'a place name'],
 }
 
 // ─── New-element detection ────────────────────────────────────────────────────

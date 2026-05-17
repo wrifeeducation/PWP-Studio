@@ -159,12 +159,12 @@ function LevelStartScreen({ level, steps, totalXp, streakDays, onStart, onBack }
                 boxShadow: '0 4px 16px rgba(0,0,0,0.07)',
                 position: 'relative',
               }}
-              data-tts={`Welcome! Today you'll practise: ${level.new_element}`}
+              data-tts={`Can you build a sentence using: ${level.new_element}?`}
             >
               <p className="text-[13px] text-[#2D3436] leading-[1.5]">
                 {isParagraph
-                  ? <>Time to build a <strong className="text-[#00b894]">full paragraph</strong> using Lead → Support → Close! 📝</>
-                  : <>Today you'll practise <strong className="text-[#6C5CE7]">{level.new_element}</strong>. 🎯</>
+                  ? <>Ready to build a <strong className="text-[#00b894]">full paragraph</strong> using Lead → Support → Close? 📝</>
+                  : <>Can you build a sentence using <strong className="text-[#6C5CE7]">{level.new_element}</strong>? 🎯</>
                 }
               </p>
               {/* Tail */}
@@ -196,7 +196,7 @@ function LevelStartScreen({ level, steps, totalXp, streakDays, onStart, onBack }
                 className="text-[10px] font-bold uppercase tracking-[1px] mb-[3px]"
                 style={{ color: isParagraph ? '#00b894' : '#6C5CE7' }}
               >
-                New element today
+                What's new today?
               </div>
               <div className="text-[16px] font-bold text-[#2D3436]">{level.new_element}</div>
             </div>
@@ -205,7 +205,7 @@ function LevelStartScreen({ level, steps, totalXp, streakDays, onStart, onBack }
             <div
               className="text-[11px] font-bold text-[#aaa] uppercase tracking-[1px] mb-3"
             >
-              Today's formula chain — {steps.length} steps
+              Your challenge — {steps.length} steps to complete
             </div>
             <div className="flex flex-col gap-[6px] max-h-[240px] overflow-y-auto pr-1">
               {steps.map(step => {
@@ -520,6 +520,7 @@ function InLevelScreen({
               subjectPrompt={step.subject_prompt}
               onChange={handleRawChange}
               disabled={isAssessing}
+              formula={step.formula ?? undefined}
             />
           )}
 

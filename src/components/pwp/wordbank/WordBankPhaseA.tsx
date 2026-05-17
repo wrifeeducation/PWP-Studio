@@ -26,6 +26,12 @@ export interface WordBankPhaseAProps {
   subjectPrompt: string
   onChange:      (assembled: string) => void
   disabled:      boolean
+  /**
+   * Formula string for this step (e.g. "Det + Adj + N + Helping Verb + V(-ing)").
+   * When supplied, word bank sections are ordered left-to-right to match the formula
+   * so pupils see Determiners first, then Nouns, then Verbs, exactly as written.
+   */
+  formula?:      string
 }
 
 interface BankSection {
@@ -37,14 +43,83 @@ interface BankSection {
 // ─── SECTION GROUPING ────────────────────────────────────────────────────────
 
 /**
- * Groups bank words into labelled sections by inferred word class.
- * Keeps the visual order: Determiners → Nouns → Verbs → Adjectives → Other
+ * Helping verbs that get their own labelled section in the word bank
+ * so pupils can clearly distinguish them from action/main verbs.
+ * Covers the forms used in PWP continuous-tense formulas (L16+).
  */
-function groupIntoSections(words: string[]): BankSection[] {
-  const ORDER = ['determiner', 'noun', 'verb', 'adjective', 'adverb', 'pronoun', 'preposition', 'conjunction']
+const HELPING_VERBS_BANK = new Set([
+  'is', 'are', 'was', 'were',
+  'has', 'have', 'had',
+  'will', 'would', 'could', 'should', 'can', 'may', 'might', 'shall',
+  'do', 'does', 'did',
+])
+
+// ─── Formula-driven section ordering ─────────────────────────────────────────
+// Maps the abbreviated formula token labels to word-class keys.
+// Mirrors the mapping in FormulaBar.tsx LABEL_TO_CLASS; kept local here to
+// avoid a circular dependency between wordbank/ and step/ components.
+
+const FORMULA_TOKEN_TO_WC: Record<string, string> = {
+  det: 'determiner', d: 'determiner', determiner: 'determiner',
+  'det (definite)': 'determiner', 'det (indefinite)': 'determiner',
+  n: 'noun', noun: 'noun',
+  'n(subject)': 'noun', 'n(object)': 'noun',
+  'noun(subject)': 'noun', 'noun(object)': 'noun',
+  'noun (subject)': 'noun', 'noun (object)': 'noun',
+  adj: 'adjective', adjective: 'adjective',
+  adv: 'adverb', adverb: 'adverb',
+  'adverb (manner)': 'adverb', 'adverb (time)': 'adverb', 'adverb (place)': 'adverb',
+  'adverb of manner': 'adverb', 'adverb of time': 'adverb', 'adverb of place': 'adverb',
+  pro: 'pronoun', pronoun: 'pronoun',
+  prep: 'preposition', preposition: 'preposition',
+  conj: 'conjunction', conjunction: 'conjunction',
+  // Helping verbs — must come BEFORE the plain 'verb' entries
+  'helping v': 'helping_verb', 'helping verb': 'helping_verb',
+  'helping verb (is)': 'helping_verb', 'helping verb (are)': 'helping_verb',
+  'helping verb (was)': 'helping_verb', 'helping verb (were)': 'helping_verb',
+  'helping verb + verb(-ing)': 'helping_verb',
+  'helping verb + verb (-ing)': 'helping_verb',
+  // Action / main verbs
+  v: 'verb', verb: 'verb',
+  'v(-ing)': 'verb', 'verb(-ing)': 'verb',
+  'v(past)': 'verb', 'v(present)': 'verb', 'v(continuous)': 'verb',
+  'verb (past tense)': 'verb', 'verb (present tense)': 'verb',
+  'verb (past)': 'verb', 'verb (present)': 'verb', 'verb (continuous)': 'verb',
+}
+
+const DEFAULT_SECTION_ORDER = ['determiner', 'noun', 'helping_verb', 'verb', 'adjective', 'adverb', 'pronoun', 'preposition', 'conjunction']
+
+/**
+ * Derives the word-class section order from a formula string such as
+ * "Det + Adj + N + Helping Verb + V(-ing)".
+ * Sections will appear left-to-right in the same order as the formula tokens,
+ * with any classes not in the formula appended at the end (for distractors).
+ */
+function orderFromFormula(formula: string | undefined): string[] {
+  if (!formula) return DEFAULT_SECTION_ORDER
+  const seen = new Set<string>()
+  const order: string[] = []
+  formula.split(/\s*\+\s*/).forEach(token => {
+    const wc = FORMULA_TOKEN_TO_WC[token.trim().toLowerCase()]
+    if (wc && !seen.has(wc)) { seen.add(wc); order.push(wc) }
+  })
+  // Append defaults not already in formula order (handles distractor word classes)
+  DEFAULT_SECTION_ORDER.forEach(wc => { if (!seen.has(wc)) order.push(wc) })
+  return order
+}
+
+/**
+ * Groups bank words into labelled sections by inferred word class.
+ * Section order matches the formula left-to-right when a formula is supplied,
+ * otherwise falls back to the default: Determiners → Nouns → Helping Verbs → Verbs → …
+ * Helping verbs (is/are/was/were etc.) are always separated from action/main verbs.
+ */
+function groupIntoSections(words: string[], formula?: string): BankSection[] {
+  const ORDER = orderFromFormula(formula)
   const map = new Map<string, { word: string; origIdx: number }[]>()
   words.forEach((word, origIdx) => {
-    const wc = guessWordClass(word)
+    // Check for helping verbs BEFORE guessWordClass — both return 'verb' otherwise
+    const wc = HELPING_VERBS_BANK.has(word.toLowerCase()) ? 'helping_verb' : guessWordClass(word)
     if (!map.has(wc)) map.set(wc, [])
     map.get(wc)!.push({ word, origIdx })
   })
@@ -71,7 +146,7 @@ function groupIntoSections(words: string[]): BankSection[] {
 
 // ─── COMPONENT ───────────────────────────────────────────────────────────────
 
-export function WordBankPhaseA({ bankWords, distractors, onChange, disabled }: WordBankPhaseAProps) {
+export function WordBankPhaseA({ bankWords, distractors, onChange, disabled, formula }: WordBankPhaseAProps) {
   // Pool: bank words + distractors, shuffled once on mount.
   // Each entry tracks its original position to avoid key collisions.
   const [pool, setPool] = useState<{ word: string; id: number }[]>(() => {
@@ -103,10 +178,10 @@ export function WordBankPhaseA({ bankWords, distractors, onChange, disabled }: W
     setTray([])
   }
 
-  // Group pool words into sections for display
+  // Group pool words into sections for display — ordered to match the formula
   const sections = useMemo(
-    () => groupIntoSections(pool.map(p => p.word)),
-    [pool]
+    () => groupIntoSections(pool.map(p => p.word), formula),
+    [pool, formula]
   )
 
   return (
@@ -135,8 +210,9 @@ export function WordBankPhaseA({ bankWords, distractors, onChange, disabled }: W
         ) : sections.length === 0 ? null : sections.map(section => {
           const colour = getWordClassColour(section.wordClass)
           // Find the ids in pool that match this section's words
+          // Must use the same helping-verb pre-check as groupIntoSections
           const poolIds = pool
-            .filter(p => guessWordClass(p.word) === section.wordClass)
+            .filter(p => (HELPING_VERBS_BANK.has(p.word.toLowerCase()) ? 'helping_verb' : guessWordClass(p.word)) === section.wordClass)
             .map(p => p.id)
 
           return (
