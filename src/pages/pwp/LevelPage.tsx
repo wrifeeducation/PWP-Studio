@@ -488,16 +488,15 @@ function InLevelScreen({
           )}
 
           {/* ── Punctuation + capitalisation step ────────────────────────────────
-               Show as placeholder when Phase A word-bank mode (even when empty),
-               OR show whenever rawAssembly has content (word-bank after words added,
-               typed mode, or C/D free-write phases).
+               FIX-08: Only shown once the pupil has tapped at least one word
+               (rawAssembly non-empty). Hiding the placeholder on an empty sentence
+               removes a confusing empty box that appeared before any words were tapped.
                FIX-03: typeMode no longer hides PunctuationStep — typed sentences
                must also pass through capitalisation + punctuation before submit.
                FIX-05: minWordCount derived from formula element count gates the
                punctuation selector so it only appears once the formula is complete.
           ── */}
-          {!feedback && !isParagraphStep &&
-           (rawAssembly.trim().length > 0 || (stepPhase === 'A' && !typeMode)) && (
+          {!feedback && !isParagraphStep && rawAssembly.trim().length > 0 && (
             <PunctuationStep
               key={`punct-${stepIndex}`}
               sentence={rawAssembly}
