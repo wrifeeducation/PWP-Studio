@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, lazy, Suspense } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
+import FeedbackWidget from '@/components/FeedbackWidget'
 import { ProtectedRoute } from '@/components/ui/ProtectedRoute'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { Role } from '@/types/index'
@@ -150,6 +151,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Suspense>
+      <FeedbackWidget />
     </BrowserRouter>
   )
 }

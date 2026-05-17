@@ -90,6 +90,7 @@ export default function LoginPage() {
   const [classCode, setClassCode] = useState('')
   const [pupilUsername, setPupilUsername] = useState('')
   const [pin, setPin] = useState('')
+  const [showPin, setShowPin] = useState(false)
   const [loginAvatar] = useState<AvatarVariantId>('wizard')
   // Pupil fields — home learner mode
   const [pupilMode, setPupilMode] = useState<'school' | 'home'>('school')
@@ -230,7 +231,7 @@ export default function LoginPage() {
       // Call the Platform pupil-login Edge Function
       const { data, error } = await supabase.functions.invoke('pupil-login', {
         body: {
-          classCode: classCode.trim().toUpperCase(),
+          class_code: classCode.trim().toUpperCase(),
           username: pupilUsername.trim().toLowerCase(),
           pin: pin.trim(),
         },
@@ -258,9 +259,10 @@ export default function LoginPage() {
       }
 
       // Establish Supabase auth session from the returned tokens
+      // Edge Function returns { session: { access_token, refresh_token }, pupil: {...} }
       const { error: sessionError } = await supabase.auth.setSession({
-        access_token: data.access_token as string,
-        refresh_token: data.refresh_token as string,
+        access_token: data.session.access_token as string,
+        refresh_token: data.session.refresh_token as string,
       })
 
       if (sessionError) {
@@ -1086,29 +1088,44 @@ export default function LoginPage() {
                           data-tts="Four digit PIN">
                           PIN
                         </label>
-                        <input
-                          id="pin"
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          maxLength={4}
-                          value={pin}
-                          onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                          placeholder="0 0 0 0"
-                          className="w-full text-center text-3xl font-bold tracking-[0.5em] px-4 py-4 rounded-xl outline-none transition-all"
-                          style={{
-                            backgroundColor: 'var(--color-background)',
-                            border: `2px solid ${errors.pin ? 'var(--color-verb)' : 'var(--color-brand-primary)'}`,
-                            color: 'var(--color-text)',
-                            letterSpacing: '0.4em',
-                          }}
-                          onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--color-brand-secondary)')}
-                          onBlur={(e) => (e.currentTarget.style.borderColor = errors.pin ? 'var(--color-verb)' : 'var(--color-brand-primary)')}
-                          data-testid="input-pin"
-                          aria-describedby={errors.pin ? 'pin-error' : undefined}
-                          aria-invalid={!!errors.pin}
-                          data-tts="PIN entry field"
-                        />
+                        <div className="relative">
+                          <input
+                            id="pin"
+                            type={showPin ? 'text' : 'password'}
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={4}
+                            value={pin}
+                            onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                            placeholder="0 0 0 0"
+                            className="w-full text-center text-3xl font-bold tracking-[0.5em] px-4 py-4 pr-12 rounded-xl outline-none transition-all"
+                            style={{
+                              backgroundColor: 'var(--color-background)',
+                              border: `2px solid ${errors.pin ? 'var(--color-verb)' : 'var(--color-brand-primary)'}`,
+                              color: 'var(--color-text)',
+                              letterSpacing: '0.4em',
+                            }}
+                            onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--color-brand-secondary)')}
+                            onBlur={(e) => (e.currentTarget.style.borderColor = errors.pin ? 'var(--color-verb)' : 'var(--color-brand-primary)')}
+                            data-testid="input-pin"
+                            aria-describedby={errors.pin ? 'pin-error' : undefined}
+                            aria-invalid={!!errors.pin}
+                            data-tts="PIN entry field"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPin((v) => !v)}
+                            aria-label={showPin ? 'Hide PIN' : 'Show PIN'}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-lg bg-transparent border-0 cursor-pointer p-1"
+                            style={{ color: 'var(--color-text-muted)' }}
+                          >
+                            {showPin ? '🙈' : '👁️'}
+                          </button>
+                        </div>
+                        <p className="mt-1.5 text-xs text-center" style={{ color: 'var(--color-text-muted)' }}
+                          data-tts="Forgotten your PIN? Ask your teacher.">
+                          Forgotten your PIN? Ask your teacher.
+                        </p>
                         {errors.pin && (
                           <p id="pin-error" className="mt-1 text-xs text-center" style={{ color: 'var(--color-verb)' }} data-tts={errors.pin}>
                             {errors.pin}
