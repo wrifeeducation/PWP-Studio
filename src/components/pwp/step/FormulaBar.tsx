@@ -98,7 +98,7 @@ const WC_FRIENDLY: Record<string, [string, string]> = {
   pronoun:      ['Pronoun',      'I / he / she / they'],
   preposition:  ['Preposition',  'a position word'],
   conjunction:  ['Conjunction',  'a joining word'],
-  proper:       ['Proper Noun',  'a person\'s name'],
+  proper:       ['Proper Noun',  'a name (person or place)'],
   place:        ['Place Name',   'a place name'],
 }
 

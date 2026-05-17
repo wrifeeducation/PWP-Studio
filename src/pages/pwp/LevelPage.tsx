@@ -83,8 +83,11 @@ function clientCheck(submitted: string, target: string): boolean {
 }
 
 function stepTypeBadge(st: string): { label: string; bg: string; fg: string } {
-  if (st === 'new_element') return { label: '★ NEW', bg: '#fef0e0', fg: '#d4700a' }
-  if (st === 'consolidation') return { label: 'Review', bg: '#f0ecff', fg: '#6C5CE7' }
+  if (st === 'new_element')   return { label: '★ NEW',     bg: '#fef0e0', fg: '#d4700a' }
+  if (st === 'consolidation') return { label: 'Review',    bg: '#f0ecff', fg: '#6C5CE7' }
+  if (st === 'tense_variety') return { label: 'Tense Mix', bg: '#e8f5e9', fg: '#2e7d32' }
+  if (st === 'transition')    return { label: 'Transition',bg: '#e3f2fd', fg: '#1565c0' }
+  if (st === 'three_stage')   return { label: '3-Stage',   bg: '#fce4ec', fg: '#880e4f' }
   return { label: st, bg: '#f0f0f0', fg: '#666' }
 }
 
@@ -667,7 +670,7 @@ function InLevelScreen({
             }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
-            exit={{ y: '100%' }}
+            exit={{ opacity: 0, transition: { duration: 0.08 } }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           >
             {/* Row 1: icon + heading + XP chip */}
@@ -1271,16 +1274,22 @@ export default function LevelPage() {
       const newLongest = Math.max(longestStreak, newStreak)
 
       // ── 3. Persist to formula_progress ──────────────────────────────────
+      // current_formula_level = next level to work on (highest completed + 1).
+      // Uses Math.max so replaying an earlier level never decrements the pointer.
+      const prevCurrentLevel = c?.current_formula_level ?? 1
+      const newCurrentLevel  = Math.max(prevCurrentLevel, newHighest + 1)
+
       await supabase
         .from('formula_progress')
         .upsert({
-          pupil_id:              pupilId,
-          highest_level_reached: newHighest,
-          current_pwp_level_id:  level.id + 1,
-          total_xp:              (c?.total_xp ?? 0) + sessionXp,
-          streak_days:           newStreak,
-          last_session_date:     todayISO,
-          longest_streak:        newLongest,
+          pupil_id:               pupilId,
+          highest_level_reached:  newHighest,
+          current_formula_level:  newCurrentLevel,
+          current_pwp_level_id:   level.id + 1,
+          total_xp:               (c?.total_xp ?? 0) + sessionXp,
+          streak_days:            newStreak,
+          last_session_date:      todayISO,
+          longest_streak:         newLongest,
         }, { onConflict: 'pupil_id' })
 
       // ── 4. Check for new title ───────────────────────────────────────────

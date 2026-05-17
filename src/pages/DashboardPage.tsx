@@ -1321,14 +1321,13 @@ export default function DashboardPage() {
   }
 
   // ── node click ──────────────────────────────────────────────────────────────
-  const handleNodeClick = (_level: number, _node: NodeType) => {
+  const handleNodeClick = (level: number, _node: NodeType) => {
     // S-07: Unlock <audio> autoplay within the gesture so SessionIntro TTS plays on iOS.
     sfx.prime()
     sfx.unlockAudio()
-    // All level nodes lead to the daily chain writing practice.
-    // The chain already builds cumulatively from L1 up to the pupil's current level,
-    // so clicking any node is equivalent to "continue your journey".
-    navigate('/daily-practice')
+    // Navigate directly to the level page so pupils can replay any completed level
+    // or continue to the active (current) level without going through daily-practice.
+    navigate(`/level/${level}`)
   }
 
   // ── derived data ────────────────────────────────────────────────────────────

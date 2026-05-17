@@ -174,9 +174,9 @@ export function PunctuationStep({
           {phase === 'capitalise' && !capitalised
             ? 'What do we need at the start of a sentence? Tap to correct your sentence.'
             : phase === 'capitalise' && capitalised
-            ? 'Keep adding words to complete your sentence'
+            ? 'What else does your sentence need?'
             : phase === 'punctuate'
-            ? 'Now choose how your sentence ends'
+            ? 'How should your sentence end?'
             : 'Your sentence'}
         </div>
 
