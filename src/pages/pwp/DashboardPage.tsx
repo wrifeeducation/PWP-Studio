@@ -390,28 +390,48 @@ function PathNodeRow({ node, isLast, isCurrent, nodeRef, onClick }: PathNodeRowP
   const isQuiz      = node.kind === 'quiz'
 
   const PRIMARY = isParagraph ? '#00b894' : isQuiz ? '#F5C500' : '#6C5CE7'
-  const DARK    = isParagraph ? '#007d67' : isQuiz ? '#c4980a' : '#3d35a0'
 
-  // Current formula/quiz nodes use orange CTA colour; paragraph nodes use teal
-  const nodeBg =
-    node.state === 'done'    ? (isParagraph ? '#55d6b3' : isQuiz ? '#fde68a' : '#a29bf5') :
-    node.state === 'current' ? (isParagraph ? '#00b894' : isQuiz ? '#F5C500' : '#F5A623') :
-    node.state === 'next'    ? PRIMARY :
-    '#ddd'
-
-  const nodeShadowColor =
-    node.state === 'current' ? (isParagraph ? '#007d67' : isQuiz ? '#c4980a' : '#c47a0a') :
-    node.state === 'locked'  ? '#bbb' :
-    DARK
-
-  const nodeShadowH = node.state === 'current' ? 5 : 4
-
-  // Bigger circle for the current node — pupils feel "where I am" is special
+  // Bigger circle for the current node — pupils feel "where I am" is special (defined early so ambient can reference it)
   const nodeSize =
     node.state === 'done'    ? 52 :
     node.state === 'current' ? 64 :
     node.state === 'next'    ? 56 :
     48
+
+  // 3-D sphere styles — radial gradient + inner highlight/depth shadows + physical shelf
+  const ambient = nodeSize >= 64 ? '0 10px 22px' : '0 8px 18px'
+  const nodeGrad: { background: string; boxShadow: string } = (() => {
+    if (node.state === 'locked') return {
+      background: 'radial-gradient(ellipse at 38% 32%, #E5E7EB 0%, #C8CBD0 55%, #9CA3AF 100%)',
+      boxShadow: 'inset 0 3px 7px rgba(255,255,255,0.45), inset 0 -2px 5px rgba(0,0,0,0.12), 0 4px 0 #9CA3AF',
+    }
+    if (node.state === 'current') {
+      if (isParagraph) return {
+        background: 'radial-gradient(ellipse at 38% 32%, #33D6AD 0%, #00b894 55%, #00796B 100%)',
+        boxShadow: `inset 0 4px 10px rgba(255,255,255,0.28), inset 0 -3px 8px rgba(0,0,0,0.18), 0 6px 0 #006655, ${ambient} rgba(0,102,85,0.35)`,
+      }
+      if (isQuiz) return {
+        background: 'radial-gradient(ellipse at 38% 32%, #FFE566 0%, #F5C500 55%, #C49730 100%)',
+        boxShadow: `inset 0 4px 10px rgba(255,255,255,0.28), inset 0 -3px 8px rgba(0,0,0,0.18), 0 6px 0 #A87E28, ${ambient} rgba(168,126,40,0.35)`,
+      }
+      return {
+        background: 'radial-gradient(ellipse at 38% 32%, #FFD08A 0%, #F5A623 55%, #C47010 100%)',
+        boxShadow: `inset 0 4px 10px rgba(255,255,255,0.28), inset 0 -3px 8px rgba(0,0,0,0.18), 0 6px 0 #A85F0A, ${ambient} rgba(168,95,10,0.35)`,
+      }
+    }
+    if (isParagraph) return {
+      background: 'radial-gradient(ellipse at 38% 32%, #55d6b3 0%, #00b894 55%, #00796B 100%)',
+      boxShadow: `inset 0 3px 8px rgba(255,255,255,0.28), inset 0 -2px 6px rgba(0,0,0,0.18), 0 5px 0 #006655, ${ambient} rgba(0,102,85,0.33)`,
+    }
+    if (isQuiz) return {
+      background: 'radial-gradient(ellipse at 38% 32%, #fde68a 0%, #F5C500 55%, #c4980a 100%)',
+      boxShadow: `inset 0 3px 8px rgba(255,255,255,0.28), inset 0 -2px 6px rgba(0,0,0,0.18), 0 5px 0 #A87E28, ${ambient} rgba(168,126,40,0.33)`,
+    }
+    return {
+      background: 'radial-gradient(ellipse at 38% 32%, #9B8FF7 0%, #6C5CE7 55%, #4A3DAD 100%)',
+      boxShadow: `inset 0 3px 8px rgba(255,255,255,0.28), inset 0 -2px 6px rgba(0,0,0,0.18), 0 5px 0 #3d35a0, ${ambient} rgba(61,53,160,0.33)`,
+    }
+  })()
 
   const nodeIcon =
     node.state === 'done'   ? '✓' :
@@ -461,11 +481,10 @@ function PathNodeRow({ node, isLast, isCurrent, nodeRef, onClick }: PathNodeRowP
             style={{
               width: nodeSize,
               height: nodeSize,
-              background: nodeBg,
+              ...nodeGrad,
               cursor: isClickable ? 'pointer' : 'default',
               opacity: node.state === 'locked' ? 0.45 : 1,
               border: 'none',
-              boxShadow: `0 ${nodeShadowH}px 0 0 ${nodeShadowColor}`,
               outline: isCurrent ? '4px solid #fff3e0' : 'none',
               outlineOffset: 2,
             }}
