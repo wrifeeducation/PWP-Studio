@@ -87,17 +87,18 @@ function tokenToWordClass(token: string): string {
 // Shown as a small subtitle under each formula chip so primary pupils
 // know what each word class means without needing a dictionary.
 
-const WC_FRIENDLY: Record<string, string> = {
-  determiner:   'the / a',
-  noun:         'a name or thing',
-  verb:         'an action word',
-  adjective:    'a describing word',
-  adverb:       'how / when / where',
-  pronoun:      'I / he / she / they',
-  preposition:  'a position word',
-  conjunction:  'a joining word',
-  proper:       'a person\'s name',
-  place:        'a place name',
+// Each entry: [proper term, plain-English explanation]
+const WC_FRIENDLY: Record<string, [string, string]> = {
+  determiner:   ['Determiner',   'the / a'],
+  noun:         ['Noun',         'a name or thing'],
+  verb:         ['Verb',         'an action word'],
+  adjective:    ['Adjective',    'a describing word'],
+  adverb:       ['Adverb',       'how / when / where'],
+  pronoun:      ['Pronoun',      'I / he / she / they'],
+  preposition:  ['Preposition',  'a position word'],
+  conjunction:  ['Conjunction',  'a joining word'],
+  proper:       ['Proper Noun',  'a person\'s name'],
+  place:        ['Place Name',   'a place name'],
 }
 
 // ─── New-element detection ────────────────────────────────────────────────────
@@ -184,13 +185,18 @@ export function FormulaBar({ formula, stepType, newElement, onSpeak, accent, ste
                       <span>{token.trim()}</span>
                     </span>
 
-                    {/* Plain-English word class hint */}
+                    {/* Word class label: proper term + plain-English explanation */}
                     {friendly && (
                       <span
-                        className="text-[9px] text-center leading-tight font-medium whitespace-nowrap"
-                        style={{ color: colour.fg + 'b0', maxWidth: '72px', whiteSpace: 'normal', lineHeight: '1.2' }}
+                        className="text-center leading-tight font-medium"
+                        style={{ color: colour.fg + 'b0', maxWidth: '80px', lineHeight: '1.2' }}
                       >
-                        {friendly}
+                        <span className="block text-[9px] font-black uppercase tracking-wide">
+                          {friendly[0]}
+                        </span>
+                        <span className="block text-[8px] font-medium">
+                          {friendly[1]}
+                        </span>
                       </span>
                     )}
                   </span>
@@ -210,7 +216,7 @@ export function FormulaBar({ formula, stepType, newElement, onSpeak, accent, ste
           {/* Colour legend — unique word classes in this formula */}
           {(() => {
             const seen = new Set<string>()
-            const entries: { wc: string; colour: ReturnType<typeof getWordClassColour>; friendly: string }[] = []
+            const entries: { wc: string; colour: ReturnType<typeof getWordClassColour>; friendly: [string, string] }[] = []
             tokens.forEach(token => {
               const wc = tokenToWordClass(token)
               if (!seen.has(wc) && WC_FRIENDLY[wc]) {
@@ -226,8 +232,11 @@ export function FormulaBar({ formula, stepType, newElement, onSpeak, accent, ste
                       className="inline-block w-[10px] h-[10px] rounded-[3px]"
                       style={{ background: colour.bg, border: `1px solid ${colour.fg}40` }}
                     />
-                    <span className="text-[10px]" style={{ color: '#888' }}>
-                      {friendly}
+                    <span className="text-[10px] font-semibold" style={{ color: '#555' }}>
+                      {friendly[0]}
+                    </span>
+                    <span className="text-[10px]" style={{ color: '#999' }}>
+                      — {friendly[1]}
                     </span>
                   </span>
                 ))}
