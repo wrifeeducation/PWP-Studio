@@ -244,12 +244,6 @@ export default function LoginPage() {
       if (data?.error) {
         const msg: string = data.error as string
 
-        // Sprint 3: school pupils must use wrife.co.uk (Route A)
-        if (msg === 'SCHOOL_PUPIL_USE_HUB') {
-          window.location.replace('https://wrife.co.uk/pupil/login')
-          return
-        }
-
         // Map specific errors to the relevant field
         if (msg.toLowerCase().includes('class')) {
           setErrors({ classCode: msg })

@@ -968,6 +968,28 @@ export default function LevelPage() {
   const [sessionXp,   setSessionXp]   = useState(0)
   const [totalXp,     setTotalXp]     = useState(0)
   const [streakDays,  setStreakDays]   = useState(0)
+
+  // ── Session-level step persistence ─────────────���──────────────────────────
+  // Saves step position + XP + lives to sessionStorage so a page reload during
+  // a level session restores the pupil's exact position rather than sending
+  // them back to the start screen.  Uses levelId (from URL) as the key so
+  // different levels don't collide.  sessionStorage is scoped to the tab and
+  // clears when the tab closes — no cross-session state bleed.
+  const stepPersistKey = levelId ? `pwp_step_${levelId}` : null
+
+  // Write position whenever the pupil is mid-level
+  useEffect(() => {
+    if (!stepPersistKey || screen !== 'step') return
+    try {
+      sessionStorage.setItem(stepPersistKey, JSON.stringify({ stepIndex, sessionXp, lives }))
+    } catch { /* sessionStorage quota exceeded or private-browsing restriction */ }
+  }, [stepPersistKey, screen, stepIndex, sessionXp, lives])
+
+  // Clear on level completion so a revisit always starts fresh
+  useEffect(() => {
+    if (!stepPersistKey || screen !== 'done') return
+    sessionStorage.removeItem(stepPersistKey)
+  }, [stepPersistKey, screen])
   const [value,             setValue]             = useState('')
   const [attemptCount,      setAttemptCount]      = useState(0)
   const [consecutiveErrors, setConsecutiveErrors] = useState(0)
@@ -1024,8 +1046,31 @@ export default function LevelPage() {
         }
 
         setLevel(lvl as unknown as PwpLevel)
-        setSteps((stepsData ?? []) as unknown as PwpStep[])
-        setScreen('start')
+        const loadedSteps = (stepsData ?? []) as unknown as PwpStep[]
+        setSteps(loadedSteps)
+
+        // Restore mid-level position from sessionStorage (survives page reload)
+        const savedJson = sessionStorage.getItem(`pwp_step_${id}`)
+        if (savedJson) {
+          try {
+            const saved = JSON.parse(savedJson) as { stepIndex?: number; sessionXp?: number; lives?: number }
+            const savedIdx = saved.stepIndex ?? 0
+            if (savedIdx >= 0 && savedIdx < loadedSteps.length) {
+              setStepIndex(savedIdx)
+              setSessionXp(saved.sessionXp ?? 0)
+              setLives(saved.lives ?? MAX_LIVES)
+              setScreen('step')   // skip start screen — pupil was mid-level
+            } else {
+              // Saved index is out of range (level may have changed) — start fresh
+              sessionStorage.removeItem(`pwp_step_${id}`)
+              setScreen('start')
+            }
+          } catch {
+            setScreen('start')
+          }
+        } else {
+          setScreen('start')
+        }
       } catch (err) {
         console.error('[LevelPage] load error:', err)
         setLoadError('Could not load this level. Please go back and try again.')
