@@ -172,7 +172,7 @@ export function PunctuationStep({
       <div>
         <div className="text-xs font-semibold text-[#9b87f0] uppercase tracking-wider mb-2">
           {phase === 'capitalise' && !capitalised
-            ? 'Tap the first letter to make it a capital'
+            ? 'What do we need at the start of a sentence? Tap to correct your sentence.'
             : phase === 'capitalise' && capitalised
             ? 'Keep adding words to complete your sentence'
             : phase === 'punctuate'
@@ -188,8 +188,10 @@ export function PunctuationStep({
             const needsCapTap = isFirst && !capitalised && phase === 'capitalise'
 
             if (needsCapTap) {
-              // Split first letter and rest — first letter is tappable
-              const firstLetter = word.charAt(0)
+              // Force the first letter to lowercase so proper nouns (Maya, London)
+              // are shown uncapitalised — the pupil must tap to apply the capital,
+              // teaching that ALL sentences start with a capital, not just names.
+              const firstLetter = word.charAt(0).toLowerCase()
               const rest = word.slice(1)
               return (
                 <span key={i} className="flex flex-col items-center gap-[3px]">
@@ -210,8 +212,8 @@ export function PunctuationStep({
                     whileHover={{ scale: 1.05 }}
                     animate={{ boxShadow: ['0 0 0 0px #F5A62340', '0 0 0 8px #F5A62370', '0 0 0 0px #F5A62340'] }}
                     transition={{ boxShadow: { duration: 1.1, repeat: Infinity } }}
-                    aria-label={`Tap to capitalise — ${word}`}
-                    data-tts={`Tap to capitalise ${word}`}
+                    aria-label={`Tap to add a capital letter to start the sentence`}
+                    data-tts={`Tap to add a capital letter`}
                   >
                     {/* First letter highlighted in yellow pill */}
                     <span
