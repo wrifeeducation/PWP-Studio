@@ -192,25 +192,37 @@ export function PunctuationStep({
               const firstLetter = word.charAt(0)
               const rest = word.slice(1)
               return (
-                <motion.button
-                  key={i}
-                  className="px-3 py-2 rounded-xl text-sm sm:text-base font-semibold min-h-[44px] border-2 cursor-pointer"
-                  style={{ background: bg, color: fg, borderColor: '#F5A623' }}
-                  onClick={handleCapitalise}
-                  whileHover={{ scale: 1.05 }}
-                  animate={{ boxShadow: ['0 0 0 0px #F5A62340', '0 0 0 6px #F5A62340', '0 0 0 0px #F5A62340'] }}
-                  transition={{ boxShadow: { duration: 1.2, repeat: Infinity } }}
-                  aria-label={`Tap to capitalise — ${word}`}
-                  data-tts={`Tap to capitalise ${word}`}
-                >
-                  <span
-                    className="inline-block border-b-2 border-[#F5A623] text-base sm:text-lg"
-                    style={{ color: fg }}
+                <span key={i} className="flex flex-col items-center gap-[3px]">
+                  {/* Bouncing tap indicator */}
+                  <motion.span
+                    className="text-[14px] leading-none select-none"
+                    animate={{ y: [0, -3, 0] }}
+                    transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut' }}
+                    aria-hidden="true"
                   >
-                    {firstLetter}
-                  </span>
-                  <span style={{ color: fg }}>{rest}</span>
-                </motion.button>
+                    👆
+                  </motion.span>
+
+                  <motion.button
+                    className="px-3 py-2 rounded-xl text-sm sm:text-base font-semibold min-h-[44px] border-2 cursor-pointer"
+                    style={{ background: bg, color: fg, borderColor: '#F5A623' }}
+                    onClick={handleCapitalise}
+                    whileHover={{ scale: 1.05 }}
+                    animate={{ boxShadow: ['0 0 0 0px #F5A62340', '0 0 0 8px #F5A62370', '0 0 0 0px #F5A62340'] }}
+                    transition={{ boxShadow: { duration: 1.1, repeat: Infinity } }}
+                    aria-label={`Tap to capitalise — ${word}`}
+                    data-tts={`Tap to capitalise ${word}`}
+                  >
+                    {/* First letter highlighted in yellow pill */}
+                    <span
+                      className="inline-block px-[3px] rounded-[4px] font-black text-base sm:text-lg"
+                      style={{ background: '#FEF3C7', color: '#92400E', border: '1.5px solid #F5A623' }}
+                    >
+                      {firstLetter}
+                    </span>
+                    <span style={{ color: fg }}>{rest}</span>
+                  </motion.button>
+                </span>
               )
             }
 

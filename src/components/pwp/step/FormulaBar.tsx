@@ -83,6 +83,23 @@ function tokenToWordClass(token: string): string {
   return LABEL_TO_CLASS[key] ?? 'noun' // sensible fallback
 }
 
+// ─── Plain-English word class labels (Fix 4) ──────────────────────────────────
+// Shown as a small subtitle under each formula chip so primary pupils
+// know what each word class means without needing a dictionary.
+
+const WC_FRIENDLY: Record<string, string> = {
+  determiner:   'the / a',
+  noun:         'a name or thing',
+  verb:         'an action word',
+  adjective:    'a describing word',
+  adverb:       'how / when / where',
+  pronoun:      'I / he / she / they',
+  preposition:  'a position word',
+  conjunction:  'a joining word',
+  proper:       'a person\'s name',
+  place:        'a place name',
+}
+
 // ─── New-element detection ────────────────────────────────────────────────────
 // A token is considered "new" if:
 //  (a) The step type is 'new_element' AND it contains any of the new_element keywords
@@ -137,46 +154,90 @@ export function FormulaBar({ formula, stepType, newElement, onSpeak, accent, ste
               const colour   = getWordClassColour(wc)
               const isNew    = isNewStep && tokenMatchesNewElement(token, newElement)
 
+              const friendly = WC_FRIENDLY[wc]
+
               return (
-                <span key={i} className="relative flex items-center">
-                  {/* New element dot — sits above the chip */}
-                  {isNew && (
+                <span key={i} className="inline-flex items-end gap-[6px]">
+                  {/* Chip + friendly label stacked */}
+                  <span className="relative flex flex-col items-center gap-[3px]">
+                    {/* New element dot — sits above the chip */}
+                    {isNew && (
+                      <span
+                        className="absolute -top-[6px] left-1/2 -translate-x-1/2 w-[7px] h-[7px] rounded-full"
+                        style={{ background: '#6C5CE7' }}
+                        aria-label="New element"
+                      />
+                    )}
                     <span
-                      className="absolute -top-[6px] left-1/2 -translate-x-1/2 w-[7px] h-[7px] rounded-full"
-                      style={{ background: '#6C5CE7' }}
-                      aria-label="New element"
-                    />
-                  )}
-                  <span
-                    className="inline-flex items-center gap-[4px] px-[9px] py-[5px] rounded-[10px] text-[12px] font-bold min-h-[32px]"
-                    style={{
-                      background:  isNew ? colour.bg : `${colour.bg}cc`,
-                      color:       colour.fg,
-                      outline:     isNew ? `2px solid ${accent}` : 'none',
-                      outlineOffset: '1px',
-                    }}
-                  >
-                    {/* Word class label badge */}
-                    <span
-                      className="text-[9px] font-black uppercase opacity-70"
+                      className="inline-flex items-center gap-[4px] px-[9px] py-[5px] rounded-[10px] text-[12px] font-bold min-h-[32px]"
+                      style={{
+                        background:  isNew ? colour.bg : `${colour.bg}cc`,
+                        color:       colour.fg,
+                        outline:     isNew ? `2px solid ${accent}` : 'none',
+                        outlineOffset: '1px',
+                      }}
                     >
-                      {colour.label}
+                      {/* Word class label badge */}
+                      <span className="text-[9px] font-black uppercase opacity-70">
+                        {colour.label}
+                      </span>
+                      <span>{token.trim()}</span>
                     </span>
-                    <span>{token.trim()}</span>
+
+                    {/* Plain-English word class hint */}
+                    {friendly && (
+                      <span
+                        className="text-[9px] text-center leading-tight font-medium whitespace-nowrap"
+                        style={{ color: colour.fg + 'b0', maxWidth: '72px', whiteSpace: 'normal', lineHeight: '1.2' }}
+                      >
+                        {friendly}
+                      </span>
+                    )}
                   </span>
 
-                  {/* Plus separator */}
+                  {/* Plus separator — offset upward to align with chip */}
                   {i < tokens.length - 1 && (
-                    <span className="ml-[6px] text-[13px] font-bold text-[#c0b8d4]">+</span>
+                    <span
+                      className="text-[13px] font-bold text-[#c0b8d4]"
+                      style={{ marginBottom: friendly ? '16px' : '0' }}
+                    >+</span>
                   )}
                 </span>
               )
             })}
           </div>
 
+          {/* Colour legend — unique word classes in this formula */}
+          {(() => {
+            const seen = new Set<string>()
+            const entries: { wc: string; colour: ReturnType<typeof getWordClassColour>; friendly: string }[] = []
+            tokens.forEach(token => {
+              const wc = tokenToWordClass(token)
+              if (!seen.has(wc) && WC_FRIENDLY[wc]) {
+                seen.add(wc)
+                entries.push({ wc, colour: getWordClassColour(wc), friendly: WC_FRIENDLY[wc] })
+              }
+            })
+            return entries.length > 0 ? (
+              <div className="mt-[10px] flex flex-wrap gap-x-[10px] gap-y-[4px]">
+                {entries.map(({ wc, colour, friendly }) => (
+                  <span key={wc} className="inline-flex items-center gap-[4px]">
+                    <span
+                      className="inline-block w-[10px] h-[10px] rounded-[3px]"
+                      style={{ background: colour.bg, border: `1px solid ${colour.fg}40` }}
+                    />
+                    <span className="text-[10px]" style={{ color: '#888' }}>
+                      {friendly}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            ) : null
+          })()}
+
           {/* Step type badge */}
           <span
-            className="inline-block mt-[10px] px-[10px] py-[2px] rounded-[10px] text-[10px] font-bold"
+            className="inline-block mt-[8px] px-[10px] py-[2px] rounded-[10px] text-[10px] font-bold"
             style={{ background: stepTypeBadge.bg, color: stepTypeBadge.fg }}
           >
             {stepTypeBadge.label}
