@@ -942,7 +942,7 @@ function LevelCompleteScreen({ level, sessionXp, xpBonus, newTitle, onContinue }
 export default function LevelPage() {
   const { levelId }    = useParams<{ levelId: string }>()
   const navigate       = useNavigate()
-  useAuthStore()
+  const { isInitialised: authReady } = useAuthStore()
 
   // ── Audio ─────────────────────────────────────────────────────────────────
   const { speak, stop: stopTts } = useTTS()
@@ -977,7 +977,11 @@ export default function LevelPage() {
   const [loadError,         setLoadError]         = useState<string | null>(null)
 
   // ── Load level + steps ────────────────────────────────────────────────────
+  // BUG-01 fix: wait for auth to be initialised before querying Supabase.
+  // On first navigation (without F5), the Supabase session isn't propagated yet,
+  // causing RLS-protected queries to fail or return no rows.
   useEffect(() => {
+    if (!authReady) return  // wait for auth session to initialise
     const load = async () => {
       const id = Number(levelId)
       if (!id) { navigate('/dashboard'); return }
@@ -1026,7 +1030,7 @@ export default function LevelPage() {
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [levelId])
+  }, [levelId, authReady])
 
   // ── Submit handler ────────────────────────────────────────────────────────
   const handleSubmit = useCallback(async () => {

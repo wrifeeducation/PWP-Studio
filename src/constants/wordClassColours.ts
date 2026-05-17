@@ -122,13 +122,15 @@ export function guessWordClass(word: string): string {
   if (CONJUNCTIONS.has(w))         return 'conjunction'
   if (ADVERBS.has(w))              return 'adverb'
   if (ADJECTIVES.has(w))           return 'adjective'
+  // Named entities checked BEFORE morphological heuristics so that place/person
+  // names ending in -s (Paris, Athens, Brussels, James, etc.) are not misclassified
+  // as verbs by the w.endsWith('s') pattern.
+  if (PLACE_NAMES.has(w))          return 'place'
+  if (PROPER_NAMES.has(w))         return 'proper'
   if (HELPING_VERBS.has(w))        return 'verb'
   if (PAST_IRREGULAR_VERBS.has(w)) return 'verb'
   // Morphological patterns: -ing, -ed, -s verb forms
   if (w.endsWith('ing') || w.endsWith('ed') || (w.endsWith('s') && w.length > 4)) return 'verb'
-  // Named entities — checked after verb patterns to avoid misclassifying
-  if (PLACE_NAMES.has(w))          return 'place'
-  if (PROPER_NAMES.has(w))         return 'proper'
   // Capitalised words not otherwise classified are likely proper nouns
   if (word[0] === word[0].toUpperCase() && word[0] !== word[0].toLowerCase()) return 'proper'
   return 'noun'

@@ -19,6 +19,7 @@ import { getWordClassColour } from '@/constants/wordClassColours'
 
 const LABEL_TO_CLASS: Record<string, string> = {
   // ── Determiners ───────────────────────────────────────────────────────────
+  determiner: 'determiner',
   det: 'determiner', d: 'determiner',
   'det (definite)': 'determiner', 'det (indefinite)': 'determiner',
 
