@@ -483,7 +483,6 @@ function PathNodeRow({ node, isLast, isCurrent, nodeRef, onClick }: PathNodeRowP
               height: nodeSize,
               ...nodeGrad,
               cursor: isClickable ? 'pointer' : 'default',
-              opacity: node.state === 'locked' ? 0.45 : 1,
               border: 'none',
               outline: isCurrent ? '4px solid #fff3e0' : 'none',
               outlineOffset: 2,
@@ -517,7 +516,7 @@ function PathNodeRow({ node, isLast, isCurrent, nodeRef, onClick }: PathNodeRowP
         </div>
 
         {/* Info text */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0" style={{ opacity: node.state === 'locked' ? 0.5 : 1 }}>
           <div style={{ fontSize: 'var(--pwp-text-sm)', fontWeight: 700, color: '#2D3436' }} className="truncate" data-tts={node.title}>
             {isLevel ? `Level ${(node as LevelNode).levelNumber} — ${node.title}` : node.title}
           </div>
@@ -529,7 +528,7 @@ function PathNodeRow({ node, isLast, isCurrent, nodeRef, onClick }: PathNodeRowP
         {/* State badge */}
         <div
           className="flex-shrink-0 whitespace-nowrap"
-          style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.fg }}
+          style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.fg, opacity: node.state === 'locked' ? 0.5 : 1 }}
         >
           {badge.label}
         </div>
@@ -863,19 +862,29 @@ export default function DashboardPage() {
                   totalLevels={stat.totalLevels}
                 />
 
-                <div className="pl-10 mb-8">
+                <div className="mb-8">
                   {chapterNodes.map((node, idx) => {
                     const isCurrent = node.state === 'current'
                     const isLast    = idx === chapterNodes.length - 1
+                    // DWP-style winding offsets — gives a journey feel
+                    const WINDING = [0, 40, 64, 40, 0, -40, -64, -40]
+                    const offset  = WINDING[idx % WINDING.length]
                     return (
-                      <PathNodeRow
+                      <div
                         key={`${node.kind}-${node.id}`}
-                        node={node}
-                        isLast={isLast}
-                        isCurrent={isCurrent}
-                        nodeRef={isCurrent ? currentNodeRef : undefined}
-                        onClick={() => handleNodeClick(node)}
-                      />
+                        style={{
+                          paddingLeft:  Math.max(0, offset),
+                          paddingRight: Math.max(0, -offset),
+                        }}
+                      >
+                        <PathNodeRow
+                          node={node}
+                          isLast={isLast}
+                          isCurrent={isCurrent}
+                          nodeRef={isCurrent ? currentNodeRef : undefined}
+                          onClick={() => handleNodeClick(node)}
+                        />
+                      </div>
                     )
                   })}
                 </div>
