@@ -1,5 +1,5 @@
 # WriFe PWP Studio
-*Last updated: 2026-05-14 · Session 34*
+*Last updated: 2026-05-18 · Session 35*
 
 ## Current state
 PWP Studio is live. Session 34 completed voice quality audit, assessment corrections, and PunctuationStep sync fix:
@@ -22,6 +22,14 @@ PWP Studio is live. Session 34 completed voice quality audit, assessment correct
 - **9 audio files pending generation** (ElevenLabs sandbox network blocked — needs local run): `punctuation.capitalise_prompt`, `punctuation.end_prompt`, `feedback.error_wrong_order`, `feedback.error_wrong_subject_type`, `feedback.error_extra_element`, `feedback.error_incomplete`, `guidance.adaptive_open`, `cap-step.capitalise`, `cap-step.punctuate`
 - All changes TypeScript clean.
 
+## Session 35 changes (2026-05-18)
+- **Admin route renamed `/admin` → `/staffhub`** — `App.tsx` now properly registers `/staffhub/login` + `/staffhub` routes (they were missing before). `ProtectedRoute.tsx`, `RoleRedirect.tsx`, `LoginPage.tsx`, `AdminLoginPage.tsx`, `AuthConfirmPage.tsx` all updated.
+- **Visible "Admin" button removed** from `HomePage.tsx` (was fixed bottom-right corner).
+- **← WriFe Hub buttons fixed** in `DashboardPage.tsx` — desktop sidebar + mobile TopBar both now use `<a href="https://wrife.co.uk/pupil/dashboard">` (hard navigation, not React Router).
+- **`pwp_audio_assets` migrated** — 153 rows from legacy project now in live shared project (`gzmgjkbtsvezfclmreru`). Seed SQL: `supabase/migrations/20260518_pwp_audio_assets_seed.sql`.
+- **TypeScript clean** — removed orphaned `const navigate = useNavigate()` in `DashboardPage.tsx` Sidebar component.
+- **⚠️ NOTE on Supabase project** — `wrifeapp` previously referenced `nxhkpqngnxshgotvuujb` as PWP project. This is the **legacy project** — safe to delete. Live project is `gzmgjkbtsvezfclmreru` (shared platform).
+
 ## Next steps
 1. **Generate 9 pending audio files** (run locally from `wrifeapp/scripts/`):
    ```
@@ -39,7 +47,7 @@ PWP Studio is live. Session 34 completed voice quality audit, assessment correct
 4. **Mobile keyboard avoidance for Phase B**: `visualViewport` listener, tray pins top, bank collapses, pull-tab
 
 ## Key decisions
-- **PWP Supabase project:** `nxhkpqngnxshgotvuujb` (separate from WriFe Platform `gzmgjkbtsvezfclmreru`)
+- **PWP Supabase project:** `gzmgjkbtsvezfclmreru` (shared WriFe Platform — `nxhkpqngnxshgotvuujb` was the legacy isolated project, now retired)
 - **Word bank as vocabulary selector:** bank words are never the target sentence — pupils compose original sentences using the palette as inspiration
 - **PunctuationStep always at top:** renders a placeholder card when no words chosen yet; stable key `punct-${stepIndex}` prevents remounting on every word tap
 - **Tense classification at render time:** `WordBankTenseVariety` uses a `detectTense()` heuristic to split flat `bank_words` into past/present/continuous groups — no DB schema change needed
@@ -70,7 +78,6 @@ PWP Studio is live. Session 34 completed voice quality audit, assessment correct
 - `PWP Formulas/pwp_audio_seed.sql` — 162 rows; added cap-step.capitalise + cap-step.punctuate (Alice)
 
 ## Open questions
-- Is `ANTHROPIC_API_KEY` set in `nxhkpqngnxshgotvuujb`? Needs verification.
 - 7-day streak bonus currently writes directly to `pwp_progress.total_xp` — should this go via an Edge Function for auditability?
 
 ---
