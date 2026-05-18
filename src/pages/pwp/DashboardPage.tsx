@@ -229,13 +229,14 @@ function Sidebar({ progress, pupilName, onSignOut }: SidebarProps) {
     <div style={{ width: 'var(--pwp-sidebar-width)', minHeight: '100dvh', backgroundColor: '#6C5CE7', display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px', overflowY: 'auto', flexShrink: 0 }}>
       {/* Back button — only shown when accessed via WriFe Hub SSO */}
       {showBackToHub && (
-        <button
-          onClick={() => navigate('/')}
+        <a
+          href="https://wrife.co.uk/pupil/dashboard"
           className="flex items-center gap-1 text-white/60 text-xs hover:text-white/90 transition-colors"
           data-tts="Back to WriFe Hub"
+          style={{ textDecoration: 'none' }}
         >
           ← WriFe Hub
-        </button>
+        </a>
       )}
 
       {/* Avatar */}
@@ -741,20 +742,21 @@ export default function DashboardPage() {
           style={{ backgroundColor: '#6C5CE7', minHeight: 'var(--pwp-touch-xl)', flexShrink: 0 }}
         >
           {showBackToHub && (
-            <button
-              onClick={() => navigate('/')}
+            <a
+              href="https://wrife.co.uk/pupil/dashboard"
               style={{
                 background: 'rgba(255,255,255,0.18)',
                 border: '1.5px solid rgba(255,255,255,0.35)',
                 borderRadius: '8px', color: '#fff',
                 fontSize: 'var(--pwp-text-xs)', fontWeight: 700,
-                padding: '6px 10px', cursor: 'pointer',
+                padding: '6px 10px',
                 minHeight: 'var(--pwp-touch-min)', whiteSpace: 'nowrap',
+                textDecoration: 'none', display: 'inline-flex', alignItems: 'center',
               }}
               data-tts="Back to WriFe Hub"
             >
               ← Hub
-            </button>
+            </a>
           )}
           <div className="flex-1 min-w-0">
             <div style={{ fontSize: 'var(--pwp-text-sm)', fontWeight: 700, color: '#fff' }} className="truncate">
