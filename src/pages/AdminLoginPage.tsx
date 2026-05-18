@@ -66,7 +66,7 @@ export default function AdminLoginPage() {
     // Hydrate Zustand store so ProtectedRoute passes immediately
     setSession(data.session)
     setProfile(profileData as Profile)
-    navigate('/admin', { replace: true })
+    navigate('/staffhub', { replace: true })
   }
 
   return (

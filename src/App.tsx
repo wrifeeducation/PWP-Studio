@@ -15,6 +15,10 @@ import TeacherSignupPage from '@/pages/TeacherSignupPage'
 import AuthConfirmPage  from '@/pages/AuthConfirmPage'
 import UpdatePasswordPage from '@/pages/UpdatePasswordPage'
 
+// ── Lazy-loaded admin pages (hidden route — do not publicise) ────────────────
+const AdminLoginPage  = lazy(() => import('@/pages/AdminLoginPage'))
+const AdminPage       = lazy(() => import('@/pages/AdminPage'))
+
 // ── Lazy-loaded PWP pages ─────────────────────────────────────────────────────
 const DashboardPage   = lazy(() => import('@/pages/pwp/DashboardPage'))
 const LevelPage       = lazy(() => import('@/pages/pwp/LevelPage'))
@@ -130,6 +134,17 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={[Role.PUPIL]}>
                 <OnboardingPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ── Admin routes (hidden — do not publicise) ──────────────────── */}
+          <Route path="/staffhub/login" element={<AdminLoginPage />} />
+          <Route
+            path="/staffhub"
+            element={
+              <ProtectedRoute allowedRoles={[Role.SCHOOL_ADMIN]}>
+                <AdminPage />
               </ProtectedRoute>
             }
           />

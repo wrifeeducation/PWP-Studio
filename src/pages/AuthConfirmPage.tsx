@@ -56,7 +56,7 @@ export default function AuthConfirmPage() {
             .single()
 
           const role = (profile as { role: string } | null)?.role
-          if (role === 'school_admin') navigate('/admin', { replace: true })
+          if (role === 'school_admin') navigate('/staffhub', { replace: true })
           else if (role === 'teacher')  navigate('/teacher', { replace: true })
           else if (role === 'parent')   navigate('/parent', { replace: true })
           else                          navigate('/dashboard', { replace: true })

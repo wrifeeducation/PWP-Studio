@@ -206,7 +206,6 @@ interface SidebarProps {
 }
 
 function Sidebar({ progress, pupilName, onSignOut }: SidebarProps) {
-  const navigate = useNavigate()
   const showBackToHub = sessionStorage.getItem('entryViaHub') === '1'
   const { current: xpCurrent, max: xpMax } = xpForTier(progress.totalXp)
   const xpPct = Math.min(100, Math.round((xpCurrent / xpMax) * 100))

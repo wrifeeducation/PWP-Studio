@@ -34,6 +34,18 @@ export default defineConfig({
         globIgnores: ['mascot/**', '**/*.png'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MiB safety net
         runtimeCaching: [
+          // ── Supabase Edge Functions — NEVER cache; always hit the network ──
+          // Missing this rule caused the SW to intercept /functions/ calls and
+          // return stale/no-response errors that looked like network failures.
+          {
+            urlPattern: /^https:\/\/gzmgjkbtsvezfclmreru\.supabase\.co\/functions\/.*/i,
+            handler: 'NetworkOnly',
+          },
+          // ── Supabase Auth — NEVER cache; tokens and sessions must be fresh ──
+          {
+            urlPattern: /^https:\/\/gzmgjkbtsvezfclmreru\.supabase\.co\/auth\/.*/i,
+            handler: 'NetworkOnly',
+          },
           {
             urlPattern: /^https:\/\/gzmgjkbtsvezfclmreru\.supabase\.co\/rest\/.*/i,
             handler: 'NetworkFirst',

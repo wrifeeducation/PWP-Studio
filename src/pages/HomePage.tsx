@@ -693,30 +693,7 @@ export default function HomePage() {
         <span style={{ fontSize: 11, color: C.muted }}>pwp-studio.wrife.co.uk</span>
       </footer>
 
-      {/* ── ADMIN LOGIN BUTTON (fixed bottom-right, unobtrusive) ─────────── */}
-      <button
-        onClick={() => navigate('/admin/login')}
-        style={{
-          position: 'fixed',
-          bottom: 14,
-          right: 14,
-          background: 'rgba(45,52,54,0.06)',
-          border: '1px solid rgba(45,52,54,0.12)',
-          borderRadius: 8,
-          padding: '5px 11px',
-          fontFamily: 'inherit',
-          fontSize: 10,
-          fontWeight: 700,
-          color: C.muted,
-          cursor: 'pointer',
-          letterSpacing: '0.03em',
-          zIndex: 50,
-          backdropFilter: 'blur(4px)',
-        }}
-        title="Platform admin login"
-      >
-        Admin
-      </button>
+      {/* Admin access: navigate directly to /staffhub/login */}
 
     </div>
   )

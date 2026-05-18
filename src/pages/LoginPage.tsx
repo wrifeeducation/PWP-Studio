@@ -136,7 +136,7 @@ export default function LoginPage() {
   const handleRoleRedirect = (role: Role) => {
     if (role === Role.PUPIL) navigate('/welcome', { replace: true })
     else if (role === Role.TEACHER) navigate('/teacher', { replace: true })
-    else if (role === Role.SCHOOL_ADMIN) navigate('/admin', { replace: true })
+    else if (role === Role.SCHOOL_ADMIN) navigate('/staffhub', { replace: true })
     else if (role === Role.PARENT) navigate('/parent', { replace: true })
     else navigate('/dashboard', { replace: true })
   }
