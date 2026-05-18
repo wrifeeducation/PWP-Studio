@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { useTTS } from '@/hooks/useTTS'
+import { DemoBanner } from '@/components/ui/DemoBanner'
 
 // ─── STATIC PATH DATA ────────────────────────────────────────────────────────
 
@@ -728,6 +729,9 @@ export default function DashboardPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100dvh', backgroundColor: 'var(--color-background)', display: 'flex', flexDirection: 'column' }}>
+      {/* Demo mode floating banner */}
+      <DemoBanner />
+
       {/* Skip navigation */}
       <a href="#pwp-main-content" className="skip-nav">
         Skip to learning path
