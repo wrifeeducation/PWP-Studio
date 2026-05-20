@@ -628,26 +628,18 @@ export default function DashboardPage() {
         // Returning user greeting (fires every login for a returning pupil)
         speak('onboarding.returning_user')
 
-        // Streak audio: celebrate if streak is active, acknowledge if broken
-        if (streakDays > 0) {
-          speak('gamification.streak_continue')
-          // 7-day streak milestone: award +30 XP bonus (once per 7-day cycle)
-          if (streakDays % 7 === 0) {
-            // Award 7-day streak bonus XP — persist to DB
-            const pupilId = getPupilId()
-            if (pupilId) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const db = supabase as any
-              db.from('pwp_progress').select('total_xp').eq('pupil_id', pupilId).single().then(({ data }: { data: any }) => {
-                if (data) {
-                  db.from('pwp_progress').update({ total_xp: (data.total_xp ?? 0) + 30 }).eq('pupil_id', pupilId)
-                }
-              })
-            }
-            speak('gamification.xp_50_bonus')  // reuse 50-bonus key for streak celebration
+        // 7-day streak milestone: award +30 XP bonus (once per 7-day cycle)
+        if (streakDays > 0 && streakDays % 7 === 0) {
+          const pupilId = getPupilId()
+          if (pupilId) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const db = supabase as any
+            db.from('pwp_progress').select('total_xp').eq('pupil_id', pupilId).single().then(({ data }: { data: any }) => {
+              if (data) {
+                db.from('pwp_progress').update({ total_xp: (data.total_xp ?? 0) + 30 }).eq('pupil_id', pupilId)
+              }
+            })
           }
-        } else {
-          speak('gamification.streak_broken')
         }
       } catch (err) {
         console.error('[Dashboard] fetch error:', err)

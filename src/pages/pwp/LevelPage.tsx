@@ -305,6 +305,9 @@ function InLevelScreen({
   const isWordBankPhase   = stepPhase === 'A' || stepPhase === 'B'
   const isParagraphStep   = step.is_paragraph_step === true
 
+  // ── Help panel state ───────────────────────────────────────────────
+  const [showHelp, setShowHelp] = useState(false)
+
   // ── Punctuation / capitalisation state ────────────────────────────
   // rawAssembly: the unpunctuated text from word bank or textarea
   // value (parent): only set after PunctuationStep completes (= submitted value)
@@ -402,7 +405,49 @@ function InLevelScreen({
           >
             <span aria-hidden="true">{ttsEnabled ? '🔊' : '🔇'}</span>
           </button>
+
+          {/* Help button */}
+          <button
+            className="bg-white/15 rounded-[8px] w-[30px] h-[30px] flex items-center justify-center text-[15px] font-bold flex-shrink-0 transition-opacity"
+            style={{ opacity: showHelp ? 1 : 0.75, color: 'white' }}
+            onClick={() => setShowHelp(v => !v)}
+            aria-label="What does this mean?"
+            aria-expanded={showHelp}
+            data-tts="What does this mean?"
+          >
+            ?
+          </button>
         </div>
+
+        {/* Help panel — slides in below header */}
+        <AnimatePresence>
+          {showHelp && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{ overflow: 'hidden', background: '#fffbea', borderBottom: '2px solid #F5C500', flexShrink: 0 }}
+            >
+              <div style={{ padding: 'clamp(10px, 2vw, 16px) clamp(16px, 4vw, 32px)', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>💡</span>
+                <div>
+                  <div style={{ fontSize: 'var(--pwp-text-sm)', fontWeight: 800, color: '#2D3436', marginBottom: 2 }}>
+                    {level.title}
+                  </div>
+                  <div style={{ fontSize: 'var(--pwp-text-sm)', color: '#555', fontWeight: 500 }}>
+                    {level.new_element}
+                  </div>
+                  {step.example && (
+                    <div style={{ marginTop: 6, fontSize: 'var(--pwp-text-sm)', color: '#6C5CE7', fontStyle: 'italic' }}>
+                      e.g. <em>{step.example}</em>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Body — centred content column */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'clamp(16px, 3vw, 28px) clamp(16px, 4vw, 32px)', paddingBottom: 'clamp(24px, 4vw, 40px)' }}>
