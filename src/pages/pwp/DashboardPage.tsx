@@ -617,7 +617,7 @@ export default function DashboardPage() {
         setProgress({
           totalXp:           p?.total_xp ?? 0,
           streakDays,
-          highestLevel:      p?.highest_level_reached ?? p?.current_formula_level ?? 1,
+          highestLevel:      p?.current_formula_level ?? (p?.highest_level_reached != null ? p.highest_level_reached + 1 : 1),
           currentPwpLevelId: p?.current_pwp_level_id ?? null,
           levelsMastered:    p?.levels_mastered_count ?? 0,
           badgeCount:        badgeCount ?? 0,
