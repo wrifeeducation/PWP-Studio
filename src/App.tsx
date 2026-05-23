@@ -36,6 +36,13 @@ function AuthInitialiser() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
 
+      // Hub SSO backup detection: if the hash was still present when this
+      // callback fires (before Supabase strips it), set the flag here too.
+      // The primary detection is in main.tsx; this is belt-and-suspenders.
+      if (event === 'SIGNED_IN' && window.location.hash.includes('access_token')) {
+        sessionStorage.setItem('entryViaHub', '1')
+      }
+
       if (session?.user) {
         const userId = session.user.id
 
