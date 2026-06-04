@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
+import { resolvePupilName } from '@/lib/pupilName'
 
 // ─── COLOURS ─────────────────────────────────────────────────────────────────
 
@@ -359,12 +360,14 @@ const SLIDE_VARIANTS = {
 
 export default function OnboardingPage() {
   const navigate  = useNavigate()
-  const { profile } = useAuthStore()
+  const { profile, user } = useAuthStore()
   const [step, setStep]       = useState(0)
   const [dir,  setDir]        = useState(1)   // +1 = forward, -1 = backward
   const [completing, setCompleting] = useState(false)
 
-  const name = profile?.first_name ?? null
+  // Prefer JWT user_metadata over the (often-null) profiles.first_name for
+  // SSO pupils; keep the null branch for "no name available". See lib/pupilName.ts.
+  const name = resolvePupilName(user, profile, '') || null
   const isLast = step === SLIDES.length - 1
 
   function go(newStep: number) {

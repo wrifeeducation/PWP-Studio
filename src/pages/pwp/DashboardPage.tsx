@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { useTTS } from '@/hooks/useTTS'
 import { DemoBanner } from '@/components/ui/DemoBanner'
+import { resolvePupilName } from '@/lib/pupilName'
 
 // ─── STATIC PATH DATA ────────────────────────────────────────────────────────
 
@@ -680,13 +681,9 @@ export default function DashboardPage() {
   }
 
   // ── Pupil name ────────────────────────────────────────────────────────────
-  const pupilName = profile?.first_name ?? (() => {
-    try {
-      const s = localStorage.getItem('pupilSession')
-      if (s) return JSON.parse(s).username ?? 'Writer'
-    } catch { /* ignore */ }
-    return 'Writer'
-  })()
+  // Prefer the JWT (user_metadata) over the profiles row — school pupils have a
+  // stub profiles row with a null first_name. See lib/pupilName.ts.
+  const pupilName = resolvePupilName(user, profile)
 
   // ── Quick resume target ────────────────────────────────────────────────────
   const quickResumeNode =
